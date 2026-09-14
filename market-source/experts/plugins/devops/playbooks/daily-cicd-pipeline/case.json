@@ -1,0 +1,53 @@
+{
+  "id": "daily-cicd-pipeline",
+  "title": "构建基础CI/CD自动化流水线",
+  "title_en": "Build Basic CI/CD Pipeline",
+  "subtitle": "零基础快速上手自动化部署",
+  "subtitle_en": "",
+  "description": "面向初创项目的日常自动化部署。帮你实现代码提交到上线的全自动闭环。有效减少人工干预，大幅提升日常交付效率。",
+  "description_en": "",
+  "categories": [
+    "dev"
+  ],
+  "tags": [
+    "CI/CD",
+    "自动化部署",
+    "GitHub Actions"
+  ],
+  "tags_en": [],
+  "artifact_type": "md",
+  "cover_image": "cover.png",
+  "cover_mode": "landscape",
+  "preview": "output.md",
+  "prompt": "我有一个Node.js前端和Python(FastAPI)后端项目，存放在GitHub。请帮我设计一个GitHub Actions CI/CD流水线。要求：1. Push到main分支触发。2. 自动运行单元测试。3. 构建Docker镜像推送到Docker Hub。4. SSH登录Ubuntu服务器拉取镜像并用Docker Compose重启。请提供完整的workflow YAML和Compose文件。",
+  "skills": [],
+  "experts": [
+    {
+      "id": "devops",
+      "name": "鹏城信息AI专家",
+      "description": "Automate deployments, manage infrastructure as code, and build reliable CI/CD pipelines.",
+      "expertType": "agent",
+      "source": "expert-marketplace"
+    }
+  ],
+  "mcps": [],
+  "creator": {
+    "name": "鹏城信息AI专家",
+    "avatar": "",
+    "badge": "official"
+  },
+  "sort_order": 100,
+  "is_featured": false,
+  "featured_order": 0,
+  "quality_score": 0,
+  "source": "official",
+  "usage_count": 0,
+  "created_at": "2026-07-31T05:10:54Z",
+  "updated_at": "2026-07-31T05:10:54Z",
+  "artifacts": [
+    {
+      "file": "output.md",
+      "label": "产物文件"
+    }
+  ]
+}

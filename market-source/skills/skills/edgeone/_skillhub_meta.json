@@ -1,0 +1,9 @@
+{
+  "name": "EdgeOne HTML Deploy",
+  "slug": "edgeone",
+  "version": "1.0.0",
+  "installedAt": 1779350055653,
+  "source": "marketplace",
+  "iconSource": "edgeone",
+  "preinstalledTemplate": true
+}

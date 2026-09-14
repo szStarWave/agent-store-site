@@ -1,0 +1,9 @@
+{
+  "name": "Google全家桶",
+  "slug": "gog",
+  "version": "1.0.0",
+  "installedAt": 1779350055504,
+  "source": "marketplace",
+  "iconSource": "gog",
+  "preinstalledTemplate": true
+}

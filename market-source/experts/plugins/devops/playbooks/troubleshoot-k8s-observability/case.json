@@ -1,0 +1,53 @@
+{
+  "id": "troubleshoot-k8s-observability",
+  "title": "K8s集群排障与可观测性建设",
+  "title_en": "K8s Troubleshooting & Observability",
+  "subtitle": "快速定位线上问题与监控告警",
+  "subtitle_en": "",
+  "description": "适用于容器服务的线上排障与监控优化。通过日志聚合与指标暴露快速定位异常。保障系统高可用，实现故障秒级响应。",
+  "description_en": "",
+  "categories": [
+    "dev"
+  ],
+  "tags": [
+    "Kubernetes",
+    "可观测性",
+    "排障优化"
+  ],
+  "tags_en": [],
+  "artifact_type": "md",
+  "cover_image": "cover.png",
+  "cover_mode": "landscape",
+  "preview": "output.md",
+  "prompt": "我的K8s集群中某微服务Pod频繁重启，且响应延迟高。请提供排障SOP：1. 使用哪些kubectl命令收集日志和事件定位CrashLoopBackOff？2. 如何排查OOMKilled或探针失败问题？3. 请给出优化该服务资源限制(requests/limits)的YAML示例。4. 推荐一套轻量级的Prometheus+Grafana监控告警方案。",
+  "skills": [],
+  "experts": [
+    {
+      "id": "devops",
+      "name": "鹏城信息AI专家",
+      "description": "Automate deployments, manage infrastructure as code, and build reliable CI/CD pipelines.",
+      "expertType": "agent",
+      "source": "expert-marketplace"
+    }
+  ],
+  "mcps": [],
+  "creator": {
+    "name": "鹏城信息AI专家",
+    "avatar": "",
+    "badge": "official"
+  },
+  "sort_order": 100,
+  "is_featured": false,
+  "featured_order": 0,
+  "quality_score": 0,
+  "source": "official",
+  "usage_count": 0,
+  "created_at": "2026-07-31T05:10:54Z",
+  "updated_at": "2026-07-31T05:10:54Z",
+  "artifacts": [
+    {
+      "file": "output.md",
+      "label": "产物文件"
+    }
+  ]
+}

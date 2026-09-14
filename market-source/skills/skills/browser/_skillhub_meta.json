@@ -1,0 +1,9 @@
+{
+  "name": "Browser (Puppeteer)",
+  "slug": "browser",
+  "version": "1.0.0",
+  "installedAt": 1779350055578,
+  "source": "marketplace",
+  "iconSource": "browser",
+  "preinstalledTemplate": true
+}

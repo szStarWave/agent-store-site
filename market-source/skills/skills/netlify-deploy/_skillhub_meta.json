@@ -1,0 +1,9 @@
+{
+  "name": "Netlify Deploy",
+  "slug": "netlify-deploy",
+  "version": "1.0.0",
+  "installedAt": 1779350055658,
+  "source": "marketplace",
+  "iconSource": "netlify-deploy",
+  "preinstalledTemplate": true
+}

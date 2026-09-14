@@ -1,0 +1,9 @@
+{
+  "name": "腾讯文档智能页面",
+  "slug": "smart-page",
+  "version": "1.0.1",
+  "installedAt": 1779350055485,
+  "source": "marketplace",
+  "iconSource": "smart-page",
+  "preinstalledTemplate": true
+}

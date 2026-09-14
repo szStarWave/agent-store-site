@@ -1,0 +1,64 @@
+{
+  "name": "designkit-viral-note-recreate",
+  "version": "1.0.6",
+  "description": "Analyze viral posts and recreate their visual language, layout, and hierarchy with a new topic and user assets.",
+  "author": {
+    "name": "美图设计室",
+    "email": "designkit@meitu.com"
+  },
+  "agents": [
+    "./agents/designkit-viral-note-recreate.md"
+  ],
+  "skills": [
+    "./skills/viral-note-recreate"
+  ],
+  "expertType": "agent",
+  "agentName": "designkit-viral-note-recreate",
+  "displayName": {
+    "en": "Post Remix",
+    "zh": "爆款图文复刻"
+  },
+  "profession": {
+    "en": "Viral Post Recreation Designer",
+    "zh": "爆款图文复刻师"
+  },
+  "displayDescription": {
+    "en": "Analyze viral posts and recreate their visual language, layout, and hierarchy with a new topic and user assets.",
+    "zh": "拆解爆款图文的视觉风格、版式结构与信息层级，结合新主题和素材生成同类封面或套图内容。"
+  },
+  "avatar": "avatars/expert.png",
+  "categoryId": "06-ContentCreative",
+  "defaultInitPrompt": {
+    "en": "Recreate this viral post style with my topic and assets.",
+    "zh": "参考这组爆款图文，用我的主题和素材复刻同类内容。"
+  },
+  "plugin": "designkit-viral-note-recreate",
+  "tags": [
+    {
+      "en": "Viral Posts",
+      "zh": "爆款图文"
+    },
+    {
+      "en": "Style Recreation",
+      "zh": "风格复刻"
+    },
+    {
+      "en": "DesignKit",
+      "zh": "美图设计室"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "en": "Recreate this viral post style with my topic and assets.",
+      "zh": "参考这组爆款图文，用我的主题和素材复刻同类内容。"
+    },
+    {
+      "en": "Analyze this cover and create three matching social images.",
+      "zh": "拆解这张爆款封面，并生成 3 张同风格社媒图片。"
+    },
+    {
+      "en": "Make a platform-ready carousel inspired by these references.",
+      "zh": "参考这些图文，为目标平台生成一套同类轮播图。"
+    }
+  ]
+}

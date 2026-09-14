@@ -1,0 +1,53 @@
+{
+  "id": "advanced-terraform-iac",
+  "title": "Terraform基础设施代码化落地",
+  "title_en": "Advanced IaC with Terraform",
+  "subtitle": "标准化管理云原生基础设施",
+  "subtitle_en": "",
+  "description": "针对复杂云环境的进阶基建管理。通过代码定义云资源，确保环境强一致性。降低手动配置错误，实现基础设施版本控制。",
+  "description_en": "",
+  "categories": [
+    "dev"
+  ],
+  "tags": [
+    "基础设施",
+    "Terraform",
+    "云原生"
+  ],
+  "tags_en": [],
+  "artifact_type": "md",
+  "cover_image": "cover.png",
+  "cover_mode": "landscape",
+  "preview": "output.md",
+  "prompt": "我需要用Terraform在AWS上创建高可用EKS集群。要求：1. 包含VPC、公有/私有子网。2. 创建托管节点组(2台t3.medium)。3. 配置IAM角色及策略。4. 输出kubeconfig配置。请提供模块化的Terraform代码结构及核心文件内容，并附上简要的init/plan/apply部署步骤说明。",
+  "skills": [],
+  "experts": [
+    {
+      "id": "devops",
+      "name": "鹏城信息AI专家",
+      "description": "Automate deployments, manage infrastructure as code, and build reliable CI/CD pipelines.",
+      "expertType": "agent",
+      "source": "expert-marketplace"
+    }
+  ],
+  "mcps": [],
+  "creator": {
+    "name": "鹏城信息AI专家",
+    "avatar": "",
+    "badge": "official"
+  },
+  "sort_order": 100,
+  "is_featured": false,
+  "featured_order": 0,
+  "quality_score": 0,
+  "source": "official",
+  "usage_count": 0,
+  "created_at": "2026-07-31T05:10:54Z",
+  "updated_at": "2026-07-31T05:10:54Z",
+  "artifacts": [
+    {
+      "file": "output.md",
+      "label": "产物文件"
+    }
+  ]
+}

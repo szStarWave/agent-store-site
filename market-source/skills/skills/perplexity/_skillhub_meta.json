@@ -1,0 +1,9 @@
+{
+  "name": "Perplexity 搜索",
+  "slug": "perplexity",
+  "version": "1.0.0",
+  "installedAt": 1779350055528,
+  "source": "marketplace",
+  "iconSource": "perplexity",
+  "preinstalledTemplate": true
+}

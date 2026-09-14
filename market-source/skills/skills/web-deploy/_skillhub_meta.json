@@ -1,0 +1,9 @@
+{
+  "name": "Web Deploy",
+  "slug": "web-deploy",
+  "version": "1.0.0",
+  "installedAt": 1779350055658,
+  "source": "marketplace",
+  "iconSource": "web-deploy",
+  "preinstalledTemplate": true
+}

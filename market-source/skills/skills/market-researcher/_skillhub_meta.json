@@ -1,0 +1,9 @@
+{
+  "name": "市场调研",
+  "slug": "market-researcher",
+  "version": "1.0.0",
+  "installedAt": 1779350055539,
+  "source": "marketplace",
+  "iconSource": "market-researcher",
+  "preinstalledTemplate": true
+}

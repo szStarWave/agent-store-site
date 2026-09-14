@@ -1,0 +1,9 @@
+{
+  "name": "ArXiv论文追踪",
+  "slug": "arxiv-watcher",
+  "version": "1.0.0",
+  "installedAt": 1779350055534,
+  "source": "marketplace",
+  "iconSource": "arxiv-watcher",
+  "preinstalledTemplate": true
+}

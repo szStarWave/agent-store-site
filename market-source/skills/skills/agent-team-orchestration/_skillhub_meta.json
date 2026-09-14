@@ -1,0 +1,9 @@
+{
+  "name": "Agent Team Orchestration",
+  "slug": "agent-team-orchestration",
+  "version": "1.0.0",
+  "installedAt": 1779350055596,
+  "source": "marketplace",
+  "iconSource": "agent-team-orchestration",
+  "preinstalledTemplate": true
+}

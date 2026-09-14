@@ -1,0 +1,9 @@
+{
+  "name": "腾讯新闻",
+  "slug": "tencent-news",
+  "version": "1.0.9",
+  "installedAt": 1779350055443,
+  "source": "marketplace",
+  "iconSource": "tencent-news",
+  "preinstalledTemplate": true
+}

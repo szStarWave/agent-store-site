@@ -1,0 +1,9 @@
+{
+  "name": "腾讯云COS向量",
+  "slug": "cos-vectors",
+  "version": "1.0.1",
+  "installedAt": 1779350055449,
+  "source": "marketplace",
+  "iconSource": "cos-vectors",
+  "preinstalledTemplate": true
+}

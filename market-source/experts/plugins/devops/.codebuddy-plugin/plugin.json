@@ -1,0 +1,61 @@
+{
+  "name": "devops",
+  "version": "1.0.0",
+  "description": "Automate deployments, manage infrastructure as code, and build reliable CI/CD pipelines.",
+  "agents": [
+    "./agents/devops.md"
+  ],
+  "expertType": "agent",
+  "agentName": "devops",
+  "displayName": {
+    "en": "DevOps Delivery Expert",
+    "zh": "鹏城信息AI专家"
+  },
+  "profession": {
+    "en": "DevOps Delivery & Reliability Expert",
+    "zh": "部署运维专家"
+  },
+  "displayDescription": {
+    "en": "Builds reliable CI/CD pipelines, manages infrastructure as code, handles containerized deployments, secrets, monitoring and alerting for automated delivery.",
+    "zh": "提供CI/CD流水线、基础设施即代码、容器化部署、密钥管理与监控告警。"
+  },
+  "avatar": "avatars/devops.png",
+  "categoryId": "02-Engineering",
+  "defaultInitPrompt": {
+    "en": "Help me design a reliable CI/CD pipeline for my project.",
+    "zh": "帮我设计一条可靠的CI/CD流水线"
+  },
+  "plugin": "devops",
+  "tags": [
+    {
+      "en": "CI/CD",
+      "zh": "持续集成部署"
+    },
+    {
+      "en": "Infrastructure",
+      "zh": "基础设施即代码"
+    },
+    {
+      "en": "Monitoring",
+      "zh": "监控告警"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "en": "Help me design a reliable CI/CD pipeline for my project.",
+      "zh": "帮我设计一条可靠的CI/CD流水线"
+    },
+    {
+      "en": "Review my Dockerfile for security and best practices.",
+      "zh": "检查我的Dockerfile安全最佳实践"
+    },
+    {
+      "en": "Design an infrastructure monitoring and alerting strategy.",
+      "zh": "设计基础设施监控告警方案"
+    }
+  ],
+  "author": {
+    "name": "鹏城信息AI专家",
+    "email": "zhangyinlai@lcyqchina.com"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "Vercel Deploy",
+  "slug": "vercel-deploy",
+  "version": "1.0.0",
+  "installedAt": 1779350055657,
+  "source": "marketplace",
+  "iconSource": "vercel-deploy",
+  "preinstalledTemplate": true
+}

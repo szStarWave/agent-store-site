@@ -1,0 +1,9 @@
+{
+  "name": "sales-pipeline",
+  "slug": "sales-pipeline",
+  "version": "1.0.0",
+  "installedAt": 1779350055608,
+  "source": "marketplace",
+  "iconSource": "sales-pipeline",
+  "preinstalledTemplate": true
+}

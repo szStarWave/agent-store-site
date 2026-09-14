@@ -1,0 +1,9 @@
+{
+  "name": "Landing Page Generator",
+  "slug": "landing-page-generator",
+  "version": "1.0.0",
+  "installedAt": 1779350055664,
+  "source": "marketplace",
+  "iconSource": "landing-page-generator",
+  "preinstalledTemplate": true
+}

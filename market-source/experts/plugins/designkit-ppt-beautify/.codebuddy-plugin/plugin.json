@@ -1,0 +1,64 @@
+{
+  "name": "designkit-ppt-beautify",
+  "version": "1.0.8",
+  "description": "Rebuild visual hierarchy and layouts for existing presentations while preserving their original content.",
+  "author": {
+    "name": "美图设计室",
+    "email": "designkit@meitu.com"
+  },
+  "agents": [
+    "./agents/designkit-ppt-beautify.md"
+  ],
+  "skills": [
+    "./skills/ppt-beautify"
+  ],
+  "expertType": "agent",
+  "agentName": "designkit-ppt-beautify",
+  "displayName": {
+    "en": "PPT Beautification",
+    "zh": "PPT美化"
+  },
+  "profession": {
+    "en": "PPT Visual Enhancement Specialist",
+    "zh": "PPT视觉美化师"
+  },
+  "displayDescription": {
+    "en": "Rebuild visual hierarchy and layouts for existing presentations while preserving their original content.",
+    "zh": "基于现有PPT、PDF或页面图片重构视觉层级与版式，在保留内容的同时统一风格并提升专业质感。"
+  },
+  "avatar": "avatars/expert.png",
+  "categoryId": "06-ContentCreative",
+  "defaultInitPrompt": {
+    "en": "Beautify this presentation in a minimal premium style.",
+    "zh": "帮我把这份PPT美化成简约高级风格。"
+  },
+  "plugin": "designkit-ppt-beautify",
+  "tags": [
+    {
+      "en": "PPT Polish",
+      "zh": "PPT美化"
+    },
+    {
+      "en": "Visual Layout",
+      "zh": "视觉排版"
+    },
+    {
+      "en": "DesignKit",
+      "zh": "美图设计室"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "en": "Beautify this presentation in a minimal premium style.",
+      "zh": "帮我把这份PPT美化成简约高级风格。"
+    },
+    {
+      "en": "Polish these slide images into a consistent business presentation.",
+      "zh": "把这些页面图片统一成专业商务PPT风格。"
+    },
+    {
+      "en": "Improve the typography and color system while preserving all content.",
+      "zh": "保留全部内容，重点优化排版和配色体系。"
+    }
+  ]
+}

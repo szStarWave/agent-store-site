@@ -1,0 +1,7 @@
+{
+  "name": "frontend-backend-experts",
+  "version": "1.0.0",
+  "description": "Frontend, backend, full-stack, mobile development experts",
+  "agents": "./agents/",
+  "expertType": "agent"
+}

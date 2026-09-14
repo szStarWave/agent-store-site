@@ -1,0 +1,9 @@
+{
+  "name": "CloudQ",
+  "slug": "cloudq",
+  "version": "1.6.0",
+  "installedAt": 1779350055464,
+  "source": "marketplace",
+  "iconSource": "cloudq",
+  "preinstalledTemplate": true
+}

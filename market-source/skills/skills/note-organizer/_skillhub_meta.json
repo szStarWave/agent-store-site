@@ -1,0 +1,9 @@
+{
+  "name": "Joplin笔记管理",
+  "slug": "note-organizer",
+  "version": "1.0.0",
+  "installedAt": 1779350055513,
+  "source": "marketplace",
+  "iconSource": "note-organizer",
+  "preinstalledTemplate": true
+}

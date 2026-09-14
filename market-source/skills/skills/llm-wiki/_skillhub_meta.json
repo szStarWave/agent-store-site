@@ -1,0 +1,9 @@
+{
+  "name": "Karpathy LLM Wiki",
+  "slug": "llm-wiki",
+  "version": "1.0.0",
+  "installedAt": 1779350055601,
+  "source": "marketplace",
+  "iconSource": "llm-wiki",
+  "preinstalledTemplate": true
+}

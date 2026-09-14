@@ -1,0 +1,9 @@
+{
+  "name": "cnb.cool",
+  "slug": "cnb-skill",
+  "version": "1.0.0",
+  "installedAt": 1779350055439,
+  "source": "marketplace",
+  "iconSource": "cnb-skill",
+  "preinstalledTemplate": true
+}

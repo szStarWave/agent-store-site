@@ -1,0 +1,9 @@
+{
+  "name": "Exa 网络搜索",
+  "slug": "web-search-exa",
+  "version": "2.0.0",
+  "installedAt": 1779350055531,
+  "source": "marketplace",
+  "iconSource": "web-search-exa",
+  "preinstalledTemplate": true
+}

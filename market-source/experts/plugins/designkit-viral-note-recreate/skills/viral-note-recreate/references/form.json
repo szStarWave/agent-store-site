@@ -1,0 +1,136 @@
+{
+  "form": {
+    "fields": [
+      {
+        "file_types": [
+          "image"
+        ],
+        "hint": "封面、内页、账号往期作品均可；首张默认主参考",
+        "key": "ref_images",
+        "label": "参考爆款图文",
+        "maxCount": 12,
+        "required": true,
+        "type": "file_upload"
+      },
+      {
+        "file_types": [
+          "image"
+        ],
+        "hint": "产品图、人像、品牌图、场景图都可以上传",
+        "key": "asset_images",
+        "label": "你的素材图",
+        "maxCount": 10,
+        "required": false,
+        "type": "file_upload"
+      },
+      {
+        "key": "topic",
+        "label": "新图文主题",
+        "placeholder": "如：夏季通勤防晒好物分享",
+        "required": true,
+        "type": "text"
+      },
+      {
+        "default": "参考风格",
+        "key": "recreate_mode",
+        "label": "参考程度",
+        "options": [
+          {
+            "key": "参考风格",
+            "label": "参考调性（变化主视觉、配色、图文结构）"
+          },
+          {
+            "key": "高度复刻",
+            "label": "高度复刻（照搬版式，仅替换内容）"
+          }
+        ],
+        "type": "radio_tags"
+      },
+      {
+        "default": "3:4",
+        "key": "ratio",
+        "label": "画面比例",
+        "options": [
+          {
+            "key": "3:4",
+            "label": "3:4"
+          },
+          {
+            "key": "9:16",
+            "label": "9:16"
+          },
+          {
+            "key": "1:1",
+            "label": "1:1"
+          },
+          {
+            "key": "4:3",
+            "label": "4:3"
+          },
+          {
+            "key": "16:9",
+            "label": "16:9"
+          }
+        ],
+        "type": "radio_tags"
+      },
+      {
+        "key": "extra",
+        "label": "文案&其他要求",
+        "maxLength": 1000,
+        "placeholder": "如：标题文案、核心卖点、必须保留或需要调整的元素",
+        "required": false,
+        "type": "textarea"
+      },
+      {
+        "default": 1,
+        "key": "count",
+        "label": "生成张数",
+        "max": 12,
+        "min": 1,
+        "type": "number"
+      },
+      {
+        "default": "小红书",
+        "key": "platform",
+        "label": "目标平台",
+        "options": [
+          {
+            "key": "小红书",
+            "label": "小红书"
+          },
+          {
+            "key": "抖音",
+            "label": "抖音"
+          },
+          {
+            "key": "微博",
+            "label": "微博"
+          },
+          {
+            "key": "公众号",
+            "label": "公众号"
+          },
+          {
+            "key": "Instagram",
+            "label": "Instagram"
+          },
+          {
+            "key": "TikTok",
+            "label": "TikTok"
+          }
+        ],
+        "required": true,
+        "type": "select"
+      }
+    ],
+    "prompt": "[爆款图文复刻]参考上传的爆款图文，复刻其社媒视觉风格、版式结构和图文层级，生成新的图文封面/套图。\n参考爆款图文：{ref_images}\n你的素材图：{asset_images}\n新图文主题：{topic}\n参考程度：{recreate_mode}\n画面比例：{ratio}\n文案&其他要求：{extra}\n生成张数：{count} 张\n目标平台：{platform}"
+  },
+  "schema_version": 1,
+  "skill": {
+    "category": "自媒体营销",
+    "description": "一键拆解爆款基因，生成同类内容",
+    "id": "viral-note-recreate",
+    "title": "爆款图文复刻"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "邮件日报摘要",
+  "slug": "email-daily-summary",
+  "version": "0.1.0",
+  "installedAt": 1779350055523,
+  "source": "marketplace",
+  "iconSource": "email-daily-summary",
+  "preinstalledTemplate": true
+}

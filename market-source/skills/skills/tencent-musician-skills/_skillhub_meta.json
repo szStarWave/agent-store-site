@@ -1,0 +1,9 @@
+{
+  "name": "腾讯音乐人AI助手",
+  "slug": "tencent-musician-skills",
+  "version": "1.0.1",
+  "installedAt": 1779350055454,
+  "source": "marketplace",
+  "iconSource": "tencent-musician-skills",
+  "preinstalledTemplate": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "国泰海通金融数据查询",
+  "slug": "lingxi-financialsearch-skill",
+  "version": "1.11.0",
+  "installedAt": 1779350055460,
+  "source": "marketplace",
+  "iconSource": "lingxi-financialsearch-skill",
+  "preinstalledTemplate": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "批量绘图",
+  "slug": "openai-image-gen",
+  "version": "1.0.1",
+  "installedAt": 1779350055559,
+  "source": "marketplace",
+  "iconSource": "openai-image-gen",
+  "preinstalledTemplate": true
+}

@@ -1,0 +1,9 @@
+{
+  "name": "HTML Deploy",
+  "slug": "html-deploy",
+  "version": "1.3.1",
+  "installedAt": 1779350055654,
+  "source": "marketplace",
+  "iconSource": "html-deploy",
+  "preinstalledTemplate": true
+}
