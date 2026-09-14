@@ -131,7 +131,7 @@ const zhCN = {
       psHint: "把下面这行粘贴到 PowerShell 运行：安装 npm 运行时包并将 agent-store 加入用户 PATH（需已安装 Node.js / npm，无需管理员权限）。",
       psView: "查看安装脚本源码",
       manual: "手动选择平台",
-      releaseNote: "查看下载中心获取历史版本与校验和",
+      releaseNote: "在 GitHub Releases 查看历史版本与校验和",
       copy: "复制命令",
       copied: "已复制",
       fallbackCta: "前往 Releases",

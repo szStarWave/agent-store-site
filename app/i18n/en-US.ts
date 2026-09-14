@@ -139,7 +139,7 @@ const enUS = {
         "Paste this line into PowerShell: installs the npm runtime package and adds agent-store to your user PATH (Node.js / npm required, no admin rights).",
       psView: "View the install script source",
       manual: "Choose a platform manually",
-      releaseNote: "See the download center for older versions and checksums",
+      releaseNote: "See GitHub Releases for older versions and checksums",
       copy: "Copy command",
       copied: "Copied",
       fallbackCta: "Go to releases",

@@ -236,7 +236,14 @@ async function pack(args) {
 // ---------------------------------------------------------------- publish
 
 function ghJson(args) {
-  return JSON.parse(dryRun(GH, args) || "{}");
+  try {
+    return JSON.parse(dryRun(GH, args) || "{}");
+  } catch (e) {
+    const msg = `${e?.stderr ?? ""}${e?.stdout ?? ""}`;
+    // `gh release view` 对不存在的 Release 退出码非零 —— 视为「尚无」而非失败。
+    if (/release not found|HTTP 404|not Found/i.test(msg)) return {};
+    die(`gh ${args.join(" ")} 失败：${msg.trim().split("\n").slice(0, 3).join(" / ")}`);
+  }
 }
 
 async function publish(args) {
