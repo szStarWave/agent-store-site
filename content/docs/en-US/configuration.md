@@ -35,10 +35,10 @@ model = "laguna-s-2.1-free"
 max_context_size = 256000
 display_name = "Laguna S 2.1 Free"
 
-# Default marketplace sources (auto-registered on first store/market call)
+# Default marketplace sources (auto-registered on first store/market call; hosted by this site)
 [default_marketplaces.experts]
 source_kind = "url"
-source = "http://111.170.173.22:10072/experts/.codebuddy-plugin/marketplace.json"
+source = "https://<site-domain>/source/experts/.codebuddy-plugin/marketplace.json"
 ```
 
 ## Top-level fields
@@ -91,15 +91,15 @@ Default marketplace sources (winget-style software sources). The App Server auto
 ```toml
 [default_marketplaces.experts]
 source_kind = "url"
-source = "http://111.170.173.22:10072/experts/.codebuddy-plugin/marketplace.json"
+source = "https://<site-domain>/source/experts/.codebuddy-plugin/marketplace.json"
 
 [default_marketplaces.workbuddy-skills]
 source_kind = "url"
-source = "http://111.170.173.22:10072/skills/.codebuddy-skill/marketplace.json"
+source = "https://<site-domain>/source/skills/.codebuddy-skill/marketplace.json"
 
 [default_marketplaces.connectors]
 source_kind = "url"
-source = "http://111.170.173.22:10072/connectors/.codebuddy-connector/connectors.json"
+source = "https://<site-domain>/source/connectors/.codebuddy-connector/connectors.json"
 ```
 
 ## `memory`
