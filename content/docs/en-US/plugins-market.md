@@ -27,18 +27,21 @@ Marketplace sources are declared in [`~/.agent-store/config.toml`](/en-US/docs/c
 | `directory` | Local directory path | Points directly at a local market/plugin root |
 
 ```toml
+# This site hosts all three market sources itself, under /source/<market>/…
 [default_marketplaces.workbuddy-experts]
 source_kind = "url"
-source = "https://market.example.com/experts/.codebuddy-plugin/marketplace.json"
+source = "https://<site-domain>/source/experts/.codebuddy-plugin/marketplace.json"
 
 [default_marketplaces.workbuddy-skills]
 source_kind = "url"
-source = "https://market.example.com/skills/.codebuddy-skill/marketplace.json"
+source = "https://<site-domain>/source/skills/.codebuddy-skill/marketplace.json"
 
 [default_marketplaces.connectors]
 source_kind = "url"
-source = "https://market.example.com/connectors/.codebuddy-connector/connectors.json"
+source = "https://<site-domain>/source/connectors/.codebuddy-connector/connectors.json"
 ```
+
+The `_files.txt` in each market root is a pre-generated directory listing (one relative path per line) that clients use to mirror the whole entry tree.
 
 At startup the runtime fetches and parses these manifests, and the **Market** page (top navigation / footer) lets you browse every entry: experts, skills and connectors.
 

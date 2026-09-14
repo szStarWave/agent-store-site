@@ -27,18 +27,21 @@ Agent Store 原生支持**插件**与**插件市场**：插件是打包好的能
 | `directory` | 本地目录路径 | 直接指向本地市场/插件根 |
 
 ```toml
+# 本站自身即托管这三个市场源，路径形如 /source/<market>/…
 [default_marketplaces.workbuddy-experts]
 source_kind = "url"
-source = "https://market.example.com/experts/.codebuddy-plugin/marketplace.json"
+source = "https://<站点域名>/source/experts/.codebuddy-plugin/marketplace.json"
 
 [default_marketplaces.workbuddy-skills]
 source_kind = "url"
-source = "https://market.example.com/skills/.codebuddy-skill/marketplace.json"
+source = "https://<站点域名>/source/skills/.codebuddy-skill/marketplace.json"
 
 [default_marketplaces.connectors]
 source_kind = "url"
-source = "https://market.example.com/connectors/.codebuddy-connector/connectors.json"
+source = "https://<站点域名>/source/connectors/.codebuddy-connector/connectors.json"
 ```
+
+每个市场根目录下的 `_files.txt` 是预生成的目录清单（一行一个相对路径），客户端据此镜像整棵条目树。
 
 启动时运行时会拉取并解析这些市场清单，Web UI 的 **市场** 页面（顶部导航 / 页脚入口）即可浏览全部条目：专家、技能与连接器。
 
