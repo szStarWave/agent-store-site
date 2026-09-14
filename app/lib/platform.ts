@@ -1,3 +1,5 @@
+import release from "../../content/release.json";
+
 import type { Language } from "../i18n";
 
 export type TargetOS = "macos" | "windows" | "linux";
@@ -8,20 +10,25 @@ export interface DetectedPlatform {
   arch: TargetArch;
 }
 
-/** Download host: the VPS serves prebuilt binaries over HTTP
- * (Caddy :8306 → http://111.170.173.22:10014/downloads/). Replace
- * `DOWNLOAD_HOST` when the release server moves.
+/**
+ * Published preview version — single source: `content/release.json`, kept in
+ * sync with the npm packages (`@flowy-agent-store/{protocol,sdk,runtime-*}`).
+ * Bump it once per release; `scripts/release.mjs` reads the same file.
  */
-const DOWNLOAD_HOST = "http://111.170.173.22:10014";
+export const RELEASE_VERSION: string = release.version;
 
-/** GitHub repository (source only — binaries ship from the VPS). */
+/** Repository that hosts the release assets (this site's own repo). */
+const RELEASE_REPO = release.repo;
+
+/** Git tag of the published release (GitHub release URLs carry the explicit tag). */
+const RELEASE_TAG = `v${RELEASE_VERSION}`;
+
+/** Source repository (code only — downloads live in the releases above). */
 const GITHUB_REPO = "Michael-Lfx/allo";
 
-/** Asset file name convention produced by the release build. */
+/** Asset file name convention produced by `scripts/release.mjs`. */
 function assetName(version: string, p: DetectedPlatform): string {
-  const target = `${p.os}-${p.arch}`;
-  const tag = version === "latest" ? "latest" : `v${version}`;
-  return `flowy-agent-store-${tag}-${target}.zip`;
+  return `flowy-agent-store-v${version}-${p.os}-${p.arch}.zip`;
 }
 
 export function detectPlatform(): DetectedPlatform {
@@ -56,10 +63,15 @@ export function detectPlatform(): DetectedPlatform {
   return { os, arch };
 }
 
-/** Direct download URL for a platform's asset on the VPS download host. */
-export function releaseAssetUrl(version: string, p: DetectedPlatform): string {
-  const file = assetName(version, p);
-  return `${DOWNLOAD_HOST}/downloads/${file}`;
+/** Direct download URL for a platform's asset.
+ *
+ * Releases are published as **prereleases** (preview builds), and GitHub only
+ * resolves `/releases/latest/download/<asset>` for the latest published
+ * *non-prerelease* release — so the URL is pinned to the explicit tag instead.
+ */
+export function releaseAssetUrl(p: DetectedPlatform): string {
+  const file = assetName(RELEASE_VERSION, p);
+  return `https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_TAG}/${file}`;
 }
 
 /**
@@ -75,9 +87,9 @@ export function isReleasedPlatform(p: DetectedPlatform): boolean {
   return RELEASED_PLATFORMS.some((r) => r.os === p.os && r.arch === p.arch);
 }
 
-/** VPS download directory (file listing / all published assets). */
+/** Release page: every published build, previews included. */
 export function releasesPageUrl(): string {
-  return `${DOWNLOAD_HOST}/downloads/`;
+  return `https://github.com/${RELEASE_REPO}/releases`;
 }
 
 export function githubUrl(): string {
