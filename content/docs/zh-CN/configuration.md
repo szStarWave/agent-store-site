@@ -35,10 +35,10 @@ model = "laguna-s-2.1-free"
 max_context_size = 256000
 display_name = "Laguna S 2.1 Free"
 
-# 默认市场源（首次调 store/market 时自动注册，公网 VPS 镜像）
+# 默认市场源（首次调 store/market 时自动注册；由官网站点自托管）
 [default_marketplaces.experts]
 source_kind = "url"
-source = "http://111.170.173.22:10072/experts/.codebuddy-plugin/marketplace.json"
+source = "https://<站点域名>/source/experts/.codebuddy-plugin/marketplace.json"
 ```
 
 ## 顶层字段
@@ -91,15 +91,15 @@ source = "http://111.170.173.22:10072/experts/.codebuddy-plugin/marketplace.json
 ```toml
 [default_marketplaces.experts]
 source_kind = "url"
-source = "http://111.170.173.22:10072/experts/.codebuddy-plugin/marketplace.json"
+source = "https://<站点域名>/source/experts/.codebuddy-plugin/marketplace.json"
 
 [default_marketplaces.workbuddy-skills]
 source_kind = "url"
-source = "http://111.170.173.22:10072/skills/.codebuddy-skill/marketplace.json"
+source = "https://<站点域名>/source/skills/.codebuddy-skill/marketplace.json"
 
 [default_marketplaces.connectors]
 source_kind = "url"
-source = "http://111.170.173.22:10072/connectors/.codebuddy-connector/connectors.json"
+source = "https://<站点域名>/source/connectors/.codebuddy-connector/connectors.json"
 ```
 
 ## `memory`
