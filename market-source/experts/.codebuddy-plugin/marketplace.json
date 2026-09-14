@@ -1,0 +1,71 @@
+{
+  "name": "experts",
+  "description": "Expert marketplace (auto-generated)",
+  "plugins": [
+    {
+      "name": "frontend-backend-experts",
+      "source": "./plugins/frontend-backend-experts",
+      "description": "Frontend, backend, full-stack, mobile development experts"
+    },
+    {
+      "name": "software-company",
+      "source": "./plugins/software-company",
+      "description": "Software Development Team - Optimized multi-agent SOP workflow for fast software delivery"
+    },
+    {
+      "name": "senior-developer",
+      "source": "./plugins/senior-developer",
+      "description": "Over 10 years of full-stack experience, proficient in multiple languages and frameworks, the technical backbone of the team"
+    },
+    {
+      "name": "aihot",
+      "source": "./plugins/aihot",
+      "description": "AI HOT daily briefing expert: curated AI models, products, industry news and papers, auto-formatted as a Chinese briefing, no API key needed."
+    },
+    {
+      "name": "stock-partner-team",
+      "source": "./plugins/stock-partner-team",
+      "description": "6 stock market experts + 1 lead editor collaborate as an agent team for stock market information analysis and discussion"
+    },
+    {
+      "name": "remotion-video-generator",
+      "source": "./plugins/remotion-video-generator",
+      "description": "Automatically generates beautiful videos using Remotion. Detects video creation requests, creates storyboards, handles environment setup, and outputs MP4 files with minimal user intervention. Supports explainer videos, product demos, social media content, and presentations."
+    },
+    {
+      "name": "meituan-living-assistant",
+      "source": "./plugins/meituan-living-assistant",
+      "description": "Meituan living deals assistant — one-click coupon collection, nearby group-buy food search and ordering, daily deals exploration for dining, coffee, milk tea, hotpot and more."
+    },
+    {
+      "name": "edgeone-makers-experts",
+      "source": "./plugins/edgeone-makers-experts",
+      "description": "Makers development team - orchestrates full-stack web development and deployment on EdgeOne Makers: Edge Functions, Cloud Functions (Node.js/Go/Python), Middleware, KV Storage, and fast deployment"
+    },
+    {
+      "name": "fbsir-super-partner",
+      "source": "./plugins/fbsir-super-partner",
+      "description": "A single execution partner that delivers a usable artifact now, completes safe host actions when available, and verifies one 72-hour outcome."
+    },
+    {
+      "name": "workspace-builder",
+      "source": "./plugins/workspace-builder",
+      "description": "Build custom digital workspaces (HTML) for different user groups: students, professionals, content creators, parents, and lifestyle users, with responsive design and local data persistence."
+    },
+    {
+      "name": "devops",
+      "source": "./plugins/devops",
+      "description": "Automate deployments, manage infrastructure as code, and build reliable CI/CD pipelines."
+    },
+    {
+      "name": "designkit-viral-note-recreate",
+      "source": "./plugins/designkit-viral-note-recreate",
+      "description": "Analyze viral posts and recreate their visual language, layout, and hierarchy with a new topic and user assets."
+    },
+    {
+      "name": "designkit-ppt-beautify",
+      "source": "./plugins/designkit-ppt-beautify",
+      "description": "Rebuild visual hierarchy and layouts for existing presentations while preserving their original content."
+    }
+  ]
+}
