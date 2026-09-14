@@ -7,8 +7,10 @@ build/
 # Dependencies
 node_modules/
 
-# Market icons cached by scripts/sync-market-data.mjs (regenerated on sync)
-public/market-icons/
+# Market tree is committed on purpose: the site itself serves it as the
+# marketplace source. It lives outside `public/` (Vite would copy it during the
+# build and stall prerender) and is copied into the output by
+# scripts/copy-market-tree.mjs — see scripts/sync-market-tree.mjs.
 
 # Logs
 *.log

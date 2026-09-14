@@ -1,0 +1,23 @@
+{
+  "installCommand": "bun install",
+  "buildCommand": "bun run build",
+  "outputDirectory": "build/client",
+  "headers": [
+    {
+      "source": "/source/experts/_files.txt",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+    },
+    {
+      "source": "/source/skills/_files.txt",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+    },
+    {
+      "source": "/source/connectors/_files.txt",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+    }
+  ],
+  "rewrites": [
+    { "source": "/zh-CN/_.data", "destination": "/zh-CN.data" },
+    { "source": "/en-US/_.data", "destination": "/en-US.data" }
+  ]
+}
