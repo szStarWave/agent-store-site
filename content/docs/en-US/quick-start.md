@@ -4,7 +4,7 @@ Flowy Agent Store packages a local-first agent runtime as a **single executable*
 
 ## 1. Download and launch
 
-Get the binary for your platform from the [download center](http://111.170.173.22:10014/downloads/) and run it:
+Download the archive for your platform from [GitHub Releases](https://github.com/szStarWave/agent-store-site/releases) and run it:
 
 ```bash
 flowy-agent-store

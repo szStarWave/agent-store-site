@@ -2,7 +2,7 @@
 
 ## Platforms
 
-Only **Windows x64** builds are published today; every other platform is not available yet and needs a separate decision before it opens up. Binaries are distributed on the [download center](http://111.170.173.22:10014/downloads/) under per-target names.
+Only **Windows x64** builds are published today; every other platform is not available yet and needs a separate decision before it opens up. Binaries are distributed on [GitHub Releases](https://github.com/szStarWave/agent-store-site/releases) under per-target names (current preview builds are marked as pre-releases).
 
 | OS | Architecture | Status |
 | --- | --- | --- |

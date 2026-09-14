@@ -64,7 +64,7 @@ export default function NavBar({ lang }: { lang: Language }) {
             <GitHubMark />
             {t("nav.github")}
           </a>
-          <a className="btn btn-primary nav-download" href={releaseAssetUrl("latest", { os: "windows", arch: "x86_64" })}>
+          <a className="btn btn-primary nav-download" href={releaseAssetUrl({ os: "windows", arch: "x86_64" })}>
                       <Download size={16} />
                       {t("nav.download")}
                     </a>

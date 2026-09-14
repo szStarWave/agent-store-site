@@ -38,7 +38,7 @@ export default function DownloadCTA({
   // published; everyone else goes to the downloads page (a guessed asset URL
   // would 404 on macOS / Linux / ARM).
   const detectedReleased = detected !== null && isReleasedPlatform(detected);
-  const detectedUrl = detected && detectedReleased ? releaseAssetUrl("latest", detected) : releasesPageUrl();
+  const detectedUrl = detected && detectedReleased ? releaseAssetUrl(detected) : releasesPageUrl();
   const detectedLabel = detected
     ? `${PLATFORM_LABELS[detected.os][lang]} · ${ARCH_LABELS[detected.arch][lang]}`
     : "";
@@ -98,7 +98,7 @@ export default function DownloadCTA({
           <summary>{t("landing.download.manual")}</summary>
           <div className="platform-grid">
             {RELEASED_PLATFORMS.map((p) => (
-              <a key={`${p.os}-${p.arch}`} className="platform-card" href={releaseAssetUrl("latest", p)}>
+              <a key={`${p.os}-${p.arch}`} className="platform-card" href={releaseAssetUrl(p)}>
                 <span className="platform-os">{PLATFORM_LABELS[p.os][lang]}</span>
                 <span className="platform-arch">{ARCH_LABELS[p.arch][lang]}</span>
               </a>

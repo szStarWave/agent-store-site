@@ -2,7 +2,7 @@
 
 ## 平台
 
-当前仅发布 **Windows x64** 构建；其余平台暂未提供，需按需立项后再开放。二进制在[下载中心](http://111.170.173.22:10014/downloads/)按目标命名分发。
+当前仅发布 **Windows x64** 构建；其余平台暂未提供，需按需立项后再开放。二进制在 [GitHub Releases](https://github.com/szStarWave/agent-store-site/releases) 按目标命名分发（当前为预览版，标为 pre-release）。
 
 | 操作系统 | 架构 | 状态 |
 | --- | --- | --- |

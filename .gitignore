@@ -12,6 +12,10 @@ node_modules/
 # build and stall prerender) and is copied into the output by
 # scripts/copy-market-tree.mjs — see scripts/sync-market-tree.mjs.
 
+# Release artifacts (zips are built per release by scripts/release.mjs and
+# uploaded to GitHub Releases; never commit them)
+dist-release/
+
 # Logs
 *.log
 
