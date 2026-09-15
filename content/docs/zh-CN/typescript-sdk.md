@@ -27,6 +27,7 @@ bun add @flowy-agent-store/protocol
 包均发布为 ESM + CJS 双格式（`exports` 提供 `import` / `require` / `types`），Node 与打包器开箱即用。
 
 > **版本状态**：三个包当前均为 `0.1.0-beta.*` 预发布（API 尚未冻结，beta 期间**不承诺向后兼容**）。生产接入请固定**确切版本**——本文与仓库当前对应 `0.1.0-beta.3`。注意不要依赖裸 `bun add`：注册表 `latest` 当前指向 `0.1.0-beta.2`，**不是**最新的 `0.1.0-beta.3`。dist-tag 语义、逐版本升级步骤与自查命令见[升级与迁移指引](/zh-CN/docs/upgrade)。
+> **协议面口径**：§3 的 `APP_SERVER_PROTOCOL_VERSION` 示例与 §7.3 的方法计数按**仓库工作区（源码）**取值——工作区已领先于任何已发布版本（MCP 声明文件的三个方法与 `store/list` 的 `published_at` 都尚未随版本发布）。未发布差异见[升级与迁移指引](/zh-CN/docs/upgrade) §8 与[变更日志](/zh-CN/docs/changelog) §4。
 > **运行环境**：Node.js **≥ 22**（依赖全局 `WebSocket`）或 Bun；版本下限由各包 `engines.node` 声明。
 
 ---
@@ -87,7 +88,7 @@ try {
 
 | 导出 | 说明 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 当前协议版本字符串（如 `"2026-09-15"`），握手与 SDK 校验用 |
+| `APP_SERVER_PROTOCOL_VERSION` | 协议版本字符串（**仓库工作区当前为** `"2026-09-18"`；每次 wire 变更取新日期），握手与 SDK 校验做严格相等 |
 | `InitializeRequest` / `InitializeResult` | 握手请求/响应（含 `protocol_version`、`server` 信息） |
 | `ClientInfo` / `ClientCapabilities` | 连接方自述 |
 | `StoreList` / `StoreInstallResult` | winget 式统一目录 |
@@ -482,8 +483,9 @@ const routes = httpRouteTable();
 // { "market/remove": { verb: "POST", path: "/markets/:marketplace_id/remove", source: "…" }, … }
 ```
 
-- 覆盖 **46 / 65** 个方法。HTTP 无绑定的 19 个方法：`initialize`、`initialized`、`workspace/create`、`conversation/model-options`、`conversation/update`、`conversation/subscribe`、`conversation/unsubscribe`、`run/subscribe`、`run/unsubscribe`、`agent/list`、`agent/get`、`team/list`、`team/get`、`config/get`、`config/set`、`skill/create`、`skill/update`、`skill/delete`、`skill/copy`。
+- 覆盖 **46 / 68** 个方法。HTTP 无绑定的 22 个方法：`initialize`、`initialized`、`workspace/create`、`conversation/model-options`、`conversation/update`、`conversation/subscribe`、`conversation/unsubscribe`、`run/subscribe`、`run/unsubscribe`、`agent/list`、`agent/get`、`team/list`、`team/get`、`config/get`、`config/set`、`skill/create`、`skill/update`、`skill/delete`、`skill/copy`、`config/get-mcp`、`config/set-mcp`、`config/set-mcp-enabled`。
 - `config/get` / `config/set`（宿主设置文件 `~/.agent-store/config.toml`）是**宿主管理面**（`16` §6）：只有 wire 方法，没有 HTTP 绑定，也**不在本包客户端内**——Web UI 自己经 transport 调用。契约见 `05` §4.10。
+- `config/get-mcp` / `config/set-mcp` / `config/set-mcp-enabled`（MCP 声明文件 `~/.agent-store/mcp.json`）同样按 `16` §6 判定为**宿主管理面**：只有 wire 方法、没有 HTTP 绑定，也不在本包客户端内。写面是**失败即不写**（整文件解析不过、或目标条目不合法 → 磁盘逐字节不变），开关是**文本级最小编辑**（只改那一条的 `enabled`，注释与缩进原样保留）。注意 `config/get-mcp` 是**唯一**返回文件原文的读面（供宿主自己的编辑器按需调用，全程只在回环与 owner 闸门内）；其余读面（`config/get.mcp`）仍然不含 `env` / `headers` 的取值。契约见 `05` §4.10。
 - `skill/create` / `skill/update` / `skill/delete` / `skill/copy`（技能写面，`16` R17 / W12）同样按 `16` §6 判定为**宿主管理面**：第三方消费者不应能往宿主的技能树里写文件，因此只有 wire 方法、没有 HTTP 绑定，也不在本包客户端内。`skill/update` 是**字段级补丁**（只改点名的字段，`name` 不可改），`skill/copy` 从任意来源派生一份可写的用户技能。读面的 `SkillSummary` 新增 `origin` / `writable` 两个字段（增量），契约见 `05` §4.11。
 - **`HttpTransport` 是请求-响应面，不等价于 WebSocket**：`notify()` 抛错、`onNotification()` 返回空订阅。实时事件与订阅必须走 `WebSocketTransport`。
 - 每次调用独立握手（`initialize` → `initialized` → 业务调用）；`connect()` 是 no-op。宿主侧服务若需要就绪连接 id，用 `openConnection()`。

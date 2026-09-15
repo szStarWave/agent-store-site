@@ -87,7 +87,7 @@ This page covers published versions only. The working tree (`web/packages/*`) al
 | Item | Status | Evidence |
 | --- | --- | --- |
 | `event_type` narrowed from an open union (with a `\| string` escape hatch) to the closed type `ConversationEventType`, plus an in-package decoder | in the working tree, **unpublished**: `\| string` is still present in all three published versions | §8 of the [Upgrade and migration guide](/en-US/docs/upgrade); row R1 of `16` |
-| Wire-method additions (`run/plan`, `config/get`, `config/set`, `run/answer-decision`, marketplace entry snapshots, …) | in the working tree, **unpublished**: the published protocol artifact contains none of these types | rows R2 / R8 / R10 / R16 of `16` |
+| Wire-method additions (`run/plan`, `config/get`, `config/set`, `config/get-mcp`, `config/set-mcp`, `config/set-mcp-enabled`, `run/answer-decision`, marketplace entry snapshots, `store/list`'s `published_at`, …) | in the working tree, **unpublished**: the published protocol artifact contains none of these types | rows R2 / R8 / R10 / R16 of `16`; the MCP read/write face in `21` D17 |
 | Release rebuild and `beta.4` | **on hold** (stated policy: release-consistency close-out deferred); no date is announced here | row R6 of `16` |
 
 So: **never assume a change has shipped unless it is listed on this page; and never assume the items in §4 have shipped.**

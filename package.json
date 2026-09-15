@@ -11,6 +11,8 @@
     "sync:market": "node scripts/sync-market-data.mjs",
     "preview": "react-router preview",
     "typecheck": "tsc --noEmit",
+    "check:docs-sync": "node scripts/check-docs-sync.mjs",
+    "test:docs-sync": "bun test scripts/check-docs-sync.test.mjs",
     "release:pack": "node scripts/release.mjs pack",
     "release:publish": "node scripts/release.mjs publish",
     "release:status": "node scripts/release.mjs status"

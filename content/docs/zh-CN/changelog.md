@@ -87,7 +87,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 | 事项 | 状态 | 依据 |
 | --- | --- | --- |
 | `event_type` 从开放联合（带 `\| string` 兜底）收窄为封闭类型 `ConversationEventType`，并新增包内解码器 | 工作区已有，**未发布**：三个已发布版本的声明里 `\| string` 仍在 | [升级与迁移指引](/zh-CN/docs/upgrade) §8；`16` R1 行 |
-| 协议方法面增量（`run/plan`、`config/get`、`config/set`、`run/answer-decision`、市场条目快照等） | 工作区已有，**未发布**：已发布的 protocol 产物里没有这些类型 | `16` R2 / R8 / R10 / R16 行 |
+| 协议方法面增量（`run/plan`、`config/get`、`config/set`、`config/get-mcp`、`config/set-mcp`、`config/set-mcp-enabled`、`run/answer-decision`、市场条目快照、`store/list` 的 `published_at` 等） | 工作区已有，**未发布**：已发布的 protocol 产物里没有这些类型 | `16` R2 / R8 / R10 / R16 行；MCP 读写面见 `21` D17 |
 | release 重建与 `beta.4` | **挂起**（口径：发布一致性收口延后）；本页不预告日期 | `16` R6 行 |
 
 因此：**没有列在本页的变更，不要假定它已经发布；列在 §4 的，不要假定它已经发布。**
