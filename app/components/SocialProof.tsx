@@ -25,7 +25,9 @@ export default function SocialProof() {
         <div className="sp-grid">
           {items.map((item, i) => (
             <figure className="feature-card sp-card" data-reveal key={i} style={revealDelay(i * 90)}>
-              <Quote className="sp-quote-mark" size={18} aria-hidden="true" />
+              <span className="sp-quote-mark" aria-hidden="true">
+                <Quote size={16} />
+              </span>
               <blockquote className="sp-quote">{item.quote}</blockquote>
               <figcaption className="sp-role">{item.role}</figcaption>
             </figure>
