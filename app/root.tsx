@@ -16,8 +16,10 @@ import faviconUrl from "./assets/favicon.ico";
  * `Layout` renders the full <html> shell; the default export is the route tree.
  */
 export function Layout({ children }: { children: React.ReactNode }) {
+  // `js-fx` is added to <html> by the inline script below before first paint;
+  // suppressHydrationWarning tells React to ignore that className during hydration.
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
