@@ -27,6 +27,7 @@ bun add @flowy-agent-store/protocol
 All packages ship ESM + CJS (`exports` maps `import` / `require` / `types`); they work out of the box in Node and bundlers.
 
 > **Version status**: all three packages are `0.1.0-beta.*` pre-releases (the API is not frozen, and **no backward compatibility is promised during beta**). Pin an **exact** version in production — this page and the repo currently correspond to `0.1.0-beta.3`. Do not rely on a bare `bun add`: the registry's `latest` currently points at `0.1.0-beta.2`, **not** the newest `0.1.0-beta.3`. For dist-tag semantics, per-version upgrade steps and self-check commands see the [Upgrade and migration guide](/en-US/docs/upgrade).
+> **Protocol surface scope**: the `APP_SERVER_PROTOCOL_VERSION` example in §3 and the method counts in §7.3 follow the **working tree (source)**, which is already ahead of every published version (the three MCP declaration methods and `store/list`'s `published_at` are in no release yet). For the unpublished diff see §8 of the [Upgrade and migration guide](/en-US/docs/upgrade) and §4 of the [Changelog](/en-US/docs/changelog).
 > **Runtime**: Node.js **≥ 22** (relies on the global `WebSocket`) or Bun; the lower bound is declared by each package's `engines.node`.
 
 ---
@@ -87,7 +88,7 @@ The single TypeScript source of truth for the wire contract: every request/respo
 
 | Export | Meaning |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | Current protocol version string (e.g. `"2026-09-15"`); used in the handshake and SDK checks |
+| `APP_SERVER_PROTOCOL_VERSION` | Protocol version string (**currently** `"2026-09-18"` in the working tree; each wire change takes a new date); the handshake and SDK checks compare it for strict equality |
 | `InitializeRequest` / `InitializeResult` | Handshake request/response (incl. `protocol_version`, server info) |
 | `ClientInfo` / `ClientCapabilities` | Caller self-description |
 | `StoreList` / `StoreInstallResult` | Winget-style unified catalog |
@@ -482,8 +483,9 @@ const routes = httpRouteTable();
 // { "market/remove": { verb: "POST", path: "/markets/:marketplace_id/remove", source: "…" }, … }
 ```
 
-- Covers **46 / 65** methods. The 19 without an HTTP binding: `initialize`, `initialized`, `workspace/create`, `conversation/model-options`, `conversation/update`, `conversation/subscribe`, `conversation/unsubscribe`, `run/subscribe`, `run/unsubscribe`, `agent/list`, `agent/get`, `team/list`, `team/get`, `config/get`, `config/set`, `skill/create`, `skill/update`, `skill/delete`, `skill/copy`.
+- Covers **46 / 68** methods. The 22 without an HTTP binding: `initialize`, `initialized`, `workspace/create`, `conversation/model-options`, `conversation/update`, `conversation/subscribe`, `conversation/unsubscribe`, `run/subscribe`, `run/unsubscribe`, `agent/list`, `agent/get`, `team/list`, `team/get`, `config/get`, `config/set`, `skill/create`, `skill/update`, `skill/delete`, `skill/copy`, `config/get-mcp`, `config/set-mcp`, `config/set-mcp-enabled`.
 - `config/get` / `config/set` (the host settings file `~/.agent-store/config.toml`) are **host management surface** (`16` §6): wire methods with no HTTP binding, and deliberately **not part of this package's client** — the Web UI calls them through its own transport helpers. Contract in `05` §4.10.
+- `config/get-mcp` / `config/set-mcp` / `config/set-mcp-enabled` (the MCP declaration file `~/.agent-store/mcp.json`) are host management surface by the same `16` §6 judgement: wire-only, no HTTP binding, and not in this package. The write face is **fail-closed** (an unparseable file, or an entry the parser rejects, leaves the file byte-identical) and the toggle is a **text-level minimal edit** (only that entry's `enabled` value moves; comments and indentation survive). Note that `config/get-mcp` is the **only** read that returns the file's own text (for the host's own editor, on demand, inside the loopback + owner gate); every other read (`config/get.mcp`) still carries no `env` / `headers` values. Contract in `05` §4.10.
 - `skill/create` / `skill/update` / `skill/delete` / `skill/copy` (the skill write face, `16` R17 / W12) are host management surface by the same `16` §6 judgement: a third-party consumer must not be able to write files into the host's skill tree, so they are wire-only, have no HTTP binding, and are not in this package. `skill/update` is a **field-level patch** (only the named fields move; `name` is not editable) and `skill/copy` derives a writable user skill from any origin. The read face's `SkillSummary` gains `origin` / `writable` (additive); contract in `05` §4.11.
 - **`HttpTransport` is the request/response binding and is not equivalent to WebSocket**: `notify()` throws and `onNotification()` returns a no-op unsubscribe. Live events and subscriptions require `WebSocketTransport`.
 - Every call performs its own handshake (`initialize` → `initialized` → business call), so `connect()` is a no-op. Host-side code that needs a ready connection id calls `openConnection()`.
