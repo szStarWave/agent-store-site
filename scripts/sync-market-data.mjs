@@ -16,6 +16,12 @@
  * skills/connectors use `icons/<source-basename>.<ext>` in the market root;
  * experts use the plugin's `avatars/expert.png`. Entries without an icon get
  * `avatar: null` and the UI renders a letter badge.
+ *
+ * Text rules: skills/connectors spell both languages out inline in their own
+ * manifest, experts only in the plugin's `.codebuddy-plugin/plugin.json`
+ * (`profession` / `displayDescription` / `tags`, each keyed by locale — note
+ * the marketplace manifest carries a single English blurb). Reading that file
+ * is what stops expert cards from showing English copy on the zh-CN catalog.
  */
 
 import { existsSync } from "node:fs";
@@ -53,6 +59,27 @@ function pickAvatar(market, candidates) {
   return null;
 }
 
+/** Experts only carry localized copy in their own plugin manifest. */
+async function readExpertPlugin(src) {
+  const file = path.join(sourceRoot, "experts", src, ".codebuddy-plugin", "plugin.json");
+  if (!existsSync(file)) return null;
+  try {
+    return JSON.parse(await readFile(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/** One locale out of a plugin.json `{ zh, en }` pair, or null when absent. */
+const pickLocale = (value, lang) => {
+  const out = typeof value?.[lang] === "string" ? value[lang].trim() : "";
+  return out || null;
+};
+
+/** `tags: [{ zh, en }]` → one locale's strings. */
+const pickTagLocale = (tags, lang) =>
+  Array.isArray(tags) ? tags.map((tag) => pickLocale(tag, lang)).filter(Boolean).slice(0, 5) : [];
+
 const experts = await readManifest("experts", ".codebuddy-plugin/marketplace.json");
 const skills = await readManifest("skills", ".codebuddy-skill/marketplace.json");
 const connectors = await readManifest("connectors", ".codebuddy-connector/connectors.json");
@@ -71,6 +98,29 @@ const expertAvatars = expertEntries.map((e) => {
     `${src}/icon.png`,
   ]);
 });
+
+/**
+ * Localized expert copy. `profession` (the expert's role) is the catalog title,
+ * `displayDescription` the blurb, `tags` the chip row; the marketplace manifest
+ * is only a single-language fallback for plugins that predate the locale fields.
+ */
+const expertCopy = await Promise.all(
+  expertEntries.map(async (e) => {
+    const plugin = await readExpertPlugin(cleanSource(e.source));
+    const fallbackName = text(e.name);
+    const fallbackDescription = text(e.description);
+    const describe = (lang) => pickLocale(plugin?.displayDescription, lang) || fallbackDescription;
+    return {
+      name: pickLocale(plugin?.profession, "zh") || fallbackName,
+      name_en: pickLocale(plugin?.profession, "en") || fallbackName,
+      description_zh: describe("zh"),
+      description_en: describe("en"),
+      tags_zh: pickTagLocale(plugin?.tags, "zh"),
+      tags_en: pickTagLocale(plugin?.tags, "en"),
+    };
+  }),
+);
+
 const skillAvatars = skillEntries.map((s) =>
   pickAvatar("skills", ICON_EXTS.map((ext) => `icons/${baseName(s.source)}.${ext}`)),
 );
@@ -82,9 +132,8 @@ const out = {
   updatedAt: new Date().toISOString(),
   // The market tree is served from this site itself; paths are site-relative.
   base: "source",
-  experts: expertEntries.map((e, i) => ({
-    name: text(e.name),
-    description: text(e.description),
+  experts: expertEntries.map((_, i) => ({
+    ...expertCopy[i],
     avatar: expertAvatars[i],
   })),
   skills: skillEntries.map((s, i) => ({

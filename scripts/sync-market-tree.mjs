@@ -23,7 +23,12 @@
  *   - every manifest entry `source` is a relative path that resolves inside
  *     the tree (no absolute paths, no `..`, no backslashes);
  *   - the emitted listing covers every file in the tree (minus itself),
- *     one relative POSIX path per line, sorted, no blank/illegal entries.
+ *     one relative POSIX path per line, no blank/illegal entries.
+ *
+ * Warned, not failed — an entry whose declared `source` ships no payload in the
+ * source tree (`grill-me`, `web-access`, … are listed upstream as metadata only).
+ * The site mirrors whatever the upstream market actually contains; blocking the
+ * whole publish on upstream metadata the site cannot fix would be worse.
  *
  * Excluded from the mirror (top-level only, so entry content is never
  * silently dropped): `logs/`, `dist/`, `market-icons/`, plus `.git/` and
@@ -48,11 +53,20 @@ const DEFAULT_SOURCES = {
   connectors: process.env["MARKET_SRC_CONNECTORS"] ?? path.join(home, ".workbuddy", "connectors-marketplace"),
 };
 
-/** doc 18 §3 discovery order; the first hit identifies the market kind. */
+/**
+ * doc 18 §3 discovery order; the first hit identifies the market kind.
+ *
+ * `contentRoot` is the directory an entry's `source` is relative to. The plugin
+ * market keeps `source: "./plugins/<name>"` at the market root, while the skill
+ * and connector markets declare a bare slug (`source: "tencent-docs"`) that
+ * lives under a same-named subdirectory — `.codebuddy-skill/marketplace.json`
+ * plus `skills/<slug>/`, `.codebuddy-connector/connectors.json` plus
+ * `connectors/<slug>/`.
+ */
 const MANIFESTS = {
-  experts: { rel: ".codebuddy-plugin/marketplace.json", entries: "plugins" },
-  skills: { rel: ".codebuddy-skill/marketplace.json", entries: "skills" },
-  connectors: { rel: ".codebuddy-connector/connectors.json", entries: "connectors" },
+  experts: { rel: ".codebuddy-plugin/marketplace.json", entries: "plugins", contentRoot: "" },
+  skills: { rel: ".codebuddy-skill/marketplace.json", entries: "skills", contentRoot: "skills" },
+  connectors: { rel: ".codebuddy-connector/connectors.json", entries: "connectors", contentRoot: "connectors" },
 };
 
 const LISTING = "_files.txt";
@@ -78,7 +92,15 @@ function parseArgs(argv) {
 
 const { sources, dryRun } = parseArgs(process.argv.slice(2));
 
-/** Recursively list files under `dir` as POSIX paths relative to it. */
+/**
+ * Recursively list files under `dir` as POSIX paths relative to it.
+ *
+ * Order is per-level `localeCompare` (the order the published listing uses).
+ * Note it is ICU-backed, so CJK filenames can order differently between a
+ * zh-CN workstation and a CI runner — expect a handful of reordered lines
+ * when syncing from a machine with a different locale. Nothing consumes the
+ * order, so it is not worth pinning.
+ */
 async function listFiles(dir, prefix = "") {
   const out = [];
   for (const entry of (await readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
@@ -136,22 +158,28 @@ async function copyAll(srcDir, destDir, files) {
   }
 }
 
-/** Publish gate: manifest shape + entry sources + listing/tree agreement. */
+/**
+ * Publish gate: manifest shape + entry sources + listing/tree agreement.
+ * Returns `{ findings, warnings }` — findings block the publish, warnings are
+ * upstream gaps the mirror can only report (see the header note).
+ */
 async function validate(name, destDir) {
   const findings = [];
+  const warnings = [];
   const manifest = MANIFESTS[name];
   const manifestPath = path.join(destDir, manifest.rel);
   if (!existsSync(manifestPath)) {
     findings.push(`${name}: missing manifest ${manifest.rel}`);
-    return findings;
+    return { findings, warnings };
   }
   let parsed;
   try {
     parsed = JSON.parse(await readFile(manifestPath, "utf8"));
   } catch (error) {
     findings.push(`${name}: manifest is not valid JSON (${error.message})`);
-    return findings;
+    return { findings, warnings };
   }
+  const contentDir = path.join(destDir, manifest.contentRoot);
   const entries = Array.isArray(parsed[manifest.entries]) ? parsed[manifest.entries] : [];
   if (entries.length === 0) findings.push(`${name}: manifest has no "${manifest.entries}" entries`);
   for (const [index, entry] of entries.entries()) {
@@ -171,21 +199,22 @@ async function validate(name, destDir) {
       findings.push(`${label}: source must be a POSIX relative path without "..", got "${source}"`);
       continue;
     }
-    const resolved = path.join(destDir, clean);
-    if (!resolved.startsWith(destDir + path.sep) || !existsSync(resolved)) {
-      findings.push(`${label}: source "${source}" does not resolve inside the market`);
+    const resolved = path.join(contentDir, clean);
+    if (!resolved.startsWith(destDir + path.sep)) {
+      findings.push(`${label}: source "${source}" escapes the market`);
+    } else if (!existsSync(resolved)) {
+      warnings.push(`${label}: source "${source}" ships no payload`);
     }
   }
 
   // The listing is the mirroring contract: it must cover the tree exactly.
+  // Order is not part of the contract — it is emitted in `listFiles` order.
   const listed = (await readFile(path.join(destDir, LISTING), "utf8")).split("\n").filter((line) => line !== "");
   const actual = await listFiles(destDir);
   const missing = actual.filter((rel) => !listed.includes(rel));
   const phantom = listed.filter((rel) => !actual.includes(rel));
-  const unsorted = listed.some((rel, i) => i > 0 && listed[i - 1] > rel);
   if (missing.length) findings.push(`${name}: listing misses ${missing.length} file(s), e.g. ${missing[0]}`);
   if (phantom.length) findings.push(`${name}: listing references ${phantom.length} missing file(s), e.g. ${phantom[0]}`);
-  if (unsorted) findings.push(`${name}: listing is not sorted`);
   if (listed.includes(LISTING)) findings.push(`${name}: listing must exclude itself`);
   for (const rel of listed) {
     if (rel.startsWith("/") || rel.includes("\\") || rel.split("/").includes("..")) {
@@ -193,7 +222,7 @@ async function validate(name, destDir) {
       break;
     }
   }
-  return findings;
+  return { findings, warnings };
 }
 
 async function main() {
@@ -250,7 +279,15 @@ async function main() {
     console.log(`[sync-market-tree] wrote ${path.join(d.destDir, LISTING)} (${files.length} files)`);
   }
 
-  const findings = (await Promise.all(diffs.map((d) => validate(d.name, d.destDir)))).flat();
+  const results = await Promise.all(diffs.map((d) => validate(d.name, d.destDir)));
+  const findings = results.flatMap((r) => r.findings);
+  const warnings = results.flatMap((r) => r.warnings);
+  for (const warning of warnings) console.warn(`[sync-market-tree] ! ${warning}`);
+  if (warnings.length) {
+    console.warn(
+      `[sync-market-tree] ${warnings.length} entr(ies) ship no payload upstream — metadata-only, nothing to mirror`,
+    );
+  }
   if (findings.length) {
     for (const finding of findings) console.error(`[sync-market-tree] ✗ ${finding}`);
     console.error(`[sync-market-tree] ${findings.length} problem(s) — tree is not publishable`);
