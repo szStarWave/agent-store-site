@@ -44,7 +44,7 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const siteRoot = path.resolve(here, "..");
-const sourceRoot = path.join(siteRoot, "market-source");
+export const sourceRoot = path.join(siteRoot, "market-source");
 
 const home = homedir();
 const DEFAULT_SOURCES = {
@@ -63,13 +63,13 @@ const DEFAULT_SOURCES = {
  * plus `skills/<slug>/`, `.codebuddy-connector/connectors.json` plus
  * `connectors/<slug>/`.
  */
-const MANIFESTS = {
+export const MANIFESTS = {
   experts: { rel: ".codebuddy-plugin/marketplace.json", entries: "plugins", contentRoot: "" },
   skills: { rel: ".codebuddy-skill/marketplace.json", entries: "skills", contentRoot: "skills" },
   connectors: { rel: ".codebuddy-connector/connectors.json", entries: "connectors", contentRoot: "connectors" },
 };
 
-const LISTING = "_files.txt";
+export const LISTING = "_files.txt";
 const TOP_EXCLUDES = new Set(["logs", "dist", "market-icons"]);
 const DEEP_EXCLUDES = new Set([".git", "node_modules"]);
 
@@ -101,7 +101,7 @@ const { sources, dryRun } = parseArgs(process.argv.slice(2));
  * when syncing from a machine with a different locale. Nothing consumes the
  * order, so it is not worth pinning.
  */
-async function listFiles(dir, prefix = "") {
+export async function listFiles(dir, prefix = "") {
   const out = [];
   for (const entry of (await readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
     const rel = `${prefix}${entry.name}`;
@@ -225,7 +225,7 @@ async function validate(name, destDir) {
   return { findings, warnings };
 }
 
-async function main() {
+export async function main() {
   const starts = Object.entries(sources);
   const unknown = starts.filter(([name]) => !MANIFESTS[name]);
   if (unknown.length) {
@@ -296,4 +296,7 @@ async function main() {
   console.log("[sync-market-tree] validation passed — tree is publishable");
 }
 
-await main();
+// Exported for `check-market.mjs` (shared listing/manifest definitions). Only run
+// the mirror when invoked as a CLI, so importing this file stays side-effect free.
+const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly) await main();

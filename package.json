@@ -13,6 +13,8 @@
     "typecheck": "tsc --noEmit",
     "check:docs-sync": "node scripts/check-docs-sync.mjs",
     "test:docs-sync": "bun test scripts/check-docs-sync.test.mjs",
+    "check:market": "node scripts/check-market.mjs",
+    "test:market": "bun test scripts/check-market.test.mjs",
     "release:pack": "node scripts/release.mjs pack",
     "release:publish": "node scripts/release.mjs publish",
     "release:status": "node scripts/release.mjs status"
