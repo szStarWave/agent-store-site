@@ -110,7 +110,7 @@ node -p "require('@flowy-agent-store/sdk/package.json').version"
 bun run typecheck && bun run test
 ```
 
-If you point `AGENT_STORE_BIN` at a self-built binary, note that the SDK **checks the readiness line's `protocol_version` against its own** (see the TypeScript SDK guide §2): after upgrading the SDK an older binary is rejected, so update the binary in the same step.
+If you point `AGENT_STORE_BIN` at a self-built binary, note that the SDK **checks the readiness line's `protocol_version` against its own** (see the [TypeScript SDK cookbook](/en-US/docs/examples-sdk) §12): after upgrading the SDK an older binary is rejected, so update the binary in the same step.
 
 ### 6.2 From 0.1.0 back onto the beta line
 
@@ -168,7 +168,7 @@ So this page states **what happened** (publish times, dist-tags, artifact differ
 
 ## 10. See also
 
-- [TypeScript SDK guide](/en-US/docs/typescript-sdk): install, API, events, error model and examples.
+- [TypeScript SDK reference](/en-US/docs/typescript-sdk): install, API, events and error model; runnable examples in the [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
 - [Quick start](/en-US/docs/quick-start): the installer path for end users.
 - [Compatibility matrix](/en-US/docs/compatibility): supported platforms and source formats.
 - [Changelog](/en-US/docs/changelog): what changed in each published version, and the announcement surface for breaking changes.

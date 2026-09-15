@@ -60,12 +60,14 @@ prerender 请求失败（构建卡在准备输出目录阶段）。因此由
 ## 内容来源
 
 1. **源仓库** —— `app/lib/platform.ts` 中的 `GITHUB_REPO`（`Michael-Lfx/allo`）
-   是**源**仓库；发布版二进制文件并不存放在该仓库，而是由 VPS 下载主机
-   （`DOWNLOAD_HOST`，目前为裸 IP 的 HTTP 源）分发。
+   是**源**仓库；发布版二进制文件既不存在于该仓库，也不由本站托管，而是由
+   GitHub Releases（`content/release.json` 的 `repo`）分发。
 2. **下载链接** —— 同一文件中的 `RELEASED_PLATFORMS` 是“实际已发布内容”的
    唯一权威来源：只有已发布的平台（目前为 Windows x64）会获得直接的资源 URL
-   （`flowy-agent-store-<tag>-<os>-<arch>.zip`）；其余平台统一导向下载中心，
-   而非返回 404。请与 `content/docs/{zh-CN,en-US}/compatibility.md` 保持一致。
+   （`flowy-agent-store-<tag>-<os>-<arch>.zip`）；其余平台统一导向 GitHub
+   Releases 页，而非返回 404。**本站不托管下载产物**：域名下没有 `/downloads/*`
+   （也不做重定向），二进制一律走 GitHub Releases——产物体积和 git 历史都不受影响。
+   请与 `content/docs/{zh-CN,en-US}/compatibility.md` 保持一致。
 3. **CLI 名称** —— 文档中以 `flowy-agent-store` 作为运行时命令；若可分发包
    名称不同，请相应调整。
 

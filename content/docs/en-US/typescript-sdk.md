@@ -1,4 +1,4 @@
-# TypeScript SDK guide
+# TypeScript SDK reference
 
 Flowy Agent Store ships three companion TypeScript packages that let Node.js / Electron / browser applications talk to a local App Server in a type-safe way:
 
@@ -9,6 +9,8 @@ Flowy Agent Store ships three companion TypeScript packages that let Node.js / E
 | `@flowy-agent-store/sdk` | Spawn the `flowy-agent-store` binary → loopback WebSocket → ready client | Node.js (`node:child_process`, …) | `@flowy-agent-store/client`, `@flowy-agent-store/protocol` |
 
 Mix and match: **types only** → `protocol`; **connect to an already-running App Server** (e.g. a desktop app) → `client` with your own `WebSocketTransport`; **launch the whole runtime yourself** → `launchClient` from `sdk`.
+
+Runnable, copy-pasteable examples (Node / browser / Electron / Store / sessions / Runs) live in the [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
 
 > **This page is for developers.** End users do not need it — grab the installer and follow [Quick start](/en-US/docs/quick-start). Two distinct paths: **end users → installer / `install.ps1`**; **developers → npm packages (this page)**.
 
@@ -27,68 +29,22 @@ bun add @flowy-agent-store/protocol
 All packages ship ESM + CJS (`exports` maps `import` / `require` / `types`); they work out of the box in Node and bundlers.
 
 > **Version status**: all three packages are `0.1.0-beta.*` pre-releases (the API is not frozen, and **no backward compatibility is promised during beta**). Pin an **exact** version in production — this page and the repo currently correspond to `0.1.0-beta.3`. Do not rely on a bare `bun add`: the registry's `latest` currently points at `0.1.0-beta.2`, **not** the newest `0.1.0-beta.3`. For dist-tag semantics, per-version upgrade steps and self-check commands see the [Upgrade and migration guide](/en-US/docs/upgrade).
-> **Protocol surface scope**: the `APP_SERVER_PROTOCOL_VERSION` example in §3 and the method counts in §7.3 follow the **working tree (source)**, which is already ahead of every published version (the three MCP declaration methods and `store/list`'s `published_at` are in no release yet). For the unpublished diff see §8 of the [Upgrade and migration guide](/en-US/docs/upgrade) and §4 of the [Changelog](/en-US/docs/changelog).
+> **Protocol surface scope**: the `APP_SERVER_PROTOCOL_VERSION` example in §2 and the method counts in §5.3 follow the **working tree (source)**, which is already ahead of every published version (the three MCP declaration methods, `store/list`'s `published_at`, and the `conversation/list-changed` notification are in no release yet). For the unpublished diff see §8 of the [Upgrade and migration guide](/en-US/docs/upgrade) and §4 of the [Changelog](/en-US/docs/changelog).
 > **Runtime**: Node.js **≥ 22** (relies on the global `WebSocket`) or Bun; the lower bound is declared by each package's `engines.node`.
 
 ---
 
-## 2. Quick start (one-liner with the SDK)
+## 2. `@flowy-agent-store/protocol` — the wire layer
 
-```ts
-import { launchClient } from "@flowy-agent-store/sdk";
-
-const session = await launchClient({
-  client: { name: "my-app", version: "0.1.0" },
-});
-const store = await session.client.listStore();
-await session.close();
-```
-
-What `launchClient` does:
-
-1. Locates the `flowy-agent-store` binary via `bin` → `AGENT_STORE_BIN` → `PATH`;
-2. Spawns it with `--host 127.0.0.1 --port 0 --no-open` and an auto-created temp `--data-dir`;
-3. Scans stdout for the readiness line (`{"agent_store":"listening",...}`) to learn the actual port;
-4. **Validates the readiness `protocol_version` against the SDK** — on mismatch it kills the process and reports both versions;
-5. Opens a loopback WebSocket and performs the `initialize` → `initialized` handshake, returning a ready `AppServerClient`.
-
-### Full lifecycle example
-
-```ts
-import { launchClient } from "@flowy-agent-store/sdk";
-
-const session = await launchClient({ client: { name: "demo", version: "1.0.0" } });
-try {
-  // Catalog (Store)
-  const items = await session.client.listStore();
-  console.log(`${items.items.length} items in the store`);
-
-  // Install and run an agent
-  await session.client.installStoreEntry("experts", "frontend-backend-experts");
-  const receipt = await session.client.runs.agent({
-    agentId: "frontend-backend-experts",
-    goal: "Generate a todo REST API",
-  });
-  const result = await session.client.runs.result(receipt.run_id);
-  console.log(result.status);
-} finally {
-  await session.close(); // terminate child + remove temp data-dir
-}
-```
-
----
-
-## 3. `@flowy-agent-store/protocol` — the wire layer
-
-### 3.1 Position
+### 2.1 Position
 
 The single TypeScript source of truth for the wire contract: every request/response/notification type, the `APP_SERVER_PROTOCOL_VERSION` constant, and structured errors. **No runtime code at all** — consumable by client, sdk, or anything else speaking the protocol.
 
-### 3.2 Main exports
+### 2.2 Main exports
 
 | Export | Meaning |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | Protocol version string (**currently** `"2026-09-18"` in the working tree; each wire change takes a new date); the handshake and SDK checks compare it for strict equality |
+| `APP_SERVER_PROTOCOL_VERSION` | Protocol version string (**currently** `"2026-09-19"` in the working tree; each wire change takes a new date); the handshake and SDK checks compare it for strict equality |
 | `InitializeRequest` / `InitializeResult` | Handshake request/response (incl. `protocol_version`, server info) |
 | `ClientInfo` / `ClientCapabilities` | Caller self-description |
 | `StoreList` / `StoreInstallResult` | Winget-style unified catalog |
@@ -100,12 +56,12 @@ The single TypeScript source of truth for the wire contract: every request/respo
 | `ConversationView` / `ConversationMessage` / `ConversationEvent` / `ConversationSendReceipt` | Persistent conversations |
 | `RunReceipt` / `RunView` / `RunResult` / `RunEvent` | Run lifecycle |
 | `JsonRpcRequest` / `JsonRpcResponse` / `JsonRpcNotification` | Wire frame types |
-| `ServerNotification` | Server notifications (`event`, `conversation/event`, `run/resync-required`, …) |
+| `ServerNotification` | Server notifications (`event`, `conversation/event`, `conversation/list-changed`, `run/resync-required`, …) |
 | `WireError` | Server error payload |
 
 > Experimental capabilities (full Team collaboration, event cursor catch-up) stay marked `experimental` and are excluded from stable exports.
 
-### 3.3 Error model (`errors.ts`)
+### 2.3 Error model (`errors.ts`)
 
 **Branch on the stable `code`, never parse the human-readable message:**
 
@@ -138,13 +94,13 @@ try {
 
 ---
 
-## 4. `@flowy-agent-store/client` — the transport-agnostic client
+## 3. `@flowy-agent-store/client` — the transport-agnostic client
 
-### 4.1 Position
+### 3.1 Position
 
 Pure business layer: every method goes through the injected `Transport`. No HTTP, no DOM, no Node in the package. The connection lifecycle (`connect → initialize → version check → initialized → ready`) lives here, so business code never knows whether the channel is WebSocket, stdio, or a future one-shot HTTP binding.
 
-### 4.2 The `Transport` interface
+### 3.2 The `Transport` interface
 
 ```ts
 export interface Transport {
@@ -181,7 +137,7 @@ await client.connect(); // initialize handshake + version check
 
 Bring your own transport by implementing the interface: an in-memory fake for tests, stdio for CLIs, Node WebSocket in Electron main — business code does not change.
 
-### 4.3 `AppServerClient` top-level methods
+### 3.3 `AppServerClient` top-level methods
 
 | Method | Wire method | Meaning |
 | --- | --- | --- |
@@ -207,7 +163,7 @@ Bring your own transport by implementing the interface: an in-memory fake for te
 > To tell "no markets at all" from "still loading": `listStore()` (that is, `store/list`) now returns `markets_pending` — `true` means the builtin markets are still registering in the background and the catalog may be incomplete.
 > If you own a fixed `dataDir`, later calls on it short-circuit idempotently and do no network I/O.
 
-### 4.4 Sub-clients
+### 3.4 Sub-clients
 
 All constructed on the same transport; every method returns `Promise<T>`.
 
@@ -327,16 +283,18 @@ client.workspaces.revoke(workspaceId: string): Promise<WorkspaceRevokeResult>; /
 
 ---
 
-## 5. `@flowy-agent-store/sdk` — the Node host
+## 4. `@flowy-agent-store/sdk` — the Node host
 
-### 5.1 `launchClient(options): Promise<LaunchedClient>`
+### 4.1 `launchClient(options): Promise<LaunchedClient>`
+
+One call does four things: locate and spawn the runtime → wait for the readiness line to learn the real port → connect over loopback → run the `initialize` / `initialized` handshake. The `client` it returns is ready to use.
 
 ```ts
 interface LaunchOptions extends SpawnOptions {
   client: ClientInfo;             // { name, version }
   capabilities?: ClientCapabilities;
   token?: string;                 // handed to WebSocketTransport
-  requestTimeoutMs?: number;      // default 30s (not enough for the first store/list — see the §4.3 warning)
+  requestTimeoutMs?: number;      // default 30s (not enough for the first store/list — see the §3.3 warning)
 }
 
 interface LaunchedClient {
@@ -347,12 +305,36 @@ interface LaunchedClient {
 }
 ```
 
-### 5.2 Lower-level primitives
+The fields `LaunchOptions` adds itself (`SpawnOptions` fields are in §4.2):
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `client` | — | **Required**; identifies the caller in the handshake (server logs and audit) |
+| `capabilities` | omitted | `{ events?, approvals?, team_runtime?, artifacts? }` — which capabilities the client will consume |
+| `token` | omitted | Handed to `WebSocketTransport`; the WebSocket API cannot set headers, so it travels as `?token=…` on the loopback URL. Required when the host runs with `--auth`, optional in local mode (`auth: "disabled-local"`) |
+| `requestTimeoutMs` | `30000` | **Per-request** timeout, unrelated to startup; the first `store/list` on a cold data-dir mirrors the market tree, so raise it (see §12 of the examples page) |
+
+What `LaunchedClient` carries:
+
+| Member | Content | Use it for |
+| --- | --- | --- |
+| `client` | A connected, initialized `AppServerClient` | Every business call |
+| `initializeResult` | The handshake response | Recording or asserting the protocol fingerprint |
+| `server.readiness` | The parsed readiness line: `{ host, port, url, protocol_version, version, auth }` | Logging; the `url` a hand-rolled `HttpTransport` needs; deciding from `auth` whether a `token` is required |
+| `server.dataDir` | The data-dir the child actually uses | Diagnosis and isolation assertions (an auto-created temp dir shows up here too) |
+| `server.exited` | A `Promise<{ code, signal }>` that never rejects | Observing crashes and exits (contract in §4.4) |
+| `close()` | Unsubscribe → close transport → kill child → remove an auto-created data-dir | Call it in `finally`; safe to repeat |
+
+**What it does not do**: it does not configure models or providers (that is `config.toml` and the host's settings surface); it does not download the binary; without `dataDir` it does not persist anything (a one-shot sandbox); it does not restart the child or install process-exit hooks.
+
+Copy-paste recipes (minimal call, your own data-dir, a token, failure handling, process-only) live in the [examples page](/en-US/docs/examples-sdk) §3.
+
+### 4.2 Lower-level primitives
 
 | Export | Meaning |
 | --- | --- |
 | `spawnAppServer(options: SpawnOptions)` | Spawn + wait for readiness only (no connect). `SpawnOptions` below |
-| `resolveAppServerBin(explicit?)` | Locate the binary (§5.3) |
+| `resolveAppServerBin(explicit?)` | Locate the binary (§4.3) |
 | `parseReadinessLine(line)` | Parse one line; `null` when not the readiness line |
 | `ReadinessInfo` | `{ host, port, url, protocol_version, version, auth }` |
 | `assertProtocolCompatible(runtimeVersion)` | Throws on mismatch (both versions in the message) |
@@ -375,15 +357,15 @@ interface SpawnOptions {
 
 `SpawnedServer.exited` is a `Promise<SpawnExitInfo>` that **never rejects**: it settles whenever the child ends, for any reason — the only entry point for observing a runtime crash.
 
-### 5.3 Binary resolution
+### 4.3 Binary resolution
 
-Order: `bin` argument → env `AGENT_STORE_BIN` → `flowy-agent-store` / `flowy-agent-store.exe` on `PATH`. Not found ⇒ **hard error; never downloads or guesses** (release-asset download is P2).
+Order: the `bin` argument → the `AGENT_STORE_BIN` environment variable → the **platform runtime package** `@flowy-agent-store/runtime-<platform>-<arch>` (`vendor/flowy-agent-store[.exe]`; it is an optionalDependency of the SDK, so a normal install has it) → `flowy-agent-store` / `flowy-agent-store.exe` on `PATH`. When none of them hits it is a **hard error — never a download or a guess** (the message names all four routes; release-asset download is P2).
 
 ```bash
 AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node your-app.mjs
 ```
 
-### 5.4 Runtime contract (P0, verified)
+### 4.4 Runtime contract (P0, verified)
 
 - **Loopback enforced**: the child always runs `--host 127.0.0.1 --no-open`; the SDK only ever dials the process it spawned (`isLoopbackUrl` rejects anything else before connecting).
 - **Data-dir exclusivity**: omit `dataDir` ⇒ auto `mkdtemp`, removed on `close()`; passing your own dir means you own it — the backend single-instance lock fails fast (`already in use by another running Flowy backend`).
@@ -393,7 +375,7 @@ AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node your-app.mjs
 - **`env` / `cwd` passthrough**: `env` is **merged over** the parent's `process.env` (not a replacement, so `PATH` etc. stay visible); omitting `cwd` inherits the parent working directory. Both go to `child_process.spawn` unchanged.
 - **Exit is observable**: `SpawnedServer.exited` (`{ code, signal }`) settles whenever the child ends, for **any** reason including a crash or a non-zero code, and `onExit` fires once alongside it. The SDK **never restarts** the runtime; restarting belongs to the caller of `launchClient`.
 
-### 5.5 Errors and cleanup
+### 4.5 Errors and cleanup
 
 - Spawn failure: the error appends the **last 50 stderr lines** (`stderr tail:` section).
 - Timeout: after the default 120s it throws `timed out waiting for the runtime readiness line`.
@@ -412,28 +394,11 @@ try {
 
 ---
 
-## 6. Full scenario: browser talking to the desktop app
-
-When a desktop App Server is already running, the browser connects directly (no sdk):
-
-```ts
-import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
-
-const ws = new WebSocketTransport(`ws://127.0.0.1:8787/api/app-server/ws`);
-const client = new AppServerClient({ transport: ws, client: { name: "web", version: "1.0.0" } });
-await client.connect();
-console.log("connected:", client.ready);
-```
-
-> Browser WebSockets cannot set custom headers: `WebSocketTransport` appends `token` as `?token=`; Node-side HTTP uses the `Authorization` header.
-
----
-
-## 7. Per-method API reference
+## 5. Per-method API reference
 
 How the three packages' real exports line up with the protocol methods. Method names follow `05`; this table introduces no new ones.
 
-### 7.1 `AppServerClient` top-level methods
+### 5.1 `AppServerClient` top-level methods
 
 | Method | Params | Returns | Protocol method |
 | --- | --- | --- | --- |
@@ -458,7 +423,7 @@ How the three packages' real exports line up with the protocol methods. Method n
 | `listStore()` | — | `StoreList` | `store/list` |
 | `installStoreEntry(marketplaceId, entryName)` | `string, string` | `StoreInstallResult` | `store/install-entry` |
 
-### 7.2 Sub-clients
+### 5.2 Sub-clients
 
 | Sub-client | Methods | Protocol methods |
 | --- | --- | --- |
@@ -472,7 +437,7 @@ How the three packages' real exports line up with the protocol methods. Method n
 | `workspaces` | `list()` / `create(path)` / `revoke(id)` | `workspace/list` / `workspace/create` / `workspace/revoke` |
 | `models` | `list()` | `models/list` |
 
-### 7.3 HTTP binding
+### 5.3 HTTP binding
 
 HTTP and WebSocket are two bindings of one method semantics. `httpRouteTable()` returns the **machine-readable route table** (method → verb + path + provenance), so this guide does not hand-copy it:
 
@@ -491,7 +456,7 @@ const routes = httpRouteTable();
 - Every call performs its own handshake (`initialize` → `initialized` → business call), so `connect()` is a no-op. Host-side code that needs a ready connection id calls `openConnection()`.
 - `/api/fs/*` (browse / list / read / metadata) is a host file service, not a protocol method, and is not part of this package.
 
-### 7.4 Answering approvals: `run/answer-decision`
+### 5.4 Answering approvals: `run/answer-decision`
 
 A run stops when it needs a human decision: `run/events` projects `approval.requested`, and the answer goes through `runs.answerDecision(input)`:
 
@@ -516,9 +481,9 @@ await client.runs.answerDecision({
 - **There is no `always_allow`**: the desktop confirmation route's approve-all switch is not part of this protocol. The params are `deny_unknown_fields`, so sending it fails with `invalid_request`.
 - `RunEvent.step_id` / `attempt_id` are present only when the engine scoped the event to an attempt (typically `approval.requested` / `approval.responded`).
 
-## 8. Event reference: `sequence` and catch-up
+## 6. Event reference: `sequence` and catch-up
 
-### 8.1 Event types
+### 6.1 Event types
 
 `ConversationEventType` is a **closed union** (`protocol.ts`) with 9 members:
 
@@ -540,14 +505,15 @@ A `message.activity` frame whose `kind === "turn_completed"` also carries **this
 
 `message.error` decodes `code` (the server's error code) and `retryable` alongside the message text. `retryable` is **three-valued**: `true`, `false`, or `null` — `null` means the wire did not supply it (history rows, commonly), and callers must not guess it into `false` or `true`. Re-reading the send receipt also exposes `result_error_retryable`, which agrees with it.
 
-### 8.2 `sequence` semantics
+### 6.2 `sequence` semantics
 
 - `sequence` is a **per-conversation, monotonic and contiguous** counter (the server keeps one per conversation). It is not a global ordinal.
 - Unsubscribing destroys that counter; resubscribing starts at `1`, which is why `rearm()` resets the local cursor to `0`.
 - Gap detection: `sequence > lastSeen + 1` while `lastSeen > 0` means loss — the subscription emits `onResync("gap")` and triggers catch-up.
 - Duplicates and out-of-order frames (`sequence <= lastSeen`) are dropped and never re-delivered.
+- **List-projection notifications are not part of that counter**: `conversation/list-changed` (the conversation list's `created` / `updated` / `deleted`; auto-titling arrives as `updated`) **carries no `sequence`**, so it must never advance `lastSeen` or take part in the gap check above. It is a best-effort hint — losing one only delays a refresh, while `conversation/list` stays authoritative.
 
-### 8.3 Catch-up
+### 6.3 Catch-up
 
 Conversations and runs catch up through different carriers:
 
@@ -558,7 +524,7 @@ Conversations and runs catch up through different carriers:
 
 Conversation subscriptions auto-catch-up by default (`autoResync`) and run at most one fetch at a time (bursts coalesce); the fetched page is handed to `onBackfill`. If your layer owns the pagination cursor, pass `autoResync: false` and listen only to `onResync`, then reload authoritatively yourself.
 
-On a `client` that has already `connect()`ed (full setup in §10):
+On a `client` that has already `connect()`ed (full setup in the [TypeScript SDK cookbook](/en-US/docs/examples-sdk)):
 
 ```ts
 const subscription = await client.conversations.follow(conversationId);
@@ -570,7 +536,7 @@ subscription.onBackfill((snapshot) => resetTranscript(snapshot.messages));
 subscription.onError((error) => report(error));
 ```
 
-## 9. Error model and retry
+## 7. Error model and retry
 
 All four error classes are exported from `@flowy-agent-store/protocol`; `retryable` is the stable contract (never branch on `message`):
 
@@ -593,64 +559,11 @@ All four error classes are exported from `@flowy-agent-store/protocol`; `retryab
 | `shouldRetry` | protocol `retryable` | custom predicate |
 | `sleep` | `setTimeout` | injectable (tests) |
 
-```ts
-import { withRetry } from "@flowy-agent-store/client";
-
-const view = await withRetry(() => client.runs.get(runId), {
-  maxAttempts: 4,
-  onRetry: ({ attempt, delayMs }) => log(`retry ${attempt} in ${delayMs}ms`),
-});
-```
+For a runnable `withRetry` example see the [TypeScript SDK cookbook](/en-US/docs/examples-sdk) §11.
 
 Writes carrying an `idempotency_key` / `command_id` replay safely: the App Server deduplicates same-key requests instead of executing twice.
 
-## 10. Examples: Node / browser / Electron
-
-### 10.1 Node: launch a local runtime in one call
-
-```ts
-import { launchClient } from "@flowy-agent-store/sdk";
-
-const launched = await launchClient({ client: { name: "my-tool", version: "1.0.0" } });
-try {
-  const conversation = await launched.client.conversations.create({ name: "demo" });
-  const subscription = await launched.client.conversations.follow(conversation.conversation_id);
-  subscription.onEvent((event) => console.log(event.event_type));
-  await launched.client.conversations.send(conversation.conversation_id, "hello", crypto.randomUUID());
-} finally {
-  await launched.close();
-}
-```
-
-### 10.2 Browser: connect to an already-running server
-
-The browser spawns nothing and only connects over WebSocket; `WebSocketTransport` passes credentials as `?token=` (browser WebSocket cannot set custom headers).
-
-```ts
-import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
-
-const transport = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", { token });
-const client = new AppServerClient({ transport, client: { name: "web", version: "1.0.0" } });
-await client.connect();
-```
-
-### 10.3 Electron: spawn in the main process, connect from the renderer
-
-The main process owns the binary and the data dir; the renderer only receives a loopback URL and token. Keep credentials in the main process (OS credential store), never in the renderer or in plaintext config.
-
-```ts
-import { spawnAppServer } from "@flowy-agent-store/sdk";
-
-const server = await spawnAppServer({ dataDir: app.getPath("userData") });
-win.webContents.send("app-server-ready", {
-  url: `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`,
-});
-app.on("before-quit", () => void server.close());
-```
-
-For pure request/response work (no live events) use `HttpTransport`; it subscribes to nothing and handshakes per call.
-
-## 11. MCP integration guide
+## 8. MCP integration guide
 
 The official MCP path for Agent Store is the **connector descriptor**, with no second format introduced:
 
@@ -666,242 +579,12 @@ Remote HTTP/SSE and local stdio servers are both described verbatim in the manif
 
 More manifest fields and examples: [Plugins and market](/en-US/docs/plugins-market).
 
-## 12. Next steps
+## 9. Next steps
 
 
-- Full method semantics: repo `docs/agent-store/05-allo-app-server-protocol.md`.
+- Full method semantics: repo `docs/agent-store/05-flowy-agent-store-app-server-protocol.md`.
 - Implementation and test samples: `web/packages/{protocol,client,sdk}/src` (the sdk has `spawn.test.ts`, `readiness.test.ts`).
 - Browser-only helpers (asset `<img>` URLs, `/api/fs/browse`): implemented by the host app, not in these three packages.
+- Runnable examples: [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
 
 ---
-
-## 13. Examples (end-to-end)
-
-This chapter consolidates the scattered fragments from earlier sections into complete, copy-pasteable scenarios. Every snippet assumes you already have a ready `client` from `launchClient` (or a hand-built `AppServerClient`), and uses `try/finally` to guarantee `close()`.
-
-> The real-time examples (session / Run `follow`) require `WebSocketTransport`; for pure request-response use `HttpTransport` (see §7.3).
-
-### 13.1 Launch / connect on three platforms
-
-**Node: launch the local runtime in one line** (the SDK handles spawn + loopback connect + handshake):
-
-```ts
-import { launchClient } from "@flowy-agent-store/sdk";
-
-const launched = await launchClient({ client: { name: "my-tool", version: "1.0.0" } });
-try {
-  const conversation = await launched.client.conversations.create({ name: "demo" });
-  const subscription = await launched.client.conversations.follow(conversation.conversation_id);
-  subscription.onEvent((event) => console.log(event.event_type));
-  await launched.client.conversations.send(conversation.conversation_id, "hello", crypto.randomUUID());
-} finally {
-  await launched.close(); // terminate the child process + remove the temp data-dir
-}
-```
-
-**Browser: connect to an already-running server only** (no spawning; credentials go via `?token=`):
-
-```ts
-import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
-
-const transport = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", { token });
-const client = new AppServerClient({ transport, client: { name: "web", version: "1.0.0" } });
-await client.connect();
-```
-
-**Electron: spawn in the main process, connect over loopback in the renderer** (keep credentials in the main process, never the renderer):
-
-```ts
-import { spawnAppServer } from "@flowy-agent-store/sdk";
-
-const server = await spawnAppServer({ dataDir: app.getPath("userData") });
-win.webContents.send("app-server-ready", {
-  url: `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`,
-});
-app.on("before-quit", () => void server.close());
-```
-
-> **Full Electron integration (main / preload / renderer)**
->
-> The snippet above is the minimal skeleton. In a real Electron app, keep "runtime launch and credentials" in the main process; the renderer only receives the loopback URL (and an optional token). Credentials (OAuth tokens, system keychain) must never reach the renderer or be written to plaintext config.
-
-**Main process `main.ts`** — spawn the runtime, hand the connection info to the renderer over IPC, and clean up on quit:
-
-```ts
-import { app, BrowserWindow, ipcMain } from "electron";
-import { spawnAppServer, type SpawnedServer } from "@flowy-agent-store/sdk";
-import { join } from "node:path";
-
-let server: SpawnedServer | null = null;
-
-async function startBackend() {
-  server = await spawnAppServer({
-    dataDir: join(app.getPath("userData"), "agent-store"),
-  });
-
-  // Loopback WS URL (under loopback, auth is usually disabled-local, no token needed)
-  const wsUrl = `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`;
-  const token = server.readiness.auth === "disabled-local" ? undefined : await getHostToken();
-
-  // The renderer pulls it on demand
-  ipcMain.handle("agent-store:get-connection", () => ({ url: wsUrl, token }));
-
-  // Crash visibility: log unexpected exits (the SDK does not auto-restart)
-  server.exited.then((info) => {
-    console.warn("agent-store runtime exited:", info.code, info.signal);
-  });
-}
-
-app.whenReady().then(startBackend);
-
-app.on("before-quit", async (event) => {
-  if (server) {
-    event.preventDefault(); // wait for cleanup before exiting
-    await server.close();
-    server = null;
-  }
-  app.exit();
-});
-```
-
-> `getHostToken()` is implemented by the host itself — only needed when the server requires a token (i.e. not `disabled-local`); the token is generated/obtained in the main process and never written to renderer-accessible plaintext.
-
-**Preload `preload.ts`** — safely expose to the renderer via `contextBridge` (don't expose the whole `ipcRenderer`):
-
-```ts
-import { contextBridge, ipcRenderer } from "electron";
-
-contextBridge.exposeInMainWorld("agentStore", {
-  getConnection: () => ipcRenderer.invoke("agent-store:get-connection"),
-});
-```
-
-**Renderer `renderer.ts`** — build `AppServerClient` and handshake once the URL arrives:
-
-```ts
-import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
-
-const { url, token } = await window.agentStore.getConnection();
-const transport = new WebSocketTransport(url, { token, requestTimeoutMs: 30_000 });
-const client = new AppServerClient({ transport, client: { name: "electron-ui", version: "1.0.0" } });
-await client.connect();
-
-// All sub-clients are now usable
-const catalog = await client.connectors.list();
-```
-
-> The renderer's `WebSocketTransport` `token` option is appended automatically as a `?token=` query parameter (browser / Electron WebSockets cannot set custom headers). For pure request-response use `HttpTransport`.
-
-### 13.2 Connector OAuth end-to-end
-
-Typical flow: `list` to get the `connectorId` → `authStart` to begin the browser flow → poll `authStatus` until `authenticated` → `logout` to revoke when done.
-
-```ts
-// 1) Get the connectorId from the catalog
-const catalog = await client.connectors.list();
-const github = catalog.find((c) => c.id === "github");
-if (!github) throw new Error("github connector not found in catalog");
-
-// 2) Check auth state first: skip authorization if already authenticated
-const before = await client.connectors.authStatus(github.id);
-if (before.state !== "authenticated") {
-  // 3) Start the host browser OAuth flow (returns immediately with started, non-blocking)
-  const started = await client.connectors.authStart(github.id);
-  if (started.state !== "started") {
-    throw new Error(started.error ?? "auth start failed");
-  }
-
-  // 4) Poll until authenticated (or timeout / reauthorization required)
-  const deadline = Date.now() + 5 * 60_000; // 5 minute grace period
-  let authenticated = false;
-  while (Date.now() < deadline) {
-    const status = await client.connectors.authStatus(github.id);
-    if (status.state === "authenticated") { authenticated = true; break; }
-    if (status.state === "reauthorization_required") {
-      throw new Error("reauthorization required");
-    }
-    await new Promise((r) => setTimeout(r, 1_500)); // 1.5s interval
-  }
-  if (!authenticated) throw new Error("oauth timed out");
-}
-
-// 5) After auth the connector status should be connected (auth ready + last probe succeeded)
-const status = await client.connectors.status(github.id);
-console.log(status.status);
-
-// 6) Revoke the token when done
-await client.connectors.logout(github.id);
-```
-
-> Note: `authStart` only returns `started`, it does **not** return an auth URL or token — the browser flow is owned by the trusted host, and the client only triggers and polls (see §4.4). stdio connectors do not support OAuth; the server returns `OAuth is not supported for stdio connectors`.
-
-### 13.3 Store browsing and installation
-
-```ts
-// List the unified catalog across all marketplaces (may be empty on first call; see markets_pending, §4.3)
-const store = await client.listStore();
-for (const item of store.items) {
-  console.log(item.marketplace_id, item.entry_name, item.kind, item.installed);
-}
-
-// One-click install: import if missing + register
-const receipt = await client.installStoreEntry("experts", "frontend-backend-experts");
-console.log("installed:", receipt.installed);
-
-// Marketplace source management
-const markets = await client.listMarketplaces();
-const added = await client.addMarketplace({ source: "https://example.com/market.json" });
-await client.refreshMarketplace(added.marketplace_id);
-await client.removeMarketplace(added.marketplace_id, /* cascade */ true);
-```
-
-### 13.4 Sessions and Runs
-
-**Session: create → send → receive in real time**
-
-```ts
-import { decodeConversationEvent } from "@flowy-agent-store/protocol";
-
-const conv = await client.conversations.create({ name: "demo" });
-const sub = await client.conversations.follow(conv.conversation_id);
-sub.onEvent((event) => {
-  const decoded = decodeConversationEvent(event);
-  if (decoded.kind === "message.delta") render(decoded.delta, decoded.replace);
-});
-sub.onBackfill((snapshot) => resetTranscript(snapshot.messages));
-sub.onError((error) => report(error));
-
-const receipt = await client.conversations.send(
-  conv.conversation_id,
-  "write me a REST API",
-  crypto.randomUUID(), // explicit idempotency key is required
-);
-```
-
-**Run: start → await result → handle approval**
-
-```ts
-const run = await client.runs.agent({
-  agentId: "frontend-backend-experts",
-  goal: "Generate a todo REST API",
-});
-const result = await client.runs.result(run.run_id); // only succeeds once terminal
-console.log(result.status);
-
-// If the Agent needs a human decision, follow live events and answer
-const sub = await client.runs.follow(run.run_id);
-sub.onEvent((event) => {
-  if (event.event_type !== "approval.requested") return;
-  client.runs.answerDecision({
-    runId: run.run_id,
-    stepId: event.step_id!,
-    attemptId: event.attempt_id!,
-    answer: "approve, continue",
-    expectedExecutionVersion: event.expected_execution_version!,
-    expectedStepVersion: event.expected_step_version!,
-    expectedAttemptVersion: event.expected_attempt_version!,
-  });
-});
-```
-
-> The three `expected*Version` fields of `answerDecision` are required CAS tokens; any change returns `conflict` (see §7.4). Write operations with an `idempotency_key` can be safely replayed.

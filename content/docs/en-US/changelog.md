@@ -88,6 +88,7 @@ This page covers published versions only. The working tree (`web/packages/*`) al
 | --- | --- | --- |
 | `event_type` narrowed from an open union (with a `\| string` escape hatch) to the closed type `ConversationEventType`, plus an in-package decoder | in the working tree, **unpublished**: `\| string` is still present in all three published versions | §8 of the [Upgrade and migration guide](/en-US/docs/upgrade); row R1 of `16` |
 | Wire-method additions (`run/plan`, `config/get`, `config/set`, `config/get-mcp`, `config/set-mcp`, `config/set-mcp-enabled`, `run/answer-decision`, marketplace entry snapshots, `store/list`'s `published_at`, …) | in the working tree, **unpublished**: the published protocol artifact contains none of these types | rows R2 / R8 / R10 / R16 of `16`; the MCP read/write face in `21` D17 |
+| New notification `conversation/list-changed` (the conversation **list** projection's `created` / `updated` / `deleted`; no subscription required, no `sequence`), protocol fingerprint `2026-09-18` → `2026-09-19` | in the working tree, **unpublished**: the published artifact has no such notification type | `05` §12.3.1; §6.2 of the [TypeScript SDK reference](/en-US/docs/typescript-sdk) on this site |
 | Release rebuild and `beta.4` | **on hold** (stated policy: release-consistency close-out deferred); no date is announced here | row R6 of `16` |
 
 So: **never assume a change has shipped unless it is listed on this page; and never assume the items in §4 have shipped.**
@@ -95,5 +96,5 @@ So: **never assume a change has shipped unless it is listed on this page; and ne
 ## 5. See also
 
 - [Upgrade and migration guide](/en-US/docs/upgrade): release-fact table, dist-tag semantics, pinning exact versions, per-version upgrade steps and self-check commands.
-- [TypeScript SDK guide](/en-US/docs/typescript-sdk): install, API, events and error model; its §1 states the current version status.
+- [TypeScript SDK reference](/en-US/docs/typescript-sdk): install, API, events and error model; its §1 states the current version status. Runnable examples: [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
 - [Quick start](/en-US/docs/quick-start): the installer path for end users.

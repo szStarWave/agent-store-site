@@ -12,7 +12,7 @@ Only **Windows x64** builds are published today; every other platform is not ava
 | Linux | x86_64 | Not available |
 | Linux | aarch64 | Not available |
 
-> The download button detects your system: only Windows x64 gets a direct link; other platforms are routed to the download center.
+> The download button detects your system: only Windows x64 gets a direct link; other platforms are routed to GitHub Releases.
 
 ## Source formats
 

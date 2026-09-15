@@ -27,18 +27,19 @@ Marketplace sources are declared in [`~/.agent-store/config.toml`](/en-US/docs/c
 | `directory` | Local directory path | Points directly at a local market/plugin root |
 
 ```toml
-# This site hosts all three market sources itself, under /source/<market>/…
+# This site (agent-store.flowyaipc.cn) hosts all three market sources itself, under /source/<market>/…;
+# with no [default_marketplaces] declared, these are exactly what the runtime registers
 [default_marketplaces.workbuddy-experts]
 source_kind = "url"
-source = "https://<site-domain>/source/experts/.codebuddy-plugin/marketplace.json"
+source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
 
 [default_marketplaces.workbuddy-skills]
 source_kind = "url"
-source = "https://<site-domain>/source/skills/.codebuddy-skill/marketplace.json"
+source = "https://agent-store.flowyaipc.cn/source/skills/.codebuddy-skill/marketplace.json"
 
 [default_marketplaces.connectors]
 source_kind = "url"
-source = "https://<site-domain>/source/connectors/.codebuddy-connector/connectors.json"
+source = "https://agent-store.flowyaipc.cn/source/connectors/.codebuddy-connector/connectors.json"
 ```
 
 The `_files.txt` in each market root is a pre-generated directory listing (one relative path per line) that clients use to mirror the whole entry tree.

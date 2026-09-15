@@ -27,18 +27,19 @@ Agent Store 原生支持**插件**与**插件市场**：插件是打包好的能
 | `directory` | 本地目录路径 | 直接指向本地市场/插件根 |
 
 ```toml
-# 本站自身即托管这三个市场源，路径形如 /source/<market>/…
+# 本站（agent-store.flowyaipc.cn）即托管这三个市场源，路径形如 /source/<market>/…；
+# 未声明 [default_marketplaces] 时，运行时的内置默认源就是它们
 [default_marketplaces.workbuddy-experts]
 source_kind = "url"
-source = "https://<站点域名>/source/experts/.codebuddy-plugin/marketplace.json"
+source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
 
 [default_marketplaces.workbuddy-skills]
 source_kind = "url"
-source = "https://<站点域名>/source/skills/.codebuddy-skill/marketplace.json"
+source = "https://agent-store.flowyaipc.cn/source/skills/.codebuddy-skill/marketplace.json"
 
 [default_marketplaces.connectors]
 source_kind = "url"
-source = "https://<站点域名>/source/connectors/.codebuddy-connector/connectors.json"
+source = "https://agent-store.flowyaipc.cn/source/connectors/.codebuddy-connector/connectors.json"
 ```
 
 每个市场根目录下的 `_files.txt` 是预生成的目录清单（一行一个相对路径），客户端据此镜像整棵条目树。

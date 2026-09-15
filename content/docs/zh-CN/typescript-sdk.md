@@ -1,4 +1,4 @@
-# TypeScript SDK 使用指南
+# TypeScript SDK 接口参考
 
 Flowy Agent Store 提供三个配套的 TypeScript 包，让 Node.js / Electron / 浏览器应用以类型安全的方式接入本地 App Server：
 
@@ -9,6 +9,8 @@ Flowy Agent Store 提供三个配套的 TypeScript 包，让 Node.js / Electron 
 | `@flowy-agent-store/sdk` | spawn `flowy-agent-store` 二进制 → 回环 WS 建连 → 就绪客户端 | Node.js（依赖 `node:child_process` 等） | `@flowy-agent-store/client`、`@flowy-agent-store/protocol` |
 
 三个包按需组合：**只用类型**取 `protocol`；**连已运行的 App Server**（如桌面端已启动）取 `client` + 自建 `WebSocketTransport`；**自己拉起整个运行时**取 `sdk` 的 `launchClient`。
+
+可运行的完整示例（Node / 浏览器 / Electron / Store / 会话 / Run）集中在 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk)。
 
 > **本文面向开发者。** 终端用户不需要它——下载安装包并按[快速开始](/zh-CN/docs/quick-start)运行即可。两条路径分工明确：**终端用户 → 安装包 / `install.ps1`**；**开发者 → npm 包（本文）**。
 
@@ -27,68 +29,22 @@ bun add @flowy-agent-store/protocol
 包均发布为 ESM + CJS 双格式（`exports` 提供 `import` / `require` / `types`），Node 与打包器开箱即用。
 
 > **版本状态**：三个包当前均为 `0.1.0-beta.*` 预发布（API 尚未冻结，beta 期间**不承诺向后兼容**）。生产接入请固定**确切版本**——本文与仓库当前对应 `0.1.0-beta.3`。注意不要依赖裸 `bun add`：注册表 `latest` 当前指向 `0.1.0-beta.2`，**不是**最新的 `0.1.0-beta.3`。dist-tag 语义、逐版本升级步骤与自查命令见[升级与迁移指引](/zh-CN/docs/upgrade)。
-> **协议面口径**：§3 的 `APP_SERVER_PROTOCOL_VERSION` 示例与 §7.3 的方法计数按**仓库工作区（源码）**取值——工作区已领先于任何已发布版本（MCP 声明文件的三个方法与 `store/list` 的 `published_at` 都尚未随版本发布）。未发布差异见[升级与迁移指引](/zh-CN/docs/upgrade) §8 与[变更日志](/zh-CN/docs/changelog) §4。
+> **协议面口径**：§2 的 `APP_SERVER_PROTOCOL_VERSION` 示例与 §5.3 的方法计数按**仓库工作区（源码）**取值——工作区已领先于任何已发布版本（MCP 声明文件的三个方法、`store/list` 的 `published_at`、以及通知 `conversation/list-changed` 都尚未随版本发布）。未发布差异见[升级与迁移指引](/zh-CN/docs/upgrade) §8 与[变更日志](/zh-CN/docs/changelog) §4。
 > **运行环境**：Node.js **≥ 22**（依赖全局 `WebSocket`）或 Bun；版本下限由各包 `engines.node` 声明。
 
 ---
 
-## 2. 快速开始（SDK 一行拉起）
+## 2. `@flowy-agent-store/protocol` — 协议层
 
-```ts
-import { launchClient } from "@flowy-agent-store/sdk";
-
-const session = await launchClient({
-  client: { name: "my-app", version: "0.1.0" },
-});
-const store = await session.client.listStore();
-await session.close();
-```
-
-`launchClient` 完成的事：
-
-1. 按 `bin` → `AGENT_STORE_BIN` → `PATH` 定位 `flowy-agent-store` 可执行文件；
-2. 以 `--host 127.0.0.1 --port 0 --no-open` 并携带自动创建的临时 `--data-dir` 启动子进程；
-3. 扫描 stdout 就绪行（`{"agent_store":"listening",...}`），取得实际端口；
-4. **校验就绪行 `protocol_version` 与 SDK 一致**，不一致则杀进程并报错（含两端版本）；
-5. 建立回环 WebSocket、执行 `initialize` → `initialized` 握手，返回可用的 `AppServerClient`。
-
-### 完整生命周期示例
-
-```ts
-import { launchClient } from "@flowy-agent-store/sdk";
-
-const session = await launchClient({ client: { name: "demo", version: "1.0.0" } });
-try {
-  // 目录（Store）
-  const items = await session.client.listStore();
-  console.log(`${items.items.length} items in the store`);
-
-  // 安装并运行一个 Agent
-  await session.client.installStoreEntry("experts", "frontend-backend-experts");
-  const receipt = await session.client.runs.agent({
-    agentId: "frontend-backend-experts",
-    goal: "Generate a todo REST API",
-  });
-  const result = await session.client.runs.result(receipt.run_id);
-  console.log(result.status);
-} finally {
-  await session.close(); // 终止子进程 + 删除临时 data-dir
-}
-```
-
----
-
-## 3. `@flowy-agent-store/protocol` — 协议层
-
-### 3.1 定位
+### 2.1 定位
 
 线协议的唯一 TypeScript 真源：所有请求/响应/通知类型、`APP_SERVER_PROTOCOL_VERSION` 常量与结构化错误。**无任何运行时代码**，可被 client/sdk/Rust 之外任何方言消费。
 
-### 3.2 主要导出
+### 2.2 主要导出
 
 | 导出 | 说明 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 协议版本字符串（**仓库工作区当前为** `"2026-09-18"`；每次 wire 变更取新日期），握手与 SDK 校验做严格相等 |
+| `APP_SERVER_PROTOCOL_VERSION` | 协议版本字符串（**仓库工作区当前为** `"2026-09-19"`；每次 wire 变更取新日期），握手与 SDK 校验做严格相等 |
 | `InitializeRequest` / `InitializeResult` | 握手请求/响应（含 `protocol_version`、`server` 信息） |
 | `ClientInfo` / `ClientCapabilities` | 连接方自述 |
 | `StoreList` / `StoreInstallResult` | winget 式统一目录 |
@@ -100,12 +56,12 @@ try {
 | `ConversationView` / `ConversationMessage` / `ConversationEvent` / `ConversationSendReceipt` | 持久会话 |
 | `RunReceipt` / `RunView` / `RunResult` / `RunEvent` | Run 生命周期 |
 | `JsonRpcRequest` / `JsonRpcResponse` / `JsonRpcNotification` | 线框类型 |
-| `ServerNotification` | 服务器下行通知（`event`、`conversation/event`、`run/resync-required` 等） |
+| `ServerNotification` | 服务器下行通知（`event`、`conversation/event`、`conversation/list-changed`、`run/resync-required` 等） |
 | `WireError` | 服务器错误载荷 |
 
 > 实验性能力（Team 完整协作、事件 cursor 追平）在协议中标注 `experimental`，不进稳定导出。
 
-### 3.3 错误模型（包内 `errors.ts`）
+### 2.3 错误模型（包内 `errors.ts`）
 
 调用方**必须按稳定 `code` 分支，绝不解析人类可读 message**：
 
@@ -138,13 +94,13 @@ try {
 
 ---
 
-## 4. `@flowy-agent-store/client` — 传输无关客户端
+## 3. `@flowy-agent-store/client` — 传输无关客户端
 
-### 4.1 定位
+### 3.1 定位
 
 纯业务层：任何方法都只经注入的 `Transport`，包内无 HTTP、无 DOM、无 Node。连接生命周期（`connect → initialize → 版本检查 → initialized → ready`）全在此层完成，业务代码永远不知道底层是 WebSocket、stdio 还是未来的一次性 HTTP 绑定。
 
-### 4.2 `Transport` 接口
+### 3.2 `Transport` 接口
 
 ```ts
 export interface Transport {
@@ -181,7 +137,7 @@ await client.connect(); // initialize 握手 + 版本校验
 
 自建传输只需实现接口即可：测试用内存假传输、CLI 用 stdio、Electron 主进程用 Node WebSocket——业务代码零改动。
 
-### 4.3 `AppServerClient` 顶层方法
+### 3.3 `AppServerClient` 顶层方法
 
 | 方法 | 线方法 | 说明 |
 | --- | --- | --- |
@@ -207,7 +163,7 @@ await client.connect(); // initialize 握手 + 版本校验
 > 想区分「真的没有市场」与「仍在载入」：`listStore()` 的返回（`store/list`）现在带 `markets_pending` —— 为 `true` 时表示内置市场仍在后台注册、目录可能不完整。
 > 若你自持 `dataDir`，同一目录的后续调用走幂等短路，不再联网。
 
-### 4.4 子客户端
+### 3.4 子客户端
 
 构造即绑定同一传输；所有方法返回 `Promise<T>`。
 
@@ -327,16 +283,18 @@ client.workspaces.revoke(workspaceId: string): Promise<WorkspaceRevokeResult>; /
 
 ---
 
-## 5. `@flowy-agent-store/sdk` — Node 宿主
+## 4. `@flowy-agent-store/sdk` — Node 宿主
 
-### 5.1 `launchClient(options): Promise<LaunchedClient>`
+### 4.1 `launchClient(options): Promise<LaunchedClient>`
+
+一次调用完成四件事：定位并 spawn 运行时 → 等就绪行拿到真实端口 → 回环建连 → `initialize` / `initialized` 握手。返回的 `client` 已经可以直接用。
 
 ```ts
 interface LaunchOptions extends SpawnOptions {
   client: ClientInfo;             // { name, version }
   capabilities?: ClientCapabilities;
   token?: string;                 // 传给 WebSocketTransport
-  requestTimeoutMs?: number;      // 默认 30s（不足以覆盖首次 store/list，见 §4.3 警告）
+  requestTimeoutMs?: number;      // 默认 30s（不足以覆盖首次 store/list，见 §3.3 警告）
 }
 
 interface LaunchedClient {
@@ -347,12 +305,36 @@ interface LaunchedClient {
 }
 ```
 
-### 5.2 底层原语
+`LaunchOptions` 自带的字段（`SpawnOptions` 的字段见 §4.2）：
+
+| 字段 | 默认 | 说明 |
+| --- | --- | --- |
+| `client` | — | **必填**，握手时自报身份（进服务端日志与审计） |
+| `capabilities` | 省略 | `{ events?, approvals?, team_runtime?, artifacts? }`：声明客户端会消费哪些能力 |
+| `token` | 省略 | 交给 `WebSocketTransport`；WebSocket 无法设自定义 header，所以它以 `?token=…` 拼在回环 URL 上。宿主以 `--auth` 启动时必需，本地模式（`auth: "disabled-local"`）可省略 |
+| `requestTimeoutMs` | `30000` | **单次请求**超时，与启动超时无关；冷启动首个 `store/list` 要下载市场镜像，务必调大（见示例页 §12） |
+
+`LaunchedClient` 的成员：
+
+| 成员 | 内容 | 用途 |
+| --- | --- | --- |
+| `client` | 已握手就绪的 `AppServerClient` | 所有业务调用 |
+| `initializeResult` | 握手响应 | 记录或断言协议指纹 |
+| `server.readiness` | 就绪行解析结果 `{ host, port, url, protocol_version, version, auth }` | 打日志；自建 `HttpTransport` 时取 `url`；据 `auth` 判断是否需要 `token` |
+| `server.dataDir` | 子进程实际使用的 data-dir | 排查路径、断言隔离（自动创建的临时目录也在这里） |
+| `server.exited` | 永不 reject 的 `Promise<{ code, signal }>` | 观察崩溃与退出（契约见 §4.4） |
+| `close()` | 退订 → 关传输 → 终止子进程 → 删除自动创建的 data-dir | 在 `finally` 中调用；可重复调用 |
+
+**它不做什么**：不配置模型与供应商（那是 `config.toml` 与宿主设置面的事）；不下载二进制；不给 `dataDir` 就不持久化（一次性沙箱）；不自动重启子进程，也不注册进程退出钩子。
+
+可直接复制的配方（最小用法、自持 data-dir、带 token、失败兜底、只要进程不要客户端）见[示例页](/zh-CN/docs/examples-sdk) §3。
+
+### 4.2 底层原语
 
 | 导出 | 说明 |
 | --- | --- |
 | `spawnAppServer(options: SpawnOptions)` | 仅 spawn + 等就绪行（不建连）。`SpawnOptions`: 见下 |
-| `resolveAppServerBin(explicit?)` | 定位二进制（见 §5.3 ） |
+| `resolveAppServerBin(explicit?)` | 定位二进制（见 §4.3 ） |
 | `parseReadinessLine(line)` | 解析单行；非就绪行返回 `null` |
 | `ReadinessInfo` | `{ host, port, url, protocol_version, version, auth }` |
 | `assertProtocolCompatible(runtimeVersion)` | 版本不一致直接 throw（含两端版本） |
@@ -375,15 +357,15 @@ interface SpawnOptions {
 
 `SpawnedServer.exited` 是一个**永不 reject** 的 `Promise<SpawnExitInfo>`，在子进程因任意原因退出时 settle——这是观察运行时崩溃的唯一入口。
 
-### 5.3 二进制定位
+### 4.3 二进制定位
 
-顺序：`bin` 参数 → 环境变量 `AGENT_STORE_BIN` → `PATH` 上的 `flowy-agent-store` / `flowy-agent-store.exe`。找不到**直接报错、绝不下载或猜测**（release 资产下载属 P2）。
+顺序：`bin` 参数 → 环境变量 `AGENT_STORE_BIN` → **平台运行时包** `@flowy-agent-store/runtime-<platform>-<arch>` 里的 `vendor/flowy-agent-store[.exe]`（它是 SDK 的 optionalDependency，正常装依赖就有）→ `PATH` 上的 `flowy-agent-store` / `flowy-agent-store.exe`。都没有命中就**直接报错，绝不下载或猜测**（报错文案会逐条点出这四条途径；release 资产下载属 P2）。
 
 ```bash
 AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node your-app.mjs
 ```
 
-### 5.4 运行契约（P0 实测结论）
+### 4.4 运行契约（P0 实测结论）
 
 - **回环强制**：子进程固定 `--host 127.0.0.1 --no-open`；SDK 也只连刚 spawn 的进程（`isLoopbackUrl` 非回环一律拒绝）。
 - **data-dir 独占**：省略 `dataDir` → 自动 `mkdtemp` 临时目录，`close()` 时删除；传入自己的目录即表示独占——后端单实例锁会 fail-fast（`already in use by another running Flowy backend`）。
@@ -393,7 +375,7 @@ AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node your-app.mjs
 - **`env` / `cwd` 透传**：`env` 在父进程 `process.env` 之上**合并**（不是替换，`PATH` 等仍可见）；`cwd` 省略即继承父进程工作目录。两者原样交给 `child_process.spawn`。
 - **退出可见**：`SpawnedServer.exited`（`{ code, signal }`）在子进程**任意原因退出**时 settle，含崩溃与非零退出码；`onExit` 同时触发一次。SDK **不自动重启**，重启用 `launchClient` 的调用方负责。
 
-### 5.5 错误与清理
+### 4.5 错误与清理
 
 - spawn 失败：报错附 **stderr 尾部 50 行**（`stderr tail:` 段）。
 - 超时：默认 120s 后抛 `timed out waiting for the runtime readiness line`。
@@ -412,28 +394,11 @@ try {
 
 ---
 
-## 6. 完整场景：浏览器接入桌面端
-
-桌面端已启动 App Server 时，浏览器直接建连（无需 sdk）：
-
-```ts
-import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
-
-const ws = new WebSocketTransport(`ws://127.0.0.1:8787/api/app-server/ws`);
-const client = new AppServerClient({ transport: ws, client: { name: "web", version: "1.0.0" } });
-await client.connect();
-console.log("connected:", client.ready);
-```
-
-> 注意自定义 header 在浏览器 WebSocket 中不可用：`WebSocketTransport` 会把 `token` 追加为 `?token=` 查询参数；Node 侧 HTTP 走 `Authorization` 头。
-
----
-
-## 7. 逐方法 API 参考
+## 5. 逐方法 API 参考
 
 三个包的实际导出面与协议方法的对齐关系。协议方法名以 `05` 为准，此表不引入新方法。
 
-### 7.1 `AppServerClient` 顶层方法
+### 5.1 `AppServerClient` 顶层方法
 
 | 方法 | 参数 | 返回 | 协议方法 |
 | --- | --- | --- | --- |
@@ -458,7 +423,7 @@ console.log("connected:", client.ready);
 | `listStore()` | — | `StoreList` | `store/list` |
 | `installStoreEntry(marketplaceId, entryName)` | `string, string` | `StoreInstallResult` | `store/install-entry` |
 
-### 7.2 子客户端
+### 5.2 子客户端
 
 | 子客户端 | 方法 | 协议方法 |
 | --- | --- | --- |
@@ -472,7 +437,7 @@ console.log("connected:", client.ready);
 | `workspaces` | `list()` / `create(path)` / `revoke(id)` | `workspace/list` / `workspace/create` / `workspace/revoke` |
 | `models` | `list()` | `models/list` |
 
-### 7.3 HTTP 绑定
+### 5.3 HTTP 绑定
 
 HTTP 与 WebSocket 是同一套方法语义的两种绑定。包内 `httpRouteTable()` 返回**机器可读的路由表**（方法名 → 动词 + 路径 + 证据来源），文档不再手抄一份：
 
@@ -491,7 +456,7 @@ const routes = httpRouteTable();
 - 每次调用独立握手（`initialize` → `initialized` → 业务调用）；`connect()` 是 no-op。宿主侧服务若需要就绪连接 id，用 `openConnection()`。
 - `/api/fs/*`（浏览 / 列表 / 读取 / 元数据）是宿主文件服务，不是协议方法，不在本包内。
 
-### 7.4 审批回答：`run/answer-decision`
+### 5.4 审批回答：`run/answer-decision`
 
 Agent 运行到需要人决策时会停下来，`run/events` 投影出 `approval.requested`，回答走 `runs.answerDecision(input)`：
 
@@ -516,9 +481,9 @@ await client.runs.answerDecision({
 - **没有 `always_allow`**：桌面端确认路由上的 approve-all 开关不属于本协议，方法参数是 `deny_unknown_fields`，带上它直接报 `invalid_request`。
 - `RunEvent` 的 `step_id` / `attempt_id` 只在引擎按 attempt 归属事件时出现（典型是 `approval.requested` / `approval.responded`）。
 
-## 8. 事件参考：`sequence` 与追平
+## 6. 事件参考：`sequence` 与追平
 
-### 8.1 事件类型
+### 6.1 事件类型
 
 `ConversationEventType` 是**封闭联合**（`protocol.ts`），共 9 种：
 
@@ -540,14 +505,15 @@ await client.runs.answerDecision({
 
 `message.error` 除错误文本外还解码出 `code`（服务端错误码）与 `retryable`（**三态**：`true` / `false` / `null`——`null` 表示 wire 未提供，例如历史行，调用方不得把它当作 `false` 或 `true` 猜着用）。是否需要重试由调用方按这两项决定；`conversation/send` 的响应另带 `result_error_retryable`，两者一致。
 
-### 8.2 `sequence` 语义
+### 6.2 `sequence` 语义
 
 - `sequence` 是**单会话内单调自增且连续**的计数器（服务端按会话维护），不是全局序号。
 - 取消订阅后该计数器销毁；重新订阅从 `1` 开始，因此 `rearm()` 会把本地游标重置为 `0`。
 - 缺口判定：收到 `sequence > lastSeen + 1` 且 `lastSeen > 0` 即判定丢帧，订阅会发出 `onResync("gap")` 并触发追平。
 - 重复与乱序（`sequence <= lastSeen`）直接丢弃，不重复投递。
+- **列表投影通知不在这个计数器里**：`conversation/list-changed`（会话列表的 `created` / `updated` / `deleted`，自动标题走的就是 `updated`）**不带 `sequence`**，不得据此推进 `lastSeen`、也不参与上述缺口判定。它是尽力而为的提示——丢了只是晚一步刷新，`conversation/list` 仍是权威。
 
-### 8.3 追平（catch-up）
+### 6.3 追平（catch-up）
 
 会话与 Run 的追平载体不同：
 
@@ -558,7 +524,7 @@ await client.runs.answerDecision({
 
 会话订阅默认自动追平（`autoResync`），一次只跑一个取数请求（突发信号合并）；拉取到的新页经 `onBackfill` 交给上层。若上层自己持有分页游标，传 `autoResync: false` 并只监听 `onResync`，由上层做权威重载。
 
-在已 `connect()` 的 `client` 上（完整装配见 §10）：
+在已 `connect()` 的 `client` 上（完整装配见 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk)）：
 
 ```ts
 const subscription = await client.conversations.follow(conversationId);
@@ -570,7 +536,7 @@ subscription.onBackfill((snapshot) => resetTranscript(snapshot.messages));
 subscription.onError((error) => report(error));
 ```
 
-## 9. 错误模型与重试
+## 7. 错误模型与重试
 
 四个错误类都从 `@flowy-agent-store/protocol` 导出，`retryable` 是稳定契约（不要按 `message` 分支）：
 
@@ -593,64 +559,11 @@ subscription.onError((error) => report(error));
 | `shouldRetry` | 协议 `retryable` | 自定义判定 |
 | `sleep` | `setTimeout` | 注入用（测试） |
 
-```ts
-import { withRetry } from "@flowy-agent-store/client";
-
-const view = await withRetry(() => client.runs.get(runId), {
-  maxAttempts: 4,
-  onRetry: ({ attempt, delayMs }) => log(`retry ${attempt} in ${delayMs}ms`),
-});
-```
+可运行的 `withRetry` 示例见 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §11。
 
 带 `idempotency_key` / `command_id` 的写操作可安全重放：App Server 对同键请求去重，不会重复执行。
 
-## 10. 示例集：Node / 浏览器 / Electron
-
-### 10.1 Node：一行拉起本地运行时
-
-```ts
-import { launchClient } from "@flowy-agent-store/sdk";
-
-const launched = await launchClient({ client: { name: "my-tool", version: "1.0.0" } });
-try {
-  const conversation = await launched.client.conversations.create({ name: "demo" });
-  const subscription = await launched.client.conversations.follow(conversation.conversation_id);
-  subscription.onEvent((event) => console.log(event.event_type));
-  await launched.client.conversations.send(conversation.conversation_id, "你好", crypto.randomUUID());
-} finally {
-  await launched.close();
-}
-```
-
-### 10.2 浏览器：只连已运行的服务端
-
-浏览器不 spawn 进程，只连 WebSocket；`WebSocketTransport` 通过 `?token=` 传凭据（浏览器 WebSocket 不能设自定义头）。
-
-```ts
-import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
-
-const transport = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", { token });
-const client = new AppServerClient({ transport, client: { name: "web", version: "1.0.0" } });
-await client.connect();
-```
-
-### 10.3 Electron：主进程 spawn，渲染进程连回环
-
-主进程持二进制与数据目录；渲染进程只拿回环 URL 与 token。凭据放主进程（系统凭据存储），不要进渲染进程或配置明文。
-
-```ts
-import { spawnAppServer } from "@flowy-agent-store/sdk";
-
-const server = await spawnAppServer({ dataDir: app.getPath("userData") });
-win.webContents.send("app-server-ready", {
-  url: `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`,
-});
-app.on("before-quit", () => void server.close());
-```
-
-纯请求-响应场景（无实时事件）可用 `HttpTransport`；它不订阅通知，且每次调用独立握手。
-
-## 11. MCP 接入指南
+## 8. MCP 接入指南
 
 Agent Store 的官方 MCP 接入路径是**连接器描述文件**，不引入第二套格式：
 
@@ -666,242 +579,12 @@ Agent Store 的官方 MCP 接入路径是**连接器描述文件**，不引入�
 
 更多清单字段与示例见 [插件与市场](/zh-CN/docs/plugins-market)。
 
-## 12. 下一步
+## 9. 下一步
 
 
-- 协议方法语义全集：见仓库 `docs/agent-store/05-allo-app-server-protocol.md`。
+- 协议方法语义全集：见仓库 `docs/agent-store/05-flowy-agent-store-app-server-protocol.md`。
 - 包实现与测试样例：`web/packages/{protocol,client,sdk}/src`（SDK 含 `spawn.test.ts`、`readiness.test.ts` 用例）。
 - 浏览器专属辅助（资产 `<img>` URL、`/api/fs/browse`）：宿主 app 实现，不在三包内。
+- 可运行示例：[TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk)。
 
 ---
-
-## 13. 示例（端到端实战）
-
-本章把前几节分散的片段整合为可直接复制运行的完整场景。所有片段都假设已通过 `launchClient`（或自建 `AppServerClient`）拿到就绪的 `client`，且用 `try/finally` 保证 `close()`。
-
-> 实时事件类示例（会话 / Run 的 `follow`）依赖 `WebSocketTransport`；纯请求-响应场景可用 `HttpTransport`（见 §7.3）。
-
-### 13.1 三端拉起 / 连接
-
-**Node：一行拉起本地运行时**（SDK 负责 spawn + 回环建连 + 握手）：
-
-```ts
-import { launchClient } from "@flowy-agent-store/sdk";
-
-const launched = await launchClient({ client: { name: "my-tool", version: "1.0.0" } });
-try {
-  const conversation = await launched.client.conversations.create({ name: "demo" });
-  const subscription = await launched.client.conversations.follow(conversation.conversation_id);
-  subscription.onEvent((event) => console.log(event.event_type));
-  await launched.client.conversations.send(conversation.conversation_id, "你好", crypto.randomUUID());
-} finally {
-  await launched.close(); // 终止子进程 + 删除临时 data-dir
-}
-```
-
-**浏览器：只连已运行的服务端**（不 spawn 进程；凭据走 `?token=`）：
-
-```ts
-import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
-
-const transport = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", { token });
-const client = new AppServerClient({ transport, client: { name: "web", version: "1.0.0" } });
-await client.connect();
-```
-
-**Electron：主进程 spawn，渲染进程连回环**（凭据留主进程，不进渲染进程）：
-
-```ts
-import { spawnAppServer } from "@flowy-agent-store/sdk";
-
-const server = await spawnAppServer({ dataDir: app.getPath("userData") });
-win.webContents.send("app-server-ready", {
-  url: `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`,
-});
-app.on("before-quit", () => void server.close());
-```
-
-> **Electron 完整接入（主进程 / 预加载 / 渲染进程）**
->
-> 上面是最小骨架。真实 Electron 应用要把「运行时拉起与凭据」留在主进程，渲染进程只拿到回环 URL（和可选的 token）。凭据（OAuth 令牌、系统凭据存储）永远不要进渲染进程或配置文件明文。
-
-**主进程 `main.ts`** — spawn 运行时、经 IPC 把连接信息交给渲染进程、退出时清理：
-
-```ts
-import { app, BrowserWindow, ipcMain } from "electron";
-import { spawnAppServer, type SpawnedServer } from "@flowy-agent-store/sdk";
-import { join } from "node:path";
-
-let server: SpawnedServer | null = null;
-
-async function startBackend() {
-  server = await spawnAppServer({
-    dataDir: join(app.getPath("userData"), "agent-store"),
-  });
-
-  // 回环 WS 地址（loopback 下 auth 通常为 disabled-local，无需 token）
-  const wsUrl = `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`;
-  const token = server.readiness.auth === "disabled-local" ? undefined : await getHostToken();
-
-  // 渲染进程主动来取
-  ipcMain.handle("agent-store:get-connection", () => ({ url: wsUrl, token }));
-
-  // 崩溃可见：进程意外退出时记日志（SDK 不自动重启）
-  server.exited.then((info) => {
-    console.warn("agent-store runtime exited:", info.code, info.signal);
-  });
-}
-
-app.whenReady().then(startBackend);
-
-app.on("before-quit", async (event) => {
-  if (server) {
-    event.preventDefault(); // 先等清理完成再退出
-    await server.close();
-    server = null;
-  }
-  app.exit();
-});
-```
-
-> `getHostToken()` 由宿主自己实现——只有服务端要求 token（非 `disabled-local`）时才需要；token 由主进程生成 / 获取，绝不写入渲染进程可访问的明文。
-
-**预加载 `preload.ts`** — 用 `contextBridge` 安全地暴露给渲染进程（不暴露整个 `ipcRenderer`）：
-
-```ts
-import { contextBridge, ipcRenderer } from "electron";
-
-contextBridge.exposeInMainWorld("agentStore", {
-  getConnection: () => ipcRenderer.invoke("agent-store:get-connection"),
-});
-```
-
-**渲染进程 `renderer.ts`** — 拿到 URL 后自建 `AppServerClient` 并握手：
-
-```ts
-import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
-
-const { url, token } = await window.agentStore.getConnection();
-const transport = new WebSocketTransport(url, { token, requestTimeoutMs: 30_000 });
-const client = new AppServerClient({ transport, client: { name: "electron-ui", version: "1.0.0" } });
-await client.connect();
-
-// 之后即可使用全部子客户端
-const catalog = await client.connectors.list();
-```
-
-> 渲染进程走 `WebSocketTransport` 的 `token` 选项会被自动追加为 `?token=` 查询参数（浏览器 / Electron 的 WebSocket 不能设自定义头）。纯请求-响应场景可用 `HttpTransport`。
-
-### 13.2 Connector OAuth 全流程
-
-典型链路：`list` 取 `connectorId` → `authStart` 发起浏览器流 → 轮询 `authStatus` 至 `authenticated` → 用完 `logout` 吊销。
-
-```ts
-// 1) 从目录取得 connectorId
-const catalog = await client.connectors.list();
-const github = catalog.find((c) => c.id === "github");
-if (!github) throw new Error("github connector not found in catalog");
-
-// 2) 先看认证态：已认证则可跳过授权
-const before = await client.connectors.authStatus(github.id);
-if (before.state !== "authenticated") {
-  // 3) 发起宿主浏览器 OAuth 流（立即返回 started，不阻塞）
-  const started = await client.connectors.authStart(github.id);
-  if (started.state !== "started") {
-    throw new Error(started.error ?? "auth start failed");
-  }
-
-  // 4) 轮询直到 authenticated（或超时 / 需要重新授权）
-  const deadline = Date.now() + 5 * 60_000; // 5 分钟宽限
-  let authenticated = false;
-  while (Date.now() < deadline) {
-    const status = await client.connectors.authStatus(github.id);
-    if (status.state === "authenticated") { authenticated = true; break; }
-    if (status.state === "reauthorization_required") {
-      throw new Error("reauthorization required");
-    }
-    await new Promise((r) => setTimeout(r, 1_500)); // 1.5s 间隔
-  }
-  if (!authenticated) throw new Error("oauth timed out");
-}
-
-// 5) 授权后连接器状态应为 connected（认证就绪 + 最近探测成功）
-const status = await client.connectors.status(github.id);
-console.log(status.status);
-
-// 6) 用完吊销令牌
-await client.connectors.logout(github.id);
-```
-
-> 注意：`authStart` 只返回 `started`，**不返回授权 URL 或 token**——浏览器流程由可信宿主持有，客户端只触发与轮询（见 §4.4）。stdio 类型连接器不支持 OAuth，服务端会报 `OAuth is not supported for stdio connectors`。
-
-### 13.3 Store 浏览与安装
-
-```ts
-// 列出全市场统一目录（首次可能为空，含 markets_pending 标志，见 §4.3）
-const store = await client.listStore();
-for (const item of store.items) {
-  console.log(item.marketplace_id, item.entry_name, item.kind, item.installed);
-}
-
-// 一键安装：缺导入就导入 + 注册
-const receipt = await client.installStoreEntry("experts", "frontend-backend-experts");
-console.log("installed:", receipt.installed);
-
-// 市场源管理
-const markets = await client.listMarketplaces();
-const added = await client.addMarketplace({ source: "https://example.com/market.json" });
-await client.refreshMarketplace(added.marketplace_id);
-await client.removeMarketplace(added.marketplace_id, /* cascade */ true);
-```
-
-### 13.4 会话与 Run 实战
-
-**会话：创建 → 发送 → 实时接收**
-
-```ts
-import { decodeConversationEvent } from "@flowy-agent-store/protocol";
-
-const conv = await client.conversations.create({ name: "demo" });
-const sub = await client.conversations.follow(conv.conversation_id);
-sub.onEvent((event) => {
-  const decoded = decodeConversationEvent(event);
-  if (decoded.kind === "message.delta") render(decoded.delta, decoded.replace);
-});
-sub.onBackfill((snapshot) => resetTranscript(snapshot.messages));
-sub.onError((error) => report(error));
-
-const receipt = await client.conversations.send(
-  conv.conversation_id,
-  "帮我写个 REST API",
-  crypto.randomUUID(), // 必须显式幂等键
-);
-```
-
-**Run：发起 → 等待结果 → 处理审批**
-
-```ts
-const run = await client.runs.agent({
-  agentId: "frontend-backend-experts",
-  goal: "Generate a todo REST API",
-});
-const result = await client.runs.result(run.run_id); // 终态后才成功
-console.log(result.status);
-
-// 若 Agent 需要人决策，follow 实时事件并回答
-const sub = await client.runs.follow(run.run_id);
-sub.onEvent((event) => {
-  if (event.event_type !== "approval.requested") return;
-  client.runs.answerDecision({
-    runId: run.run_id,
-    stepId: event.step_id!,
-    attemptId: event.attempt_id!,
-    answer: "批准，继续执行",
-    expectedExecutionVersion: event.expected_execution_version!,
-    expectedStepVersion: event.expected_step_version!,
-    expectedAttemptVersion: event.expected_attempt_version!,
-  });
-});
-```
-
-> `answerDecision` 的三个 `expected*Version` 是必填 CAS 令牌，任一变化即返回 `conflict`（见 §7.4）。带 `idempotency_key` 的写操作可安全重放。

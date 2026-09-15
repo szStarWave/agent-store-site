@@ -75,10 +75,10 @@ export function releaseAssetUrl(p: DetectedPlatform): string {
 }
 
 /**
- * Platforms with a published build artifact. The download host currently serves
- * Windows x64 only, so everything else must be pointed at the downloads page
- * instead of a direct asset URL (which would 404). Add targets here only once
- * their builds are actually published.
+ * Platforms with a published build artifact. Releases publish Windows x64 only,
+ * so everything else must be pointed at the releases page instead of a direct
+ * asset URL (which would 404). Add targets here only once their builds are
+ * actually published.
  */
 export const RELEASED_PLATFORMS: readonly DetectedPlatform[] = [{ os: "windows", arch: "x86_64" }];
 

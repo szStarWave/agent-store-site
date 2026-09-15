@@ -110,7 +110,7 @@ node -p "require('@flowy-agent-store/sdk/package.json').version"
 bun run typecheck && bun run test
 ```
 
-如果你用 `AGENT_STORE_BIN` 指向自建二进制，请注意 SDK 会**校验就绪行里的 `protocol_version` 与自己是否一致**（见 TypeScript SDK 使用指南 §2）：升级 SDK 之后旧二进制会被拒绝，请在同一步里一并更新二进制。
+如果你用 `AGENT_STORE_BIN` 指向自建二进制，请注意 SDK 会**校验就绪行里的 `protocol_version` 与自己是否一致**（见 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §12）：升级 SDK 之后旧二进制会被拒绝，请在同一步里一并更新二进制。
 
 ### 6.2 从 0.1.0 回到 beta 线
 
@@ -168,7 +168,7 @@ grep -n 'event_type' package/dist/index.d.mts
 
 ## 10. 另见
 
-- [TypeScript SDK 使用指南](/zh-CN/docs/typescript-sdk)：安装、API、事件、错误模型与示例。
+- [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk)：安装、API、事件与错误模型；可运行示例见 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk)。
 - [快速开始](/zh-CN/docs/quick-start)：终端用户的安装包路径。
 - [兼容性矩阵](/zh-CN/docs/compatibility)：平台与来源格式的支持范围。
 - [变更日志](/zh-CN/docs/changelog)：每个已发布版本改了什么，以及破坏性变更的公告面。
