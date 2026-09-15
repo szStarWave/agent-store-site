@@ -18,7 +18,11 @@ dist-release/
 
 # Logs
 *.log
+*.err
 
 # OS / editor
 .DS_Store
 Thumbs.db
+
+
+.codebuddy/
