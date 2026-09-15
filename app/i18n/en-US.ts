@@ -19,10 +19,11 @@ const enUS = {
   },
   landing: {
     eyebrow: "Local-first · Single-file runtime",
-    heroTitle: "Your local-first agent workbench",
+    heroTitle: "Run your agent workbench locally, in one command",
     heroSubtitle:
-      "A single executable that opens into a full workbench in your browser. Import experts, form teams, orchestrate runs — execution, credentials and run state never leave your machine; the cloud only syncs definitions and versions.",
-    heroCtaDownload: "Download",
+      "One executable opens a full workbench in your browser. Execution and credentials stay on your machine; the cloud only syncs definitions and versions — no database, no resident service.",
+    heroTrust: "Open source · Single-file runtime · Data never leaves your machine",
+    heroCtaDownload: "Download free",
     heroCtaMarket: "Browse the market",
     heroCtaDocs: "Read the docs",
     heroTerminalListening: "App Server is live at http://127.0.0.1:8787",
@@ -40,22 +41,24 @@ const enUS = {
     },
     featureTitle: "Built for the local workbench",
     featureSubtitle: "Import, run, observe — all inside one trusted local process.",
+    featureValue:
+      "Local-first means execution, credentials and state always stay on your machine; the cloud only handles catalog, versions and distribution.",
     features: {
       workbench: {
-        title: "Local agent catalog",
-        desc: "Import and search experts, skills and connectors in one place; immutable snapshots you can query and run right away.",
+        title: "Experts, skills and connectors — import once, ready to use",
+        desc: "Import into one catalog as immutable snapshots; search and run stay local, with no external service to depend on.",
       },
       observability: {
-        title: "Full run observability",
-        desc: "Plan (DAG), event timeline and artifacts stream in live; both single-agent and team runs are replayable.",
+        title: "Every run is visible and replayable",
+        desc: "Plan DAG, event timeline and artifacts stream in live; from a single agent to team runs, everything is reviewable.",
       },
       localFirst: {
-        title: "Local-first execution",
-        desc: "Credentials and run state stay on your machine; the cloud only syncs the market catalog, versions and distribution.",
+        title: "Credentials and state never leave your machine",
+        desc: "No cloud execution, no run data uploaded; the cloud only syncs the market catalog, versions and distribution.",
       },
       oneCmd: {
-        title: "One command to start",
-        desc: "No databases, no resident services; flowy-agent-store boots and the browser opens ready to work.",
+        title: "One command, ready to go",
+        desc: "No databases, no resident services; flowy-agent-store boots and opens the workbench in your browser.",
       },
     },
     workflowTitle: "Command line → workbench in three steps",
@@ -144,6 +147,28 @@ const enUS = {
       copied: "Copied",
       fallbackCta: "Go to releases",
       unavailableNote: "Only Windows x64 is published; other platforms are not available yet.",
+    },
+    socialProof: {
+      title: "How teams use Flowy Agent Store",
+      subtitle:
+        "The local-first, ready-out-of-the-box experience is already part of everyday work for many teams.",
+      items: [
+        {
+          quote:
+            "One command and the workbench is live in the browser — import an expert, watch the DAG, inspect artifacts, all local. No environment fuss.",
+          role: "Independent developer",
+        },
+        {
+          quote:
+            "What won me over is local-first: credentials and run state never leave the machine, which makes compliance easy and adoption safe.",
+          role: "Platform engineer",
+        },
+        {
+          quote:
+            "Experts, skills and connectors from the market drop straight into the local catalog and just run — new hires are productive the same day.",
+          role: "Tech lead",
+        },
+      ],
     },
     platforms: {
       macos: "macOS",

@@ -18,10 +18,11 @@ const zhCN = {
   },
   landing: {
     eyebrow: "本地优先 · 单文件运行时",
-    heroTitle: "本地优先的 Agent 工作台",
+    heroTitle: "一行命令，本机跑起 Agent 工作台",
     heroSubtitle:
-      "单个可执行文件，浏览器打开即用。导入专家、组建团队、编排运行——执行、凭据与运行状态只留本机，云端仅同步定义与版本。",
-    heroCtaDownload: "下载",
+      "单个可执行文件，浏览器打开即用。执行与凭据只留本机，云端只同步定义与版本——零数据库、无常驻服务。",
+    heroTrust: "开源免费 · 单文件运行时 · 数据不出本机",
+    heroCtaDownload: "免费下载",
     heroCtaMarket: "浏览市场资源",
     heroCtaDocs: "阅读文档",
     heroTerminalListening: "App Server 已在 http://127.0.0.1:8787 启动",
@@ -39,22 +40,23 @@ const zhCN = {
     },
     featureTitle: "为本地工作台而生",
     featureSubtitle: "导入、运行、观测——全部在一个可信的本地进程里完成。",
+    featureValue: "本地优先，意味着执行、凭据与状态永远留在你的机器上；云端只负责目录、版本与分发。",
     features: {
       workbench: {
-        title: "本地 Agent 目录",
-        desc: "专家、技能、连接器统一导入与检索，转为不可变快照，导入即可查询与运行。",
+        title: "专家、技能、连接器，一处导入即用",
+        desc: "统一目录导入并转为不可变快照，检索、运行都在本地完成，不再依赖外部服务。",
       },
       observability: {
-        title: "运行全程可观测",
-        desc: "计划（DAG）、事件时间线与产物实时呈现；单 Agent 与团队运行都可回放。",
+        title: "每一次运行，看得见、可回放",
+        desc: "计划 DAG、事件时间线与产物实时呈现；从单 Agent 到团队运行，全程可复盘。",
       },
       localFirst: {
-        title: "本地优先执行",
-        desc: "凭据与运行状态不出本机；云端只负责市场目录、版本与分发的同步。",
+        title: "凭据与状态，永不离开本机",
+        desc: "没有云执行，也不上传任何运行数据；云端仅同步市场目录、版本与分发。",
       },
       oneCmd: {
-        title: "一条命令开工",
-        desc: "无数据库、无常驻服务；flowy-agent-store 即起，浏览器打开即用。",
+        title: "一条命令，开箱即用",
+        desc: "无数据库、无常驻服务；flowy-agent-store 即起，浏览器自动打开工作台。",
       },
     },
     workflowTitle: "命令行 → 工作台，三步上手",
@@ -136,6 +138,27 @@ const zhCN = {
       copied: "已复制",
       fallbackCta: "前往 Releases",
       unavailableNote: "仅 Windows x64 已发布；其他平台暂未提供。",
+    },
+    socialProof: {
+      title: "他们这样用 Flowy Agent Store",
+      subtitle: "本地优先、上手即用的体验，正在被各类团队复用到日常工作中。",
+      items: [
+        {
+          quote:
+            "一行命令就在浏览器里跑起工作台，导入专家、看 DAG、查产物，本地全搞定，不用纠结环境。",
+          role: "独立开发者",
+        },
+        {
+          quote:
+            "最打动我的是本地优先——凭据和运行状态从不出本机，合规上很省心，团队也敢用。",
+          role: "平台工程师",
+        },
+        {
+          quote:
+            "市场里的专家、技能、连接器直接导入本地目录，拉下来就能跑，新人当天就能上手。",
+          role: "技术负责人",
+        },
+      ],
     },
     platforms: {
       macos: "macOS",
