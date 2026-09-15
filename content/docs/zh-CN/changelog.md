@@ -88,6 +88,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 | --- | --- | --- |
 | `event_type` 从开放联合（带 `\| string` 兜底）收窄为封闭类型 `ConversationEventType`，并新增包内解码器 | 工作区已有，**未发布**：三个已发布版本的声明里 `\| string` 仍在 | [升级与迁移指引](/zh-CN/docs/upgrade) §8；`16` R1 行 |
 | 协议方法面增量（`run/plan`、`config/get`、`config/set`、`config/get-mcp`、`config/set-mcp`、`config/set-mcp-enabled`、`run/answer-decision`、市场条目快照、`store/list` 的 `published_at` 等） | 工作区已有，**未发布**：已发布的 protocol 产物里没有这些类型 | `16` R2 / R8 / R10 / R16 行；MCP 读写面见 `21` D17 |
+| 新通知 `conversation/list-changed`（会话**列表**投影的 `created` / `updated` / `deleted`；不设订阅门槛、不带 `sequence`），协议指纹 `2026-09-18` → `2026-09-19` | 工作区已有，**未发布**：已发布的产物里没有这个通知类型 | `05` §12.3.1；本仓 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §6.2 |
 | release 重建与 `beta.4` | **挂起**（口径：发布一致性收口延后）；本页不预告日期 | `16` R6 行 |
 
 因此：**没有列在本页的变更，不要假定它已经发布；列在 §4 的，不要假定它已经发布。**
@@ -95,5 +96,5 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 ## 5. 另见
 
 - [升级与迁移指引](/zh-CN/docs/upgrade)：发布事实表、dist-tag 语义、固定确切版本、逐版本升级步骤与自查命令。
-- [TypeScript SDK 使用指南](/zh-CN/docs/typescript-sdk)：安装、API、事件与错误模型；其 §1 给出当前版本状态。
+- [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk)：安装、API、事件与错误模型；其 §1 给出当前版本状态。可运行示例见 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk)。
 - [快速开始](/zh-CN/docs/quick-start)：终端用户的安装包路径。

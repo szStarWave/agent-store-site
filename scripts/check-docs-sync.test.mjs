@@ -144,6 +144,7 @@ describe("this repository's site documentation", () => {
       "cli.md",
       "compatibility.md",
       "configuration.md",
+      "examples-sdk.md",
       "plugins-market.md",
       "quick-start.md",
       "typescript-sdk.md",

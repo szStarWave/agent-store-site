@@ -35,7 +35,7 @@ export default function DownloadCTA({
   }, []);
 
   // Only point at a direct asset when the visitor's platform is actually
-  // published; everyone else goes to the downloads page (a guessed asset URL
+  // published; everyone else goes to the releases page (a guessed asset URL
   // would 404 on macOS / Linux / ARM).
   const detectedReleased = detected !== null && isReleasedPlatform(detected);
   const detectedUrl = detected && detectedReleased ? releaseAssetUrl(detected) : releasesPageUrl();
