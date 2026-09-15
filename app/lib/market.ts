@@ -4,7 +4,11 @@ import type { Language } from "../i18n";
 
 export interface MarketExpert {
   name: string;
-  description: string;
+  name_en: string;
+  description_zh: string;
+  description_en: string;
+  tags_zh: string[];
+  tags_en: string[];
   avatar: string | null;
 }
 
@@ -37,6 +41,8 @@ export interface MarketSnapshot {
   connectors: MarketConnector[];
 }
 
+export type MarketEntry = MarketExpert | MarketSkill | MarketConnector;
+
 export type MarketTab = "experts" | "skills" | "connectors";
 
 export const MARKET_TABS: MarketTab[] = ["experts", "skills", "connectors"];
@@ -66,41 +72,26 @@ export function avatarUrl(avatar: string): string {
 }
 
 /** Localized display name for an entry. */
-export function entryName(
-  entry: MarketExpert | MarketSkill | MarketConnector,
-  lang: Language,
-): string {
+export function entryName(entry: MarketEntry, lang: Language): string {
   if ("name_en" in entry && lang === "en-US" && entry.name_en) return entry.name_en;
   return entry.name;
 }
 
-/** Localized description for an entry (falls back to whatever exists). */
-export function entryDescription(
-  entry: MarketExpert | MarketSkill | MarketConnector,
-  lang: Language,
-): string {
-  if ("description_zh" in entry || "description_en" in entry) {
-    const e = entry as MarketSkill | MarketConnector;
-    return lang === "en-US" ? e.description_en || e.description_zh : e.description_zh || e.description_en;
-  }
-  return (entry as MarketExpert).description;
+/** Localized description for an entry (falls back to whichever locale exists). */
+export function entryDescription(entry: MarketEntry, lang: Language): string {
+  return lang === "en-US"
+    ? entry.description_en || entry.description_zh
+    : entry.description_zh || entry.description_en;
 }
 
-/** Localized tags for skills (experts/connectors carry no tags). */
-export function entryTags(entry: MarketExpert | MarketSkill | MarketConnector, lang: Language): string[] {
-  if ("tags_zh" in entry) {
-    const e = entry as MarketSkill;
-    return lang === "en-US" ? e.tags_en : e.tags_zh;
-  }
-  return [];
+/** Localized tags: skills and experts carry them, connectors do not. */
+export function entryTags(entry: MarketEntry, lang: Language): string[] {
+  if (!("tags_zh" in entry)) return [];
+  return (lang === "en-US" ? entry.tags_en : entry.tags_zh) ?? [];
 }
 
 /** Case-insensitive match over name + description + tags. */
-export function entryMatches(
-  entry: MarketExpert | MarketSkill | MarketConnector,
-  lang: Language,
-  query: string,
-): boolean {
+export function entryMatches(entry: MarketEntry, lang: Language, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   const hay = [entryName(entry, lang), entryDescription(entry, lang), ...entryTags(entry, lang)]
