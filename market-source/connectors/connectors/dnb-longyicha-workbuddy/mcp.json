@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "dnb-longyicha-workbuddy": {
+     "type": "streamableHttp",
+      "url": "https://mcp.dnbservice.com.cn/v1/company",
+      "headers": {
+        "Authorization": "Bearer ${DNB_ACCESS_TOKEN}"
+      },
+        "timeout": 5184000000
+    }
+  }
+}
