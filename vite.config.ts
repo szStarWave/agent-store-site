@@ -100,6 +100,15 @@ export default defineConfig({
     marketSourcePlugin(),
   ],
   server: {
+    // Bind the IPv4 loopback explicitly. The default (`host: "localhost"`)
+    // resolves to `::1` only on Windows, which makes the market tree
+    // unreachable for clients that go through a local HTTP proxy: the proxy
+    // forwards to `127.0.0.1:<port>` and gets ECONNREFUSED, so it answers
+    // 502 — that is exactly how the Agent Store's HTTP market mirror failed
+    // (`reqwest` picks up the Windows system proxy and does not honour the
+    // `*localhost*` wildcard in `ProxyOverride`). `localhost` in a browser
+    // still works: it falls back to 127.0.0.1.
+    host: "127.0.0.1",
     watch: { ignored: [MARKET_TREE] },
   },
 });
