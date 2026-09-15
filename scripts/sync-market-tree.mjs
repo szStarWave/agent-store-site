@@ -13,10 +13,10 @@
  *   bun run sync:tree -- --dry-run    # show the diff, change nothing
  *   bun run sync:tree -- --markets experts=D:\\exp skills=D:\\skl connectors=D:\\con
  *
- * Defaults (override per market with MARKET_SRC_EXPERTS / _SKILLS / _CONNECTORS):
- *   experts    = ~/.workbuddy/plugins/marketplaces/experts
- *   skills     = ~/.workbuddy/skills-marketplace
- *   connectors = ~/.workbuddy/connectors-marketplace
+ * Defaults: each market is read from the runtime's standard working directory
+ * (see `DEFAULT_SOURCES` below). Override per market with the env vars
+ * MARKET_SRC_EXPERTS / MARKET_SRC_SKILLS / MARKET_SRC_CONNECTORS, or per run
+ * with `--markets`.
  *
  * Publish gate (fails the run, so a broken tree never reaches a deployment):
  *   - each market's discovery manifest exists and parses;
