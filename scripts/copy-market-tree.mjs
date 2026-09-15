@@ -3,7 +3,7 @@
  * Copy the committed market tree into the build output as `/source/<market>/…`.
  *
  * The tree deliberately does NOT live in `public/`: Vite copies `publicDir`
- * during the build, and a ~8.5k-file tree there makes React Router's prerender
+ * during the build, and a ~8.9k-file tree there makes React Router's prerender
  * step fail (the dev server stalls while preparing the out dir) as well as
  * slowing every HMR reload. Copying after `react-router build` keeps both the
  * dev loop and the prerender fast, while the published URL stays `/source/…`.

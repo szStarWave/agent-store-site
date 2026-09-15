@@ -12,7 +12,7 @@ const siteRoot = path.dirname(fileURLToPath(import.meta.url));
 // `/flowy-agent-store/`) without touching source; local dev/build default to
 // `/` so `react-router dev` / `preview` work at the domain root.
 //
-// `market-source/` holds the committed market tree (~8.5k files, copied into
+// `market-source/` holds the committed market tree (~8.9k files, copied into
 // the build output by scripts/copy-market-tree.mjs). It is data, not app code:
 // watching it keeps the dev server busy enough that React Router's prerender
 // requests fail, so the watcher skips it and HMR stays fast too.
@@ -42,7 +42,7 @@ const MIME: Record<string, string> = {
  * then tripped `onError` and the page showed only letter badges.
  *
  * Mounted here instead of via `publicDir`, for the reason spelled out in
- * `scripts/copy-market-tree.mjs`: a ~8.5k-file `publicDir` stalls prerender.
+ * `scripts/copy-market-tree.mjs`: a ~8.9k-file `publicDir` stalls prerender.
  * Deliberately dev-only — `preview` must keep serving `build/client` verbatim
  * so that a broken copy step fails locally rather than only after deploy.
  */

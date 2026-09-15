@@ -3,14 +3,14 @@
 **Flowy Agent Store** 的营销 + 文档站点：一个本地优先、单文件形态的智能体
 运行时，内嵌 Web UI，并通过命令行启动。
 
-> 本站为纯静态站点（SSG），无需服务器。当前发布为**手动**方式：合并到 `main`
-> 并不会自动上线，请先阅读[部署](#部署)一节。
+> 本站为纯静态站点（SSG），无需服务器。推送到 `main` 会触发 EdgeOne Makers 构建并上线；
+> 构建、缓存与重写配置见[部署](#部署)一节。
 
 ## 技术栈
 
 - React Router v8（framework 模式，内置 SSG，无需额外 prerender 插件）
 - Vite 8 + React 19 + TypeScript
-- `i18next` / `react-i18next`，支持 `zh-CN` / `en-US`（复用 `web/` 模式）
+- `i18next` / `react-i18next`，支持 `zh-CN` / `en-US`
 - `react-markdown` + `remark-gfm` + `rehype-highlight`，用于渲染文档
 - `lucide-react` 图标 + 自定义 CSS 设计变量（不使用 Tailwind/UnoCSS）
 
@@ -18,8 +18,11 @@
 
 ```bash
 bun install
-bun run dev      # 启动开发服务器 → http://localhost:5173
+bun run dev      # 启动开发服务器 → http://127.0.0.1:5173
 ```
+
+> 若启动时报 safe-delete / trash 操作失败，先 `$env:NODE_OPTIONS=""` 再启动：注入的
+> `node-language-shim` 会让 `react-router dev` 清理 `.react-router/types` 时失败并退出。
 
 ## 构建与预览
 
@@ -31,12 +34,14 @@ bun run dev      # 启动开发服务器 → http://localhost:5173
 | `bun run build` | 预渲染静态 HTML → `build/client/`，随后把 `market-source/` 拷为 `build/client/source/` |
 | `bun run preview` | 本地托管生产构建产物 |
 | `bun run typecheck` | 类型检查（`tsc --noEmit`） |
+| `bun run check:market` | 市场门禁：查清单内重复，并核对 `market-source/` 与 `content/market.json` 是否一致 |
+| `bun run check:docs-sync` | 双语文档结构门禁，改过 `content/docs/` 后必跑 |
 
 > 部署到子路径时用 `BASE_PATH`：`BASE_PATH=/<repo>/ bun run build`。
 
 ### 关于 `market-source/`
 
-市场树（experts / skills / connectors，约 8.5k 个文件）**刻意不放在 `public/`**：
+市场树（experts / skills / connectors，约 8.9k 个文件）**刻意不放在 `public/`**：
 Vite 会在构建期拷贝 `publicDir`，而位于项目根目录的这棵树会让 React Router 的
 prerender 请求失败（构建卡在准备输出目录阶段）。因此由
 `scripts/copy-market-tree.mjs` 在 `react-router build` 之后拷贝进产物，公开 URL
@@ -102,7 +107,7 @@ prerender 请求失败（构建卡在准备输出目录阶段）。因此由
 > 务必保证 `prerender()`（目前通过 `docSlugs(lang)` 遍历所有文档 slug）能
 > 枚举到它。
 
-**发布方式：** 推送到 `main` 由 EdgeOne 侧触发构建（或在其控制台手动触发）。
+**发布方式：** 推送到 `main` 触发 EdgeOne Makers 构建并上线（也可在其控制台手动触发）。
 市场内容更新走 `bun run sync` → 提交 → 部署，无需在构建期访问任何外部源。
 
 **待定：** 自定义域名与 HTTPS 尚未绑定；EdgeOne 的预览域名带签名 `eo_token`
@@ -115,9 +120,8 @@ app/                     React Router 应用（根、路由、布局、页面、
 content/docs/            Markdown 文档，含 zh-CN 与 en-US（与上游源仓库 Michael-Lfx/allo 的 docs/agent-store 保持同步）
 content/market.json      由市场树生成的目录页快照（bun run sync:market）
 market-source/           市场树（experts / skills / connectors + _files.txt），提交进仓库
-scripts/sync-market-tree.mjs   本地市场工作目录 → market-source/ + 生成清单 + 校验
-scripts/sync-market-data.mjs   市场树 → content/market.json（纯本地）
-scripts/copy-market-tree.mjs   构建后拷贝 market-source/ → build/client/source/
+scripts/                 市场同步、市场/文档门禁、构建期拷贝、发版
+docs/                    面向维护者的中文文档（不进站点）
 edgeone.json             EdgeOne Makers 构建/缓存/重写配置
 react-router.config.ts   ssr 默认开启 + prerender()
 vite.config.ts           base = BASE_PATH；watcher 忽略 market-source/
