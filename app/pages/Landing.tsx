@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router";
+import { Link, useParams, type MetaFunction } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Boxes, GitBranch, HardDrive, Terminal } from "lucide-react";
 
@@ -10,8 +10,46 @@ import MarketStrip from "../components/MarketStrip";
 import DevSection from "../components/DevSection";
 import FaqSection from "../components/FaqSection";
 import WorkflowSteps from "../components/WorkflowSteps";
+import SocialProof from "../components/SocialProof";
 import DownloadCTA from "../components/DownloadCTA";
 import CopyButton from "../components/CopyButton";
+
+const META = {
+  "zh-CN": {
+    title: "Flowy Agent Store — 本地优先的 Agent 工作台",
+    description:
+      "Flowy Agent Store 是本地优先的单文件 Agent 运行时：一条命令在浏览器中拉起工作台，导入专家、技能与连接器，执行与凭据只留本机。",
+  },
+  "en-US": {
+    title: "Flowy Agent Store — Run your agent workbench locally",
+    description:
+      "Flowy Agent Store is a local-first, single-file agent runtime. One command opens a workbench in your browser to import experts, skills and connectors — execution and credentials stay on your machine.",
+  },
+} as const;
+
+export const meta: MetaFunction = ({ params }) => {
+  const lang = params.lang === "en-US" ? "en-US" : "zh-CN";
+  const m = META[lang];
+  const zh = "/";
+  const en = "/en-US";
+  const canonical = lang === "en-US" ? en : zh;
+  return [
+    { title: m.title },
+    { name: "description", content: m.description },
+    { property: "og:type", content: "website" },
+    { property: "og:title", content: m.title },
+    { property: "og:description", content: m.description },
+    { property: "og:locale", content: lang === "en-US" ? "en_US" : "zh_CN" },
+    { property: "og:locale:alternate", content: lang === "en-US" ? "zh_CN" : "en_US" },
+    { name: "twitter:card", content: "summary_large_image" },
+    { name: "twitter:title", content: m.title },
+    { name: "twitter:description", content: m.description },
+    { tagName: "link", rel: "canonical", href: canonical },
+    { tagName: "link", rel: "alternate", hrefLang: "zh", href: zh },
+    { tagName: "link", rel: "alternate", hrefLang: "en", href: en },
+    { tagName: "link", rel: "alternate", hrefLang: "x-default", href: zh },
+  ];
+};
 
 const FEATURE_ICONS = { workbench: Boxes, observability: GitBranch, localFirst: HardDrive, oneCmd: Terminal };
 const FEATURE_KEYS = Object.keys(FEATURE_ICONS) as (keyof typeof FEATURE_ICONS)[];
@@ -45,7 +83,7 @@ export default function Landing() {
           <h1 className="hero-title" style={revealDelay(70)}>{t("landing.heroTitle")}</h1>
           <p className="hero-sub" style={revealDelay(150)}>{t("landing.heroSubtitle")}</p>
           <div className="hero-actions" style={revealDelay(230)}>
-            <a className="btn btn-primary btn-lg" href="#download">
+            <a className="btn btn-primary btn-lg btn-glow" href="#download">
               {t("landing.heroCtaDownload")}
             </a>
             <Link className="btn btn-quiet btn-lg" to={`/${lang}/market`}>
@@ -56,6 +94,9 @@ export default function Landing() {
               {t("landing.heroCtaDocs")}
             </Link>
           </div>
+          <p className="hero-trust" style={revealDelay(300)}>
+            {t("landing.heroTrust")}
+          </p>
 
           <figure className="hero-terminal" style={revealDelay(330)}>
             <span className="term-beam" aria-hidden="true" />
@@ -107,6 +148,7 @@ export default function Landing() {
           </p>
           <h2 data-reveal>{t("landing.featureTitle")}</h2>
           <p className="subtle" data-reveal>{t("landing.featureSubtitle")}</p>
+          <p className="feature-value" data-reveal>{t("landing.featureValue")}</p>
           <div className="feature-grid">
             {FEATURE_KEYS.map((key, i) => {
               const Icon = FEATURE_ICONS[key];
@@ -124,6 +166,7 @@ export default function Landing() {
         </div>
       </section>
 
+      <SocialProof />
       <WorkflowSteps />
       <MarketStrip />
       <DevSection />
