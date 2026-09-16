@@ -66,6 +66,21 @@
       "name": "designkit-ppt-beautify",
       "source": "./plugins/designkit-ppt-beautify",
       "description": "Rebuild visual hierarchy and layouts for existing presentations while preserving their original content."
+    },
+    {
+      "name": "code-review-expert",
+      "source": "./plugins/code-review-expert",
+      "description": "Examines every line of code with eagle-eye standards, intercepting defects before they reach production"
+    },
+    {
+      "name": "backend-architect",
+      "source": "./plugins/backend-architect",
+      "description": "Deep expertise in distributed systems and high-concurrency architecture, excelling at transforming complex business into elegant technical solutions"
+    },
+    {
+      "name": "data-engineer",
+      "source": "./plugins/data-engineer",
+      "description": "Builds efficient and reliable data pipelines and ETL processes, ensuring data flows smoothly from source to insight"
     }
   ]
 }
