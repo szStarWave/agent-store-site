@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Terminal } from "lucide-react";
 
-import { installScriptUrl, RELEASE_VERSION, releasesPageUrl } from "../lib/platform";
+import { installScriptUrl, RELEASE_VERSION, releasesPageUrl, SITE_ORIGIN } from "../lib/platform";
 import CopyButton from "./CopyButton";
 
 /**
@@ -23,20 +22,14 @@ export default function AgentPromptSection() {
   const { lang: raw } = useParams();
   const lang = raw === "en-US" ? "en-US" : "zh-CN";
 
-  // An agent may run the prompt from any cwd, so the URLs inside it have to be
-  // absolute — but the origin only exists in the browser. SSG renders the
-  // relative form and the effect upgrades it after hydration, the same
-  // trade-off `DownloadCTA` makes for its one-liner.
-  const [origin, setOrigin] = useState("");
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
-
+  // Absolute URLs against the canonical origin, not `window.location.origin`:
+  // an agent may run the copied prompt long after the page it came from is gone
+  // (see `SITE_ORIGIN`). This also keeps SSG output and hydration identical.
   const prompt = t("landing.agent.prompt", {
     version: RELEASE_VERSION,
-    installUrl: `${origin}${installScriptUrl()}`,
+    installUrl: `${SITE_ORIGIN}${installScriptUrl()}`,
     releasesUrl: releasesPageUrl(),
-    configUrl: `${origin}/${lang}/docs/configuration`,
+    configUrl: `${SITE_ORIGIN}/${lang}/docs/configuration`,
   });
 
   return (
