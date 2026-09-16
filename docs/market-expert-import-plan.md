@@ -400,36 +400,110 @@ content/market.json
 
 ## 8. 第二批执行计划（2026-09-16 规划，分支 `feat/market-add-experts-batch-2`）
 
-目标：专家 16 → 21，仅收 agent 型。
+目标（2026-09-16 修订）：**本批 20 个，专家 16 → 36**；最终目标是把目录中 375 个 agent
+全部收录（见 §9）。
 
-### 8.1 名单与获取通道
+### 8.1 规模与容量画像（2026-09-16 全量探测）
 
-| slug | 名称 | 版本 | 通道 |
+- 目录 428 条 = 375 agent + 53 team；站点现有 16（13 agent + 3 team）→ 待收录 agent **366 个**。
+- 366 个 bundle 合计 **759 MB**，体积分布：
+
+  | 单包上限 | 覆盖条目 | 合计体积 |
+  | --- | --- | --- |
+  | ≤1 MB | 325 | 103 MB |
+  | ≤2 MB | 346 | 133 MB |
+  | ≤5 MB | 361 | 177 MB |
+  | ≤20 MB | 364 | 224 MB |
+  | 全部 | 366 | 759 MB |
+
+- 5 个超大包占 583 MB（整体的 77%）：`vietnam-finance-tax-expert`（495 MB）、
+  `malaysia-hr-admin`（39.8）、`malaysia-legal`（18.0）、`malaysia-finance-tax`（15.4）、
+  `indonesia-digital-law-expert`（14.1）。
+- 结论：批量收录按体积分档推进；超大包单独决策，不阻塞主体。
+
+### 8.2 入口门槛（分档）
+
+- **A 档（理想卡片）**：中英文 `profession` / `displayDescription` + `tags` +
+  `avatars/expert.png` + README 齐全。
+- **B 档（可按回落收录）**：payload 与 `plugin.json` 合法，但缺头像或本地化字段 →
+  卡片回落为字母徽标 / 插件 id / 英文简介。站点本就容忍这种回落（现存 2 例），
+  为达成「全量收录」目标应接受，并在批次记录里标注。
+- **排除**：无 payload、manifest 非法、结构损坏。
+
+### 8.3 本批名单（20 个，全部 A 档）
+
+| # | slug | 类别 | 体积 |
 | --- | --- | --- | --- |
-| `carousel-content-growth-expert` | 轮播内容增长专家 | 1.0.0 | 本机已落盘（核验通过） |
-| `user-experience-architect` | 用户体验架构师 | 1.0.1 | 本机已落盘（核验通过） |
-| `security-engineer` | 安全工程师 | 1.0.1 | bundle 直下 |
-| `mcp-build-expert` | MCP构建专家 | 1.0.1 | bundle 直下 |
-| `ai-engineer` | AI工程师 | 1.0.2 | bundle 直下 |
+| 1 | `carousel-content-growth-expert` | 营销增长 | 本机包 |
+| 2 | `user-experience-architect` | 产品设计 | 本机包 |
+| 3 | `security-engineer` | 技术工程 | 285 KB |
+| 4 | `mcp-build-expert` | 技术工程 | 293 KB |
+| 5 | `ai-engineer` | 数据智能 | 417 KB |
+| 6 | `design-prototype-expert` | 产品设计 | 192 KB |
+| 7 | `sprint-priority-manager` | 产品设计 | 293 KB |
+| 8 | `marketing-reviewer` | 法务安全 | 299 KB |
+| 9 | `financial-tracker` | 金融投资 | 324 KB |
+| 10 | `new-share-expert` | 金融投资 | 321 KB |
+| 11 | `english-writing-coach` | 开学季 | 280 KB |
+| 12 | `ai-shifu` | 内容创作 | 157 KB |
+| 13 | `sg-finance-tax` | 全球发展 | 187 KB |
+| 14 | `multi-cloud-expert` | 腾讯专区 | 241 KB |
+| 15 | `tianyu-marketing-guardian` | 腾讯专区 | 138 KB |
+| 16 | `reality-checker` | 项目质量 | 273 KB |
+| 17 | `deal-strategist` | 销售商务 | 319 KB |
+| 18 | `fbsir-industry-scene-researcher` | 行业顾问 | 187 KB |
+| 19 | `unity-multiplayer-engineer` | 游戏空间 | 302 KB |
+| 20 | `recruitment-expert` | 运营人力 | 294 KB |
 
-三个 bundle 已完成字段/头像/README 核验（§7.3），本机两个包已通过落盘核验。
+后 15 个来自 60 个候选的 bundle 实检（41 个合格项），其余合格项留给后续批次。
 
-### 8.2 执行清单
+### 8.4 执行清单
 
-1. 站外造副本：以仓库 `market-source/experts`（16）为底，并入上表 5 个包，
+1. 站外造副本：以仓库 `market-source/experts`（16）为底，并入上表 20 个包，
    在副本 `.codebuddy-plugin/marketplace.json` 登记（`name` / `source` / 英文兜底 `description`）。
 2. 逐个核验：`plugin.json` 可解析、`expertType=agent`、声明 agents/skills 路径存在、
-   `avatars/expert.png` 与 README 存在、无 `.DS_Store`/`.git`/`node_modules`。
+   头像/README 状态符合分档记录、无 `.DS_Store`/`.git`/`node_modules`。
 3. 预检：`MARKET_SRC_EXPERTS=<副本>`，`MARKET_SRC_SKILLS/CONNECTORS` 指回仓库自镜像；
-   期望 `experts` 的 `-removed=0`（`+added` ≈ 5 个包的文件数之和），另两个市场 `+0 -0 ~0`。
+   期望 `experts` 的 `-removed=0`，另两个市场 `+0 -0 ~0`。
 4. `bun run sync` → `bun run check:market`（退出码 0）→ 幂等复检 `+0 -0 ~0`。
-5. `bun run build`；确认 `build/client/source/experts/` 含 5 个新包，且 `/zh-CN/market`、
-   `/en-US/market` 预渲染 HTML 出现 5 张新卡片的中英文名。
-6. 提交：市场产物一笔（`chore(market): …`）+ 文档一笔；推送后按 §5.4 合并 `main`。
+5. `bun run build`；确认 `build/client/source/experts/` 含 20 个新包，且 `/zh-CN/market`、
+   `/en-US/market` 预渲染 HTML 出现 20 张新卡片的中英文名。
+6. 提交：市场产物一笔（`chore(market): …`）+ 文档/工具一笔；推送后按 §5.4 合并 `main`。
 
-### 8.3 验收与不变量
+### 8.5 验收与不变量
 
-- 基线应为 `experts=21 skills=268 connectors=228 avatars=357`（头像数 = 352 + 5）。
+- 基线应为 `experts=36 skills=268 connectors=228 avatars=372`（头像 = 352 + 20）。
 - `-removed` 非 0、门禁 `✗`、构建失败、预渲染页面缺卡片——任一出现即停下排查。
 - `senior-developer` 版本差异仍挂账、`ai-content-creator-team` 仍按 team 排除，
   本批不改变这两项结论。
+
+## 9. 全量收录路线图（375 个 agent）
+
+目标：把目录中 **375 个 agent** 全部收录（53 个 team 不在目标内）。站点现有 13 个 agent，
+待收录 366 个。
+
+### 9.1 批次策略
+
+- 批次规模：脚本化后 20–50 个/批；按 §8.1 的体积分档推进，优先 ≤2 MB 的主体（346 个 / 133 MB）。
+- 每批固定动作（与 §8.4 相同）：造副本 → 核验（A/B 档判定）→ 预检 `-removed=0` → `sync` →
+  `check:market` + 幂等 → `build` + 页面断言 → 提交 → 合并 `main`。
+- 每批把「本批 slug / 档位 / 体积 / 基线变化」记入本文档，保证可追溯与可回滚。
+
+### 9.2 工具化（建议先做，一次投入）
+
+新增 `scripts/import-expert-bundles.mjs`：
+
+- 输入：slug 列表（`--slugs a,b,c` 或 `--from-file list.txt`），或 `--auto --category 02-Engineering`；
+- 步骤：拉目录 → 拉 bundle → A/B 档判定 → 解包到站外副本 → 登记副本 `marketplace.json` →
+  输出报告（slug/档位/体积/文件数/缺失项）；
+- 选项：`--dry-run`、`--copy <副本目录>`；
+- 边界：只写站外副本，不碰 `market-source/` 与 `content/market.json`（生成物仍由 `sync` 负责）。
+
+### 9.3 体积与基础设施风险（需在推进中观测）
+
+- 仓库：`market-source/` 现约 9k 文件；全量 agent 预计再加约 2–3 万文件。
+- 内容体积：全量 759 MB；若排除 5 个超大包为 177 MB。
+- 构建：`build/client/` 会再复制一份树；EdgeOne Makers 的构建时长/产物体积限额未验证，
+  建议在批次推进中记录构建耗时与产物体积，任一异常即暂停并评估（必要时按体积再次分档）。
+- 超大包（>5 MB）与「缺头像/缺字段但结构合法」的 B 档条目，均按 §8.2 的判定**不静默丢弃**，
+  要么收录并记录回落，要么明确挂账。
