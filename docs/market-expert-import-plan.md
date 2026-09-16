@@ -397,3 +397,39 @@ content/market.json
 - **工具化（可选）**：把「拉目录 → bundle 存在性/字段核验 → 解包 → 登记」做成
   `scripts/import-expert-bundles.mjs`（`--slugs`、`--dry-run`），下一批只给 slug 列表即可；
   先在站外副本灰度，再接标准流程。
+
+## 8. 第二批执行计划（2026-09-16 规划，分支 `feat/market-add-experts-batch-2`）
+
+目标：专家 16 → 21，仅收 agent 型。
+
+### 8.1 名单与获取通道
+
+| slug | 名称 | 版本 | 通道 |
+| --- | --- | --- | --- |
+| `carousel-content-growth-expert` | 轮播内容增长专家 | 1.0.0 | 本机已落盘（核验通过） |
+| `user-experience-architect` | 用户体验架构师 | 1.0.1 | 本机已落盘（核验通过） |
+| `security-engineer` | 安全工程师 | 1.0.1 | bundle 直下 |
+| `mcp-build-expert` | MCP构建专家 | 1.0.1 | bundle 直下 |
+| `ai-engineer` | AI工程师 | 1.0.2 | bundle 直下 |
+
+三个 bundle 已完成字段/头像/README 核验（§7.3），本机两个包已通过落盘核验。
+
+### 8.2 执行清单
+
+1. 站外造副本：以仓库 `market-source/experts`（16）为底，并入上表 5 个包，
+   在副本 `.codebuddy-plugin/marketplace.json` 登记（`name` / `source` / 英文兜底 `description`）。
+2. 逐个核验：`plugin.json` 可解析、`expertType=agent`、声明 agents/skills 路径存在、
+   `avatars/expert.png` 与 README 存在、无 `.DS_Store`/`.git`/`node_modules`。
+3. 预检：`MARKET_SRC_EXPERTS=<副本>`，`MARKET_SRC_SKILLS/CONNECTORS` 指回仓库自镜像；
+   期望 `experts` 的 `-removed=0`（`+added` ≈ 5 个包的文件数之和），另两个市场 `+0 -0 ~0`。
+4. `bun run sync` → `bun run check:market`（退出码 0）→ 幂等复检 `+0 -0 ~0`。
+5. `bun run build`；确认 `build/client/source/experts/` 含 5 个新包，且 `/zh-CN/market`、
+   `/en-US/market` 预渲染 HTML 出现 5 张新卡片的中英文名。
+6. 提交：市场产物一笔（`chore(market): …`）+ 文档一笔；推送后按 §5.4 合并 `main`。
+
+### 8.3 验收与不变量
+
+- 基线应为 `experts=21 skills=268 connectors=228 avatars=357`（头像数 = 352 + 5）。
+- `-removed` 非 0、门禁 `✗`、构建失败、预渲染页面缺卡片——任一出现即停下排查。
+- `senior-developer` 版本差异仍挂账、`ai-content-creator-team` 仍按 team 排除，
+  本批不改变这两项结论。
