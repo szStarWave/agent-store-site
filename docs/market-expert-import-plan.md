@@ -419,7 +419,22 @@ content/market.json
 - 5 个超大包占 583 MB（整体的 77%）：`vietnam-finance-tax-expert`（495 MB）、
   `malaysia-hr-admin`（39.8）、`malaysia-legal`（18.0）、`malaysia-finance-tax`（15.4）、
   `indonesia-digital-law-expert`（14.1）。
-- 结论：批量收录按体积分档推进；超大包单独决策，不阻塞主体。
+- **上表是 bundle（压缩）体积，解包入库会膨胀**。2026-09-16 实测 4 个重包：
+
+  | 包 | bundle | 解包后 | 膨胀 | 最大单文件 |
+  | --- | --- | --- | --- | --- |
+  | `malaysia-legal` | 18.0 MB | 111.3 MB | 6.2× | 47.7 MB（json 数据集） |
+  | `malaysia-hr-admin` | 39.8 MB | 67.8 MB | 1.7× | 23.3 MB（duckdb） |
+  | `malaysia-finance-tax` | 15.4 MB | 40.0 MB | 2.6× | 11.8 MB（duckdb） |
+  | `indonesia-digital-law-expert` | 14.1 MB | 15.2 MB | 1.1× | 6.2 MB（xlsx） |
+
+  按此比例外推，**全量 366 个入库后约在 1.5–2 GB 量级**（压缩态 759 MB），
+  远超「264 MB / 177 MB」这种下载体积直觉。当前仓库基数：`market-source/` 9,013 文件 /
+  112 MB，`.git` 43 MB。
+- **GitHub 硬限制**：单文件 >100 MB 会被拒收。已检查的 4 个重包最大单文件 47.7 MB（安全），
+  但 `vietnam-finance-tax-expert`（495 MB 压缩）**尚未解包检查**，收录前必须先验证。
+- 结论：批量收录按体积分档推进；超大包单独决策，不阻塞主体；每批必须记录入库体积与实际
+  增重（见 §9.3）。
 
 ### 8.2 入口门槛（分档）
 
@@ -501,9 +516,12 @@ content/market.json
 
 ### 9.3 体积与基础设施风险（需在推进中观测）
 
-- 仓库：`market-source/` 现约 9k 文件；全量 agent 预计再加约 2–3 万文件。
-- 内容体积：全量 759 MB；若排除 5 个超大包为 177 MB。
-- 构建：`build/client/` 会再复制一份树；EdgeOne Makers 的构建时长/产物体积限额未验证，
-  建议在批次推进中记录构建耗时与产物体积，任一异常即暂停并评估（必要时按体积再次分档）。
+- 仓库：`market-source/` 现 9,013 文件 / 112 MB；全量 agent 预计再加约 2–3 万文件、
+  **1.5–2 GB**（bundle 压缩态 759 MB，解包有 1.1–6.2× 膨胀，见 §8.1 实测）。
+- 单文件风险：GitHub 拒绝 >100 MB 的单文件；`vietnam-finance-tax-expert`（495 MB 压缩）
+  必须解包验证后才能决定是否收录。
+- 构建：`build/client/` 会再复制一份树；EdgeOne Makers 的构建时长/产物体积限额未验证。
+  **用第二批（20 个）做灰度**，记录构建耗时、`build/client` 体积与 git 增重，再决定后续
+  批次规模（建议 60–80 个/批 × 约 5 批覆盖 ≤2 MB 主体）；任一异常即暂停评估。
 - 超大包（>5 MB）与「缺头像/缺字段但结构合法」的 B 档条目，均按 §8.2 的判定**不静默丢弃**，
   要么收录并记录回落，要么明确挂账。
