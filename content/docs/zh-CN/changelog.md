@@ -21,25 +21,39 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.3", "latest": "0.1.0-beta.2" },
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.4", "latest": "0.1.0-beta.2" },
   "time": {
     "0.1.0": "2026-09-09T09:09:04.795Z",
     "0.1.0-beta.2": "2026-09-09T09:27:36.122Z",
-    "0.1.0-beta.3": "2026-09-10T04:44:34.609Z"
+    "0.1.0-beta.3": "2026-09-10T04:44:34.609Z",
+    "0.1.0-beta.4": "2026-09-16T10:24:02.588Z"
   }
 }
 ```
 
 | 版本 | 发布（UTC） | 变更类型 | 当前 dist-tag |
 | --- | --- | --- | --- |
-| `0.1.0-beta.3` | 2026-09-10 | 加法（无破坏性） | `beta` |
+| `0.1.0-beta.4` | 2026-09-16 | 破坏性（协议指纹严格相等 + 类型收窄） | `beta` |
+| `0.1.0-beta.3` | 2026-09-10 | 加法（无破坏性） | — |
 | `0.1.0-beta.2` | 2026-09-09 | 加法（无破坏性） | `latest` |
 | `0.1.0` | 2026-09-09 | 首次发布 | 无 |
 
 `versions` 的排列顺序**不是**时间顺序：`0.1.0` 排在最后，却是**最早**的一次发布（比 `beta.2` 早约 18 分钟），且不带任何 dist-tag。它不是稳定版，也不比 beta 线新——dist-tag 语义见[升级与迁移指引](/zh-CN/docs/upgrade) §3。
 
-### 2.1 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
+### 2.1 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
+
+> **本版含破坏性变更**：`0.1.0-beta.3` 及更早版本的客户端**连不上**本版运行时，必须一并升级（步骤见[升级与迁移指引](/zh-CN/docs/upgrade) §6.3）。
+
+- **破坏性 — 协议指纹改为严格相等的计数器**：指纹值由日期戳换成 `fp-1`（形状改为 `fp-<n>` 计数器）。它**不改变任何 wire 行为**，但握手与 SDK 对指纹做**严格相等**校验，所以按旧值编出来的客户端会被新运行时拒绝。经 `AGENT_STORE_BIN` 注入自建二进制时，SDK 与二进制必须同批升级。
+- **破坏性 — `event_type` 收窄**：`ConversationEvent` 的 `event_type` 从「开放联合 + `| string` 兜底」改为封闭类型 `ConversationEventType`，并新增包内解码器 `decodeConversationEvent`（把事件收敛成带 `kind` 判别式的 `DecodedConversationEvent`）。读取 `ConversationEvent.event_type` 并把它当 `string` 用的代码会开始报类型错误；`RunEvent.event_type` 是**另一处**声明，仍是有意保持开放的 `string`，未受影响。**此前三个已发布版本的声明里那个 `| string` 都还在**（复现方法见[升级与迁移指引](/zh-CN/docs/upgrade) §8）。
+- **加法 — 协议方法面增量**：新增 `run/plan`、`config/get`、`config/set`、`config/get-mcp`、`config/set-mcp`、`config/set-mcp-enabled`、`run/answer-decision`，以及市场条目快照与 `store/list` 的 `published_at` 等字段。
+- **加法 — 技能文件树读面** `skill/files` / `skill/file`：技能是目录，此前只有 `SKILL.md` 可读。`skill/file` 在服务端回原始字节 + `content-type`（不是 JSON 信封），因此没有进 JSON 传输的路由表。客户端映射到 HTTP 的方法数现为 **48 / 71**（已按本版已发布产物实测，见[TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §5.3）。
+- **加法 — 连接器调用代理** `connector/call`：宿主持有连接与凭据、替调用方执行 MCP 工具；**默认全关**，需 `[connector_proxy]` allowlist；工具级失败以 `is_error` 返回而不是抛错。
+- **加法 — 新通知** `conversation/list-changed`：会话**列表**投影的 `created` / `updated` / `deleted`；不设订阅门槛、不带 `sequence`。
+- **升级影响**：**需要改代码**（类型收窄）且**必须升级**（指纹严格相等），步骤见[升级与迁移指引](/zh-CN/docs/upgrade) §6.3。
+
+### 2.2 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
 
 - **client**：新增公开声明 `TransportLifecycle`、`onLifecycle`、`connectTimeoutMs`，以及订阅状态机的 `rearm()`。
 - **sdk**：新增公开声明 `assertProtocolCompatible`、`SpawnOptions.env` / `cwd` / `onExit`、`SpawnedServer.exited`、`SpawnExitInfo`。
@@ -47,13 +61,13 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - **protocol**：类型声明**逐字节未变**。
 - **升级影响**：从 `0.1.0-beta.2` 升级**无需改代码**，步骤见[升级与迁移指引](/zh-CN/docs/upgrade) §6.1。
 
-### 2.2 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
+### 2.3 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
 
 - **sdk**：补齐 `optionalDependencies`，按同一版本号钉住五个平台运行时包——`runtime-win32-x64`、`runtime-linux-x64`、`runtime-linux-arm64`、`runtime-darwin-x64`、`runtime-darwin-arm64`。
 - 此前的 `0.1.0` 没有这份依赖，`launchClient` 可能因此找不到可执行文件（见[升级与迁移指引](/zh-CN/docs/upgrade) §6.2）。
 - 它是 `latest` 标签当前指向的版本——**不是最新版**。
 
-### 2.3 `0.1.0` — 2026-09-09T09:09:04Z
+### 2.4 `0.1.0` — 2026-09-09T09:09:04Z
 
 - **首次发布**：三个包的第一个公开版本；没有更早的版本可破坏，因此不含破坏性变更。
 - 三个包的**代码与类型声明与 `0.1.0-beta.2` 逐字节相同**，差别只在 `package.json`——sdk 当时**没有** `optionalDependencies`。
@@ -63,13 +77,15 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 3. 变更类型与破坏性变更的公告规则（D10=A）
 
-口径：**beta 期间不承诺向后兼容**，破坏性变更**走 minor 号**（`0.1.x` → `0.2.0`；现在还没有稳定版可破坏，因此不做 major 号）。
+口径：**beta 期间不承诺向后兼容**，破坏性变更**随下一个预发布序号发布**（`0.1.0-beta.N` → `0.1.0-beta.N+1`）并在条目里标「破坏性」；`0.1.x` → `0.2.0` 这类 **minor 号留给退出 beta 之后的破坏性变更**——现在还没有稳定版可破坏，因此不做 major 号。
 
 | 变更类型 | 版本号 | 本页动作 |
 | --- | --- | --- |
 | 首次发布 | 该版本号本身 | 新增条目，标「首次发布」 |
 | 加法（新增声明、新增依赖、元数据） | patch / 预发布序号 | 新增条目，标「加法（无破坏性）」 |
-| 破坏性（类型收窄、方法增删、事件面调整） | **minor 号** | 新增条目，标「破坏性」并给出迁移做法 |
+| 破坏性（类型收窄、方法增删、事件面调整） | beta 线内：**下一个预发布序号**；退出 beta 后：**minor 号** | 新增条目，标「破坏性」并给出迁移做法 |
+
+> **口径修订（2026-09-16）**：原口径为「破坏性变更走 minor 号」，与 beta 线内的实际发布节奏不符——`0.1.0-beta.4` 载有 `event_type` 类型收窄与协议指纹严格相等变更，仍是预发布序号。现改为「beta 线内随下一个预发布序号发布并逐条标注，minor 号保留给退出 beta 之后的破坏性变更」。**已发布条目的版本号与发布时间不受此修订影响**（见下方「永不改写」）。
 
 **本页是破坏性变更的唯一公告面**：它不靠 commit message、聊天记录或 release 页通知——只有本页条目写了「破坏性」并给出迁移做法，才算公告（版本号规则见[升级与迁移指引](/zh-CN/docs/upgrade) §1）。
 
@@ -82,16 +98,13 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-本页只覆盖已发布的版本。工作区（`web/packages/*`）里已经有、但**尚未随任何版本发布**的改动：
+截至 `0.1.0-beta.4`（2026-09-16），**工作区（`web/packages/*`）与已发布产物一致，没有未发布的差异**：`0.1.0-beta.3` 之后积累的那批改动——`event_type` 收窄、协议方法面增量、`conversation/list-changed`、技能文件树读面、`connector/call`、协议指纹形状变更——已全部随 `0.1.0-beta.4` 发布，逐条见 §2.1。
 
-| 事项 | 状态 | 依据 |
-| --- | --- | --- |
-| `event_type` 从开放联合（带 `\| string` 兜底）收窄为封闭类型 `ConversationEventType`，并新增包内解码器 | 工作区已有，**未发布**：三个已发布版本的声明里 `\| string` 仍在 | [升级与迁移指引](/zh-CN/docs/upgrade) §8；`16` R1 行 |
-| 协议方法面增量（`run/plan`、`config/get`、`config/set`、`config/get-mcp`、`config/set-mcp`、`config/set-mcp-enabled`、`run/answer-decision`、市场条目快照、`store/list` 的 `published_at` 等） | 工作区已有，**未发布**：已发布的 protocol 产物里没有这些类型 | `16` R2 / R8 / R10 / R16 行；MCP 读写面见 `21` D17 |
-| 新通知 `conversation/list-changed`（会话**列表**投影的 `created` / `updated` / `deleted`；不设订阅门槛、不带 `sequence`），协议指纹 `2026-09-18` → `2026-09-19` | 工作区已有，**未发布**：已发布的产物里没有这个通知类型 | `05` §12.3.1；本仓 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §6.2 |
-| release 重建与 `beta.4` | **挂起**（口径：发布一致性收口延后）；本页不预告日期 | `16` R6 行 |
+「已发布产物里到底有什么」可以自己复现，做法是把相邻两版取回来对读：`0.1.0-beta.3` 的 `event_type` 仍带 `| string` 兜底、指纹是日期戳；`0.1.0-beta.4` 已是封闭联合 `ConversationEventType`、指纹是 `fp-1`。具体命令见[升级与迁移指引](/zh-CN/docs/upgrade) §8。
 
-因此：**没有列在本页的变更，不要假定它已经发布；列在 §4 的，不要假定它已经发布。**
+发布节奏：条目在版本**发布之后**才追加（见 §3 的「新增」规则），本页不预告日期。
+
+因此：**没有列在本页的变更，不要假定它已经发布。**
 
 ## 5. 另见
 
