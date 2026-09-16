@@ -4,11 +4,15 @@ import { Check, Copy } from "lucide-react";
 export default function CopyButton({
   text,
   label = "Copy",
+  copiedLabel,
   tone = "light",
+  showLabel = false,
 }: {
   text: string;
   label?: string;
+  copiedLabel?: string;
   tone?: "light" | "dark";
+  showLabel?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -20,14 +24,13 @@ export default function CopyButton({
       console.error("clipboard copy failed");
     }
   };
+  const className = ["copy-btn", tone === "dark" ? "copy-btn-dark" : "", showLabel ? "copy-btn-labeled" : ""]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <button
-      className={tone === "dark" ? "copy-btn copy-btn-dark" : "copy-btn"}
-      onClick={copy}
-      aria-label={label}
-      type="button"
-    >
+    <button className={className} onClick={copy} aria-label={label} title={label} type="button">
       {copied ? <Check size={14} /> : <Copy size={14} />}
+      {showLabel && <span>{copied ? (copiedLabel ?? label) : label}</span>}
     </button>
   );
 }

@@ -7,6 +7,8 @@ Agent Store 把所有长期偏好写进 `~/.agent-store/config.toml`（TOML 格�
 
 > 本文件沿用 Claude Code / Codex / Kimi Code 风格的用户级 `config.toml` 惯例（`[providers.<name>]` + `[models."<provider>/<model>"]`）。**未知的顶层与嵌套键会被容忍**——文件属于你，可以携带 Agent Store 不消费的其他工具（如 Kimi Code 的 `thinking`、`permission`、`hooks`）的设置，不会导致解析失败。
 
+同目录下还有第二份可选文件 `mcp.json`：它不属于本文件的任何一张表，声明的是**本机接入哪些 MCP server**，因此单独成节——见 [`mcp.json`：声明 MCP server](#mcp-json-声明-mcp-server)。
+
 ## 完整示例
 
 ```toml
@@ -208,6 +210,119 @@ AGENT_STORE_TOOLS='{"computer":false,"domains":{"knowledge":false}}' agent-store
 
 完整用法示例见 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §10。
 
+## `mcp.json`：声明 MCP server
+
+`config.toml` 管的是长期偏好；**MCP server 从哪来**写在它同级的一份独立文件 `mcp.json`（JSON）里。这份文件的 schema 沿用 [Kimi Code CLI 的 MCP 配置](https://www.kimi.com/code/docs/kimi-code-cli/customization/mcp.html)：字段同名同义，照抄通常可用，差异见本节末。
+
+- **默认位置**：`~/.agent-store/mcp.json`（Windows 上为 `%USERPROFILE%\.agent-store\mcp.json`）。它跟着宿主解析出的 `config.toml` 走——配置文件指到哪个目录，读的就是那个目录下的 `mcp.json`；没有独立的环境变量能把它挪走。
+- **可选文件**：不存在 = 没有声明任何 server，行为与此前完全一致。
+- **只有 Agent Store 宿主读它**（`agent-store` 可执行文件）。桌面端与 Web 宿主指向同一个目录、读同一份 `config.toml` 拿供应商与市场源，但**不读**这份声明——能读到不等于该由它采用。
+- 宿主**启动时读一次**，改完要重启才生效（在 Web UI 里改也一样）。
+
+声明的 server **不会写进 `mcp_servers` 表**：它们不进连接器目录、不能被预设（preset）的 `mcp_server_ids` 引用，也没有持久化的连接测试状态与工具清单。同名条目按 **`mcp.json` > `mcp_servers` 数据行** 生效——声明文件是操作者逐字写下的意图，而数据行通常只是导入的残留；一次调用里的显式绑定优先级最高，声明不会覆盖调用方本轮点名的 server。换句话说，这份文件只是 server 的**来源之一**：经 MCP 配置接口注册、或由市场 / 插件装进来的 server 落在 `mcp_servers` 行，见[插件与市场](/zh-CN/docs/plugins-market) §6。
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/srv/data"],
+      "env": { "UPSTREAM_TOKEN": "secret:UPSTREAM_TOKEN" },
+      "cwd": "servers/filesystem",
+      "toolTimeoutMs": 30000
+    },
+    "linear": {
+      "url": "https://mcp.linear.app/mcp",
+      "headers": { "X-Tenant": "acme" },
+      "bearerTokenEnvVar": "LINEAR_TOKEN"
+    },
+    "legacy": {
+      "transport": "sse",
+      "url": "https://mcp.example.com/sse"
+    }
+  }
+}
+```
+
+`mcpServers` 的每个 key 是一个 server，它属于哪一类由 `command` / `url` 二选一决定：含 `command` 的是 stdio server，含 `url` 且不写 `transport` 的是 HTTP server，旧式 SSE 才需要显式写 `"transport": "sse"`。
+
+| 字段 | 适用 | 说明 |
+| --- | --- | --- |
+| `command` | stdio | 要启动的可执行文件。写了它就按 stdio 处理 |
+| `args` | stdio | 参数数组，缺省为空 |
+| `env` | stdio | 注入子进程的环境变量；值是整值 `secret:NAME` 时按引用解析 |
+| `cwd` | stdio | 子进程的工作目录。相对路径**相对 `mcp.json` 所在目录**解析，与宿主进程从哪个目录启动无关 |
+| `url` | 远程 | 远程地址。不写 `transport` 即 Streamable HTTP |
+| `headers` | 远程 | 附加到每次请求的静态请求头；整值 `secret:NAME` 按引用解析 |
+| `bearerTokenEnvVar` | 远程 | 存放 bearer token 的**变量名**（`[credentials]` 或进程环境变量）。宿主自己把它解析成 `Authorization: Bearer <值>`，引擎看不到这个字段；同时写了 `headers.Authorization` 时以显式 header 为准 |
+| `transport` | 远程 | 只接受 `"sse"`。Streamable HTTP 请**省略**该字段——写 `"http"` 会被拒 |
+| `enabled` | 全部 | `false` = 条目仍可读、可编辑，但不进任何会话；缺省 `true` |
+| `deferred` | — | **不支持**（参考实现里它是实验性的「按需加载工具」）。在这里它算未知字段，会让整个条目被拒 |
+| `startupTimeoutMs` | 全部 | 连接握手（启动子进程 + `initialize` + `tools/list`）的预算，缺省 30 秒 |
+| `toolTimeoutMs` | 全部 | 单次工具调用的墙钟预算 |
+| `enabledTools` | 全部 | 工具白名单：只注册匹配的工具。先应用 |
+| `disabledTools` | 全部 | 工具黑名单：匹配的工具永不注册。在 `enabledTools` **之后**应用，两个列表里都出现的模式 = 排除 |
+
+解析是**严格**的：只接受上表列出的字段，未识别的键会让**该条目**被拒，报错会点名那个键并列出被接受的字段集合。静默忽略会改变声明的安全语义——一个被忽略的 `disabledTools`，正是用户以为已经关掉、实际上仍可调用的工具。字段放错传输同样拒绝：stdio 条目写 `headers` / `bearerTokenEnvVar`，或远程条目写 `args` / `env` / `cwd`，都是错误而不是被忽略。
+
+拒绝的粒度是**逐条目**的：一个条目写坏只影响它自己，同一个文件里其他 server 照常加载。只有**整份文件**级别的问题（JSON 非法、顶层不是对象、`mcpServers` 不是对象）才让整份声明作废，那时宿主按「什么都没声明」处理，并把原因打进启动日志。
+
+### 与参考实现的五处差异
+
+除下面五点外，`mcp.json` 与[参考实现](https://www.kimi.com/code/docs/kimi-code-cli/customization/mcp.html)同名同义，可以直接照抄：
+
+- **没有 `deferred`**。参考实现后来补的第十个字段（它的实验性「按需加载工具」）在这里按**未知字段**处理，会让**整个条目**被拒——照抄参考实现的 `mcp.json` 时，除了两个超时越界，这是唯一会被整条目拒绝的字段。我们的按需加载走的是 `ToolSearch` 与宿主 `[tools]` 的减项策略，声明路径固定按「急切 schema」接线，所以接这个字段是**新增一项能力**，而不是补一个漏掉的字段；在它落地之前保持拒绝。
+- **只做用户级**。参考实现有项目级 `.kimi-code/mcp.json` 并让它覆盖用户级；这里只有 `~/.agent-store/mcp.json` 这一层，项目级路径**保留但不实现**。要在某个项目里换一组 server，只能改这份用户级文件。
+- **生效时机更严格**。参考实现是「编辑只对新会话生效」，这里是「宿主启动时读一次」：新增、编辑、删除都要到下一次**宿主启动**才生效。因此这里也没有 `removed` 墓碑态——删掉的 server 在已开会话里直接不可见。
+- **没有全局超时默认值**。参考实现的 `config.toml [mcp] startup_timeout_ms` / `tool_timeout_ms` 以及对应的环境变量在这里没有对应物，两个超时只能逐条目写。
+- **两个超时的上界更紧**。参考实现允许 `1..=2147483647` 毫秒，这里按引擎自己的上界卡在 **600000 毫秒（10 分钟）**，越界**拒绝该条目**，不夹取也不静默改小。一个挂死的 MCP 调用会把整个 agent 轮次拖住，这是我们主动不要的能力；而声明文件是用户唯一的意图表达，悄悄改小会让「这个 server 从来不返回」无法归因。两个超时另外按**整秒**执行：不足一秒的向上取整，保证声明的条目不会拿到比它要求的更少的预算。
+
+> 参考实现的 OAuth 登录（`/mcp-config login`）不在声明文件这条路径上：`mcp.json` 只走静态凭据（`secret:NAME` / `headers` / `bearerTokenEnvVar`）。需要浏览器授权时，把 server 作为连接器注册成 `mcp_servers` 行，走运行时那套 OAuth。
+
+### server key、工具名与工具过滤
+
+`mcpServers` 的 key 会成为工具名的前缀：模型看到的是 `mcp__<key>__<tool>`（例：`mcp__linear__create_issue`）。所以 key 有硬约束，**不满足就拒绝该条目**：只能是 ASCII 字母、数字、`_`、`-`，必须**以字母或数字开头、也以字母或数字结尾**，且**不超过 40 个字符**。40 这个上界不是拍脑袋定的——工具名由 `mcp__` + `<key>__<tool>` 的截断 slug + 16 位摘要拼成，总长上限 64，40 是让 `<key>__` 这个分隔符能完整存活的保守值；一旦 key 被截断，用户写的 `mcp__<key>__*` 就再也命不中。
+
+`enabledTools` / `disabledTools` 的条目有两种写法，两种都收：
+
+- 以 `mcp__` 开头 → 当通配：先匹配原始来源名 `mcp__<server>__<tool>`，再匹配运行时实际的名字 `mcp__<server>__<tool>__<摘要>`；
+- 其余写法 → 当通配匹配该 server 的**局部工具名**（如 `read_file`）；
+- `*` 表示该 server 的全部工具。
+
+白名单条目一个都没命中、或白名单把该 server 的工具全裁光时，宿主会告警——否则「被裁到空」与「这个 server 本来就没这个工具」在界面上完全一样。黑名单未命中只记 debug：一份共享的减项清单覆盖多个 server 是正常用法。
+
+要整组关掉一个 server，两种写法层级不同：
+
+```toml
+# 全局：本宿主的每个会话都不注册这个 server 的工具
+[tools]
+disabled = ["mcp__<key>__*"]
+```
+
+写在 `mcp.json` 自己的 `disabledTools` 里则只作用于这一个 server。宿主 `[tools]` 永远在**最后**求交，是那道兜底——声明只拓宽 server 的**来源**，从不改变对工具的**策略**。
+
+### `secret:NAME`：凭据不写进声明文件
+
+`env` 与 `headers` 的值支持**整值**引用 `secret:NAME`：宿主按名字从 `[credentials]` 取值（找不到再回落到进程环境变量），只在 spawn 时于内存里填入。值不写回快照、数据行或日志。
+
+```toml
+# 与 mcp.json 同级的 config.toml
+[credentials]
+UPSTREAM_TOKEN = "…"    # 填给 mcp.json 里的 secret:UPSTREAM_TOKEN
+```
+
+> `[credentials]` 只能手工编辑：它不在 `config/get` 的投影里，也不在 `config/set` 的白名单里——凭据不该被任何请求读回或改写。引用查不到名字时，宿主**省掉那个变量 / header** 并告警，绝不会把 `secret:NAME` 当字面量发出去。唯一的常见误写是 `"Authorization": "Bearer secret:TOKEN"`——它落在**整值**引用之外，会被原样发出，因此宿主专门为它打一条告警（只记 header 名，不记值）；这种场景请改用 `bearerTokenEnvVar`，或把 `Bearer ` 前缀放进凭据值本身。
+
+### 在 Web UI 里读、开关与编辑
+
+设置里有一个 **MCP** 分区（连接器目录页的「MCP 服务管理」打开的是同一个面板），它读的就是宿主上的这份文件，不需要你去翻命令行：
+
+- 列出已声明的 server（名字、传输、启用状态）与**被拒绝的条目及其原因**，并单独回答「本宿主是否启用该声明」——`exists: true` 却没有被采用，正是「文件没问题、本机不读它」这一对组合。
+- 每个 server 有一个开关，翻转的是它自己的 `enabled` 成员，且是**文本级最小编辑**：只替换那个值，缩进、键顺序与注释原样保留。
+- 「配置 MCP」打开正文编辑器。保存前宿主用**同一个解析器**验一遍：解析不过就一个字节都不写，并把原始原因（含行号与列号）显示回来。这份正文是唯一会把声明取值（含 `env` / `headers`）交给客户端的读面，因此只在打开编辑器时才按需读取；其余读面只有名字、传输与启用状态。
+
+这些方法只走宿主本机的 WebSocket、没有 HTTP 绑定，也不在 SDK 包里——它们是宿主管理面，不是给远程调用方用的。方法名与判定依据见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §5.3。
+
 ## 与 Kimi Code / Claude Code 配置的异同
 
 | 维度 | Agent Store | Kimi Code 等 |
@@ -218,5 +333,6 @@ AGENT_STORE_TOOLS='{"computer":false,"domains":{"knowledge":false}}' agent-store
 | 未知键 | 容忍，不报错 | 容忍 |
 | 环境变量后备 | **无**——凭证只从文件读取 | 部分工具有 `env` 子表/环境变量后备 |
 | Agent Store 专属 | `default_marketplaces`、`[memory]`、`[marketplace]`、`[tools].domains`（`[tools]` 的 `enabled` / `disabled` 两边同构，域开关是本产品特有） | 无 `domains` 域开关 |
+| MCP 声明 | `~/.agent-store/mcp.json`（与 `config.toml` 同级，**只做用户级**） | `~/.kimi-code/mcp.json` 加项目级 `.kimi-code/mcp.json`（项目级覆盖用户级） |
 
 如果你的配置里已经有 Kimi Code 或其他工具的 `[providers]`、`[models]` 段落，可以**直接复制**它们到 `~/.agent-store/config.toml` 使用（前提是该供应商走 OpenAI/Anthropic 兼容协议）；不相关的段落（`thinking`、`permission`、`hooks` 等）保留与否都不影响 Agent Store 解析。

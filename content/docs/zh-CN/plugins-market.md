@@ -84,18 +84,28 @@ source = "https://agent-store.flowyaipc.cn/source/connectors/.codebuddy-connecto
 
 ## 6. 自研 MCP Server / 自定义技能怎么接入
 
-**自研 MCP Server 不需要走 Marketplace 注册接口。** 市场只是分发渠道；运行时接入 MCP 的统一入口是 MCP 配置（`mcp_servers`），有两条路径：
+**自研 MCP Server 不需要走 Marketplace 注册接口。** 市场只是分发渠道。MCP server 的来源其实有**三条**，落点与生效范围各不相同：
+
+| 来源 | 落点 | 生效范围 | 适合 |
+| --- | --- | --- | --- |
+| `~/.agent-store/mcp.json` 声明文件 | **不写库**；宿主启动时读一次 | 该宿主的会话 | 本机固定的私有 server。文件格式、字段与校验见[配置文件](/zh-CN/docs/configuration) |
+| MCP 配置接口（运行时自己的 HTTP 面） | `mcp_servers` 数据行 | 会话 / Run 里显式绑定 | 自研 / 私有部署，且需要连接测试与 OAuth |
+| 市场 / 插件分发 | 安装时自动落到 `mcp_servers` 行 | 同上一行 | 面向公开分发 |
+
+三者可以并存。同名时**声明文件 > `mcp_servers` 行**，而一次调用里的显式绑定优先级最高；来源优先级与读取时机只在[配置文件](/zh-CN/docs/configuration)那一节定义，本节不重复。
+
+下面两条路径说的是**后两条**（都落 `mcp_servers`）：
 
 **路径 A：直接注册（自研 / 私有部署推荐）**
 
-通过 MCP 配置接口按名注册，Web UI 的连接器管理页也是这套接口：
+通过 MCP 配置接口按名注册（这是运行时自己的 HTTP 接口，宿主就提供它；Agent Store 的 Web UI **不用**这套接口——那个界面读写的是 `mcp.json` 声明文件，见[配置文件](/zh-CN/docs/configuration)）：
 
 - `POST /api/mcp/servers` — 注册/更新一个 MCP Server（按名称 upsert）
 - `POST /api/mcp/servers/import` — 批量导入
 - `POST /api/mcp/test-connection` — 连接测试
 - `/api/mcp/oauth/*` — 标准 OAuth（PKCE Loopback）登录
 
-传输层支持三种，按你的服务器形态选择：
+传输层支持三种，按你的服务器形态选择（下面这段是 `transport` 字段的**取值形状**，整份请求体还要带 `name`；`mcp.json` 用的是另一套写法，见[配置文件](/zh-CN/docs/configuration)）：
 
 ```jsonc
 // 本地进程

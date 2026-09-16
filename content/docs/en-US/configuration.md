@@ -7,6 +7,8 @@ Agent Store keeps all long-lived preferences in `~/.agent-store/config.toml` (TO
 
 > This file follows the user-level `config.toml` convention of Claude Code / Codex / Kimi Code (`[providers.<name>]` + `[models."<provider>/<model>"]`). **Unknown top-level and nested keys are tolerated** — the file is yours and may carry settings for other tools (Kimi Code's `thinking`, `permission`, `hooks`, …) without breaking parsing.
 
+A second optional file sits next to it, `mcp.json`: it is none of this file's tables but a declaration of **which MCP servers this machine connects to**, so it gets its own section — see [`mcp.json`: declaring MCP servers](#mcp-json-declaring-mcp-servers).
+
 ## Full example
 
 ```toml
@@ -210,6 +212,119 @@ AGENT_STORE_TOOLS='{"computer":false,"domains":{"knowledge":false}}' agent-store
 
 Full usage examples are in the [TypeScript SDK cookbook](/en-US/docs/examples-sdk) §10.
 
+## `mcp.json`: declaring MCP servers
+
+`config.toml` holds long-lived preferences; **where MCP servers come from** is a separate file next to it, `mcp.json` (JSON). Its schema follows [Kimi Code CLI's MCP configuration](https://www.kimi.com/code/docs/kimi-code-cli/customization/mcp.html): the fields share names and meaning, so copying one over usually works — for the differences, see the end of this section.
+
+- **Default location**: `~/.agent-store/mcp.json` (`%USERPROFILE%\.agent-store\mcp.json` on Windows). It follows the `config.toml` the host resolves — whatever directory that file points at is the directory whose `mcp.json` is read, and no environment variable can move it elsewhere.
+- **Optional file**: absent means no server is declared, and the behaviour is exactly what it was before this file existed.
+- **Only the Agent Store host reads it** (the `agent-store` executable). The desktop and web hosts point at the same directory and read the same `config.toml` for providers and marketplaces, but **not** this declaration — being readable is not the same as being owned.
+- The host **reads it once at startup**, so a change needs a restart (including a change made in the Web UI).
+
+Declared servers **never become `mcp_servers` rows**: they do not enter the connector catalog, cannot be referenced by a preset's `mcp_server_ids`, and have no persisted connection-test status or tool list. On a name collision the order is **`mcp.json` > `mcp_servers` row** — the declaration file is the operator's own written intent, while a row is usually the residue of an import; a binding made explicitly in one call outranks both, so a declaration never overrides the server the caller named for that run. In other words this file is only **one** of the sources: servers registered through the MCP configuration API, or installed from a marketplace / plugin, live in `mcp_servers` rows — see [Plugins & Marketplace](/en-US/docs/plugins-market) §6.
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/srv/data"],
+      "env": { "UPSTREAM_TOKEN": "secret:UPSTREAM_TOKEN" },
+      "cwd": "servers/filesystem",
+      "toolTimeoutMs": 30000
+    },
+    "linear": {
+      "url": "https://mcp.linear.app/mcp",
+      "headers": { "X-Tenant": "acme" },
+      "bearerTokenEnvVar": "LINEAR_TOKEN"
+    },
+    "legacy": {
+      "transport": "sse",
+      "url": "https://mcp.example.com/sse"
+    }
+  }
+}
+```
+
+Each key under `mcpServers` is one server, and `command` or `url` (exactly one of them) decide which kind it is: an entry with `command` is a stdio server, one with `url` and no `transport` is an HTTP server, and only legacy SSE needs an explicit `"transport": "sse"`.
+
+| Field | Applies to | Description |
+| --- | --- | --- |
+| `command` | stdio | Executable to start. Its presence is what makes the entry stdio |
+| `args` | stdio | Argument array; empty when omitted |
+| `env` | stdio | Environment injected into the child; a whole-value `secret:NAME` is resolved as a reference |
+| `cwd` | stdio | The child's working directory. A relative path resolves **against the directory holding `mcp.json`**, never against the directory the host was started from |
+| `url` | remote | Remote address. Omit `transport` and it is Streamable HTTP |
+| `headers` | remote | Static headers added to every request; a whole-value `secret:NAME` is resolved as a reference |
+| `bearerTokenEnvVar` | remote | **Name** of the variable holding the bearer token (`[credentials]` or the process environment). The host resolves it into `Authorization: Bearer <value>` itself and the engine never sees this field; an explicit `headers.Authorization` wins over it |
+| `transport` | remote | Accepts `"sse"` only. Omit it for Streamable HTTP — writing `"http"` is refused |
+| `enabled` | all | `false` keeps the entry readable and editable but out of every session; defaults to `true` |
+| `deferred` | — | **Not supported** (in the reference implementation it is the experimental "load tools on demand"). Here it counts as an unknown field, which refuses the entry |
+| `startupTimeoutMs` | all | Budget for the connect handshake (spawn + `initialize` + `tools/list`); defaults to 30 s |
+| `toolTimeoutMs` | all | Wall-clock budget for a single tool call |
+| `enabledTools` | all | Tool allowlist: only matching tools are registered. Applied first |
+| `disabledTools` | all | Tool blocklist: a matching tool is never registered. Applied **after** `enabledTools`, so a pattern in both lists excludes |
+
+Parsing is **strict**: only the fields in the table above are accepted, an unrecognised key refuses **that entry**, and the error names the key and lists the accepted set. Silently ignoring one would change the declaration's safety semantics — an ignored `disabledTools` is exactly the tool the user believes is switched off and can still call. A field on the wrong transport is refused the same way: `headers` / `bearerTokenEnvVar` on a stdio entry, or `args` / `env` / `cwd` on a remote one, is an error rather than something to ignore.
+
+Refusal is **per entry**: one broken entry affects only itself, and the other servers in the same file load as usual. Only a **file-level** problem (invalid JSON, a top level that is not an object, an `mcpServers` that is not an object) invalidates the whole declaration — the host then declares nothing and writes the reason into its startup log.
+
+### Five differences from the reference implementation
+
+Apart from the five points below, `mcp.json` shares names and meaning with the [reference implementation](https://www.kimi.com/code/docs/kimi-code-cli/customization/mcp.html) and can be copied over as-is:
+
+- **No `deferred`.** The tenth field the reference implementation added later (its experimental "load tools on demand") counts as an **unknown field** here and refuses the **whole entry** — when copying a reference `mcp.json`, that is the only field besides an out-of-range timeout that rejects an entire entry. Our on-demand loading runs through `ToolSearch` and the host `[tools]` policy, and the declaration path is wired for eager schemas, so supporting this field would **add a capability** rather than restore a missed one; until that lands, it stays refused.
+- **User level only.** The reference implementation also has a project-level `.kimi-code/mcp.json` that overrides the user level; here there is only the `~/.agent-store/mcp.json` layer, and the project-level path is reserved rather than implemented. Swapping in a different set of servers for one project means editing this user-level file.
+- **Stricter activation.** The reference implementation applies an edit to new sessions; here the host reads the file **once at startup**, so adding, editing or removing an entry takes effect at the next **host start**. That is also why there is no `removed` tombstone state — a deleted server is simply invisible to already-open sessions.
+- **No global timeout defaults.** The reference implementation's `config.toml [mcp] startup_timeout_ms` / `tool_timeout_ms` and their environment variables have no counterpart here, so both timeouts can only be written per entry.
+- **Tighter bounds on both timeouts.** The reference implementation allows `1..=2147483647` ms; here they are capped at the engine's own bound of **600000 ms (10 minutes)** and an out-of-range value **refuses that entry** rather than being clamped or quietly lowered. A hung MCP call would stall a whole agent turn, which is a capability we deliberately do not want — and since the declaration file is the user's only statement of intent, silently lowering a value would make "this server never returns" impossible to attribute. Both timeouts are also executed in **whole seconds**: a sub-second value rounds up, so a declared entry never gets less time than it asked for.
+
+> The reference implementation's OAuth login (`/mcp-config login`) is not on this path: `mcp.json` carries static credentials only (`secret:NAME` / `headers` / `bearerTokenEnvVar`). When browser authorization is needed, register the server as a connector — an `mcp_servers` row — and use the runtime's OAuth flow.
+
+### The server key, tool names and tool filters
+
+The key under `mcpServers` becomes the tool name's prefix: what the model sees is `mcp__<key>__<tool>` (for example `mcp__linear__create_issue`). The key therefore has hard constraints, and **failing one refuses that entry**: ASCII letters, digits, `_` and `-` only, it must **start and end with a letter or digit**, and it must be **at most 40 characters**. That ceiling is not arbitrary — a tool name is `mcp__` + the truncated slug of `<key>__<tool>` + a 16-character digest, bounded at 64 characters in total, and 40 is the conservative value that keeps the `<key>__` separator intact; once the key is truncated, the `mcp__<key>__*` pattern the user wrote can no longer match.
+
+`enabledTools` / `disabledTools` entries are written in two ways, and both are accepted:
+
+- starting with `mcp__` → treated as a glob, matched first against the raw source name `mcp__<server>__<tool>` and then against the runtime's actual name `mcp__<server>__<tool>__<digest>`;
+- anything else → treated as a glob over that server's **local tool name** (such as `read_file`);
+- `*` means every tool of that server.
+
+When no allowlist entry matches anything, or the allowlist trims every tool of that server away, the host warns — otherwise "trimmed to nothing" and "this server never had that tool" look identical on screen. A blocklist miss is only logged at debug level: one shared subtractive list covering several servers is normal usage.
+
+Switching a whole server off can be written at two levels:
+
+```toml
+# Global: no session on this host registers that server's tools
+[tools]
+disabled = ["mcp__<key>__*"]
+```
+
+Written into the declaration's own `disabledTools` it applies to that one server only. The host `[tools]` table is always intersected **last** and is the backstop — a declaration widens where servers **come from**, never the **policy** over their tools.
+
+### `secret:NAME`: credentials stay out of the declaration file
+
+Values of `env` and `headers` support a **whole-value** `secret:NAME` reference: the host looks the name up in `[credentials]` (falling back to the process environment) and fills the value in, in memory, at spawn time only. The value is never written back to a snapshot, a row or a log.
+
+```toml
+# config.toml, next to mcp.json
+[credentials]
+UPSTREAM_TOKEN = "…"    # fills secret:UPSTREAM_TOKEN in mcp.json
+```
+
+> `[credentials]` is hand-edited only: it is absent from `config/get`'s projection and from `config/set`'s whitelist — a credential should not be readable or rewritable by any request. When a reference names something that cannot be found, the host **omits that variable / header** and warns; it never sends `secret:NAME` as a literal. The one common mis-write is `"Authorization": "Bearer secret:TOKEN"` — it falls outside a **whole-value** reference and is sent literally, so the host logs a warning naming the header (never the value); use `bearerTokenEnvVar` there instead, or put the `Bearer ` prefix into the credential's own value.
+
+### Read, toggle and edit it in the Web UI
+
+Settings has an **MCP** section (the **MCP servers** button on the connectors catalog page opens the same panel); it reads exactly this file, so you do not have to go through the command line:
+
+- It lists the declared servers (name, transport, enabled state) and the **refused entries with their reasons**, and answers "does this host use this declaration?" separately — `exists: true` with the declaration not adopted is exactly the "the file is fine, this machine does not read it" pair.
+- Every server has a toggle that flips its own `enabled` member as a **text-level minimal edit**: only that value is replaced, so indentation, key order and comments survive.
+- **Configure MCP** opens a raw-text editor. Before saving, the host validates the text with **the same parser**: if it does not parse, not a single byte is written and the original reason (with line and column) comes back. This text is the only read surface that hands declaration values (including `env` / `headers`) to a client, so it is fetched on demand when the editor opens; every other surface carries names, transports and enabled state only.
+
+These methods travel over the host's own loopback WebSocket only, have no HTTP binding, and are not in the SDK package — they are host management surface, not something a remote caller gets. Method names and the reasoning are in the [TypeScript SDK reference](/en-US/docs/typescript-sdk) §5.3.
+
 ## Differences from Kimi Code / Claude Code configs
 
 | Dimension | Agent Store | Kimi Code etc. |
@@ -220,5 +335,6 @@ Full usage examples are in the [TypeScript SDK cookbook](/en-US/docs/examples-sd
 | Unknown keys | Tolerated, no error | Tolerated |
 | Env fallback | **None** — credentials come from the file only | Some tools support `env`-subtables / env fallbacks |
 | Agent Store only | `default_marketplaces`, `[memory]`, `[marketplace]`, `[tools].domains` (`enabled` / `disabled` have the same shape on both sides; the domain switches are ours) | No `domains` switches |
+| MCP declarations | `~/.agent-store/mcp.json` (sibling of `config.toml`, **user level only**) | `~/.kimi-code/mcp.json` plus a project-level `.kimi-code/mcp.json` (project overrides user) |
 
 If your config already has `[providers]` / `[models]` sections from Kimi Code or another tool, you can **copy them directly** into `~/.agent-store/config.toml` (as long as the provider speaks an OpenAI/Anthropic-compatible protocol); unrelated sections (`thinking`, `permission`, `hooks`, …) can stay or go — Agent Store ignores them.

@@ -10,6 +10,7 @@ import MarketStrip from "../components/MarketStrip";
 import DevSection from "../components/DevSection";
 import FaqSection from "../components/FaqSection";
 import WorkflowSteps from "../components/WorkflowSteps";
+import AgentPromptSection from "../components/AgentPromptSection";
 import SocialProof from "../components/SocialProof";
 import DownloadCTA from "../components/DownloadCTA";
 import CopyButton from "../components/CopyButton";
@@ -168,6 +169,7 @@ export default function Landing() {
 
       <SocialProof />
       <WorkflowSteps />
+      <AgentPromptSection />
       <MarketStrip />
       <DevSection />
       <FaqSection />
