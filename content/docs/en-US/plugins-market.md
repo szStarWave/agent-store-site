@@ -84,18 +84,28 @@ Components that fail compatibility checks are marked with a status rather than s
 
 ## 6. Integrating a self-developed MCP server / custom skills
 
-**A self-developed MCP server does not need to go through the Marketplace registration interface.** The marketplace is only a distribution channel; the unified entry point for wiring an MCP server into the runtime is the MCP configuration (`mcp_servers`). There are two paths:
+**A self-developed MCP server does not need to go through the Marketplace registration interface.** The marketplace is only a distribution channel. An MCP server in fact has **three** sources, with different landing points and scopes:
+
+| Source | Lands in | Scope | Best for |
+| --- | --- | --- | --- |
+| The `~/.agent-store/mcp.json` declaration file | **no row**; read once at host start | that host's sessions | fixed local private servers. File format, fields and validation are in [Configuration](/en-US/docs/configuration) |
+| The MCP configuration API (the runtime's own HTTP surface) | a `mcp_servers` row | bound explicitly in a session / run | self-developed or private deployments that want connection tests and OAuth |
+| Marketplace / plugin distribution | a `mcp_servers` row, written at install time | as above | public distribution |
+
+All three can coexist. On a name collision **the declaration file > the `mcp_servers` row**, and an explicit binding made in one call outranks both; the source order and the read timing are defined once, in [Configuration](/en-US/docs/configuration), and not repeated here.
+
+The two paths below cover the **latter two** (both land in `mcp_servers`):
 
 **Path A: direct registration (recommended for self-developed / private deployments)**
 
-Register by name through the MCP configuration API — the Web UI connector management page uses the same endpoints:
+Register by name through the MCP configuration API (these are the runtime's own HTTP endpoints and the host serves them; the Agent Store Web UI does **not** use them — that panel reads and writes the `mcp.json` declaration, see [Configuration](/en-US/docs/configuration)):
 
 - `POST /api/mcp/servers` — register/update an MCP server (upsert by name)
 - `POST /api/mcp/servers/import` — batch import
 - `POST /api/mcp/test-connection` — connection test
 - `/api/mcp/oauth/*` — standard OAuth (PKCE Loopback) login
 
-Three transports are supported; pick the one matching your server:
+Three transports are supported; pick the one matching your server (the snippet below is the **value shape** of the `transport` field — a full request body also carries `name`; `mcp.json` is a different spelling, see [Configuration](/en-US/docs/configuration)):
 
 ```jsonc
 // Local process

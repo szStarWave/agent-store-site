@@ -152,6 +152,43 @@ const enUS = {
       fallbackCta: "Go to releases",
       unavailableNote: "Only Windows x64 is published; other platforms are not available yet.",
     },
+    agent: {
+      eyebrow: "Agent hand-off",
+      title: "Hand this prompt to your agent",
+      subtitle:
+        "Copy the prompt below into the coding agent you already use (Claude Code / Codex / Cursor…). It downloads, initialises and starts the service, then reports the workbench URL back to you.",
+      blockTitle: "Prompt",
+      copy: "Copy prompt",
+      copied: "Copied",
+      note: "The prompt asks npm for the current beta version first (falling back to this site's {{version}}); it only uses this site's install script and GitHub Releases, never another install method.",
+      prompt: `You are my local ops assistant. Get Flowy Agent Store running on this machine — it is a local-first, single-file agent runtime with a built-in browser workbench.
+
+Prerequisites: 64-bit Windows with Node.js LTS (npm) on PATH. If npm is missing, tell me first, then switch to the GitHub Releases zip instead (no dependencies): {{releasesUrl}}
+
+Work through these in order; if a step fails, stop and paste the exact error output — do not improvise another install method:
+
+1) Resolve the current pre-release first (do not use latest — npm's latest tag points at an older pre-release):
+   npm view @flowy-agent-store/runtime-win32-x64 dist-tags --json --registry https://registry.npmjs.org/
+   Use the "beta" value from that output as the version for the next step; if the command fails or there is no beta tag, use {{version}}.
+
+2) Install, pinned to the version from step 1:
+   iwr {{installUrl}} -OutFile install-flowy-agent-store.ps1
+   ./install-flowy-agent-store.ps1 -Version <version from step 1>
+   This puts flowy-agent-store.exe into %LOCALAPPDATA%\\Programs\\flowy-agent-store and adds it to the user PATH (no admin rights).
+   If this fails with "no matching version" (npm here is pointed at a mirror registry that has not synced the release), fall back to the GitHub Releases zip from the prerequisites.
+
+3) The PATH just changed, so start the service from a NEW terminal window:
+   flowy-agent-store --port 8787
+   It starts the App Server and opens the workbench automatically.
+   · "port already in use" → retry with --port 8788.
+   · "data directory is locked" → the desktop app is running; ask me to close it and retry (that is a double-write guard, not a failure).
+
+4) Poll http://127.0.0.1:8787 until it answers (30s max), then report the workbench URL and whether the process is still running.
+
+5) If I want a real model: ask which provider and API key to use, then follow {{configUrl}} to write [providers.<name>] and [models."<provider>/<model>"] into ~/.agent-store/config.toml — or let me fill it in on the workbench settings page. Never echo the key to the terminal or into logs.
+
+Finish with one line: workbench URL, process state, and the suggested next step (import experts / skills / connectors).`,
+    },
     socialProof: {
       title: "How teams use Flowy Agent Store",
       subtitle:

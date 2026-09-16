@@ -843,6 +843,103 @@ div[id] {
   max-width: 760px;
 }
 
+/* ── In-page table of contents (docs) ───────────────────── */
+.docs-page-toc {
+  margin: 0 0 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 14px;
+}
+.docs-page-toc > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+  list-style: none;
+}
+.docs-page-toc > summary::-webkit-details-marker {
+  display: none;
+}
+.docs-page-toc > summary::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  transition: transform 0.15s ease;
+}
+.docs-page-toc[open] > summary::after {
+  transform: rotate(180deg);
+}
+.docs-page-toc-count {
+  color: var(--muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.docs-page-toc-list {
+  margin: 0;
+  padding: 0 16px 14px;
+  list-style: none;
+}
+.docs-page-toc-list ol {
+  margin: 0;
+  padding-left: 18px;
+  list-style: none;
+}
+.docs-page-toc-list li {
+  margin: 2px 0;
+}
+.docs-page-toc-list a {
+  color: var(--muted);
+}
+.docs-page-toc-list a:hover {
+  color: var(--ink);
+}
+/* Right rail on wide screens: the same list without the disclosure widget.
+   Hidden by default, so below the breakpoint the collapsible block above the
+   prose remains the only in-page navigation (`display: none` also keeps the
+   hidden copy out of the accessibility tree). */
+.docs-page-toc-rail {
+  display: none;
+  position: sticky;
+  top: calc(var(--nav-h) + 24px);
+  align-self: start;
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+  font-size: 14px;
+}
+.docs-page-toc-rail-title {
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.docs-page-toc-rail .docs-page-toc-list {
+  padding: 0;
+}
+@media (min-width: 1200px) {
+  /* A third column only fits if the page gets more room: 240 + gap + 1fr + gap
+     + 200 still leaves the prose column near its 760px cap. */
+  .docs-detail {
+    max-width: 1320px;
+    grid-template-columns: 240px minmax(0, 1fr) 200px;
+    gap: 40px;
+  }
+  .docs-page-toc {
+    display: none;
+  }
+  .docs-page-toc-rail {
+    display: block;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .docs-page-toc > summary::after {
+    transition: none;
+  }
+}
+
 /* ── Markdown (docs): Vercel docs prose ─────────────────── */
 .markdown-body {
   font-size: 16px;
@@ -851,6 +948,10 @@ div[id] {
 }
 .markdown-body > :first-child {
   margin-top: 0;
+}
+/* Anchors from the in-page TOC must clear the sticky header. */
+.markdown-body :is(h1, h2, h3, h4) {
+  scroll-margin-top: calc(var(--nav-h) + 20px);
 }
 .markdown-body h1 {
   font-size: 32px;
@@ -2179,6 +2280,77 @@ details[open] > .platform-grid {
   color: var(--ink);
   font-size: 13px;
   line-height: 1.75;
+}
+
+/* ── Landing: agent hand-off prompt ──────────────────────── */
+.agent-prompt {
+  padding: 96px 0;
+}
+.agent-prompt h2 {
+  font-size: clamp(28px, 3.4vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.agent-prompt .subtle {
+  margin-top: 12px;
+  max-width: 720px;
+}
+.agent-prompt-card {
+  margin: 26px 0 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+.agent-prompt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-soft);
+}
+.agent-prompt-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.agent-prompt-body {
+  margin: 0;
+  padding: 18px 18px 20px;
+  max-height: 400px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--ink);
+  /* The prompt is prose with PowerShell snippets in it: wrap rather than force
+     a horizontal scrollbar on the whole block. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.agent-prompt-note {
+  margin: 14px 0 0;
+  max-width: 720px;
+  font-size: 13px;
+  color: var(--muted);
+}
+/* Labelled variant of the shared copy button (the icon-only default stays). */
+.copy-btn-labeled {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: auto;
+  height: 34px;
+  padding: 0 13px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
 }
 
 /* ── FAQ ─────────────────────────────────────────────────── */

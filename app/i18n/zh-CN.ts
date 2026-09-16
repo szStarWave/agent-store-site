@@ -142,6 +142,43 @@ const zhCN = {
       fallbackCta: "前往 Releases",
       unavailableNote: "仅 Windows x64 已发布；其他平台暂未提供。",
     },
+    agent: {
+      eyebrow: "Agent 接力",
+      title: "把这段提示词交给你的 Agent",
+      subtitle:
+        "复制下面的提示词，粘给你常用的编码 Agent（Claude Code / Codex / Cursor…）。它会替你完成下载、初始化与启动服务，并把工作台地址回报给你。",
+      blockTitle: "提示词",
+      copy: "复制提示词",
+      copied: "已复制",
+      note: "提示词会先向 npm 取当前 beta 版本（取不到则回退到本站的 {{version}}）；它只用本站的安装脚本与 GitHub Releases，不引入其他安装方式。",
+      prompt: `你是我的本机运维助手。请把这台机器上的 Flowy Agent Store 跑起来——它是一个本地优先的单文件 Agent 运行时，自带浏览器工作台。
+
+前提：64 位 Windows，且终端里有 Node.js LTS（npm）。若没有 npm，先告诉我，再改用 GitHub Releases 的压缩包（无依赖）：{{releasesUrl}}
+
+请按顺序做，每一步失败就停下并原样贴出错误输出，不要自己换别的安装方式：
+
+1) 先取当前的预发布版本（不要用 latest——npm 的 latest 指向较旧的预发布版）：
+   npm view @flowy-agent-store/runtime-win32-x64 dist-tags --json --registry https://registry.npmjs.org/
+   取输出里的 "beta" 值作为下一步的版本号；如果这条命令失败或没有 beta，就用 {{version}}。
+
+2) 安装（固定上一步取到的版本）：
+   iwr {{installUrl}} -OutFile install-flowy-agent-store.ps1
+   ./install-flowy-agent-store.ps1 -Version <上一步的版本>
+   它会把 flowy-agent-store.exe 装到 %LOCALAPPDATA%\\Programs\\flowy-agent-store 并加入用户 PATH（不需要管理员权限）。
+   若这一步报「版本不存在」（本机 npm 配了镜像源、镜像还没同步到该版本），改用前提里的 GitHub Releases 压缩包。
+
+3) PATH 刚变过，请在新开的终端窗口里启动服务：
+   flowy-agent-store --port 8787
+   它会启动 App Server 并自动打开工作台。
+   · 报端口被占用 → 换 --port 8788 重试。
+   · 报数据目录被锁 → 桌面端正在运行，让我先关掉它再重试（这是防双写保护，不是故障）。
+
+4) 轮询 http://127.0.0.1:8787 直到有响应（最多 30 秒），然后告诉我：工作台地址 + 进程是否还在运行。
+
+5) 如果我要接真实模型：问我用哪家供应商与 API Key，按 {{configUrl}} 写进 ~/.agent-store/config.toml 的 [providers.<name>] 与 [models."<provider>/<model>"]，或者让我自己在工作台设置页填。不要把 Key 回显到终端或写进日志。
+
+最后给我一句话结论：工作台地址、进程状态、下一步建议（导入专家 / 技能 / 连接器）。`,
+    },
     socialProof: {
       title: "他们这样用 Flowy Agent Store",
       subtitle: "本地优先、上手即用的体验，正在被各类团队复用到日常工作中。",

@@ -18,6 +18,21 @@ const siteRoot = path.dirname(fileURLToPath(import.meta.url));
 // requests fail, so the watcher skips it and HMR stays fast too.
 const MARKET_TREE = "**/market-source/**";
 
+// Atomic writers (write a sibling temp directory, then rename into place) leave
+// short-lived `.<name>.<pid>.<uuid>.tmpdir/` directories next to the file they
+// replace. Watching one of those crashes the dev server outright with
+// `EBUSY: resource busy or locked, watch ...` when the rename wins the race, so
+// the watcher skips the pattern. Real edits under `content/docs/` still trigger
+// HMR — only those transient directories are ignored.
+const ATOMIC_WRITE_TEMP = "**/*.tmpdir/**";
+
+// React Router's SSG output (React Router's `buildDirectory`, not Vite's
+// `build.outDir`) holds a copy of the ~8.9k-file market tree under
+// `build/client/source`, so an unignored `build/` makes the watcher fire a
+// reload per copied file and starves the dev server. Vite only auto-ignores its
+// own `outDir`, hence the explicit pattern.
+const BUILD_OUTPUT = "**/build/**";
+
 /** Extensions reachable under `/source/…` (icons + the `_files.txt` listings). */
 const MIME: Record<string, string> = {
   ".png": "image/png",
@@ -109,6 +124,6 @@ export default defineConfig({
     // `*localhost*` wildcard in `ProxyOverride`). `localhost` in a browser
     // still works: it falls back to 127.0.0.1.
     host: "127.0.0.1",
-    watch: { ignored: [MARKET_TREE] },
+    watch: { ignored: [MARKET_TREE, ATOMIC_WRITE_TEMP, BUILD_OUTPUT] },
   },
 });
