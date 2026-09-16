@@ -92,6 +92,18 @@ export function releasesPageUrl(): string {
   return `https://github.com/${RELEASE_REPO}/releases`;
 }
 
+/**
+ * Canonical public origin of this site.
+ *
+ * Used wherever a URL has to stay valid **after being copied somewhere else**.
+ * The agent prompt is handed to a machine that may run it much later, so it must
+ * not carry the origin the page happened to be served from: that would be a
+ * `localhost` dev server, or an EdgeOne preview host whose signed `eo_token`
+ * expires. The download section's one-liner can stay origin-relative because it
+ * is pasted while the visitor is looking at a working page.
+ */
+export const SITE_ORIGIN = "https://agent-store.flowyaipc.cn";
+
 export function githubUrl(): string {
   return `https://github.com/${GITHUB_REPO}`;
 }
