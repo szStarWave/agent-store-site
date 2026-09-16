@@ -383,6 +383,14 @@ content/market.json
   `database-optimization-expert`、`ai-engineer`、`mobile-application-developer`、
   `product-management`、`ui-designer`、`user-experience-researcher`、
   `dev-ops-automation-engineer`、`api-dev`。
+- **bundle 内实检结果（2026-09-16，10 选 8）**：`security-engineer`、`mcp-build-expert`、
+  `database-optimization-expert`、`ai-engineer`、`mobile-application-developer`、
+  `dev-ops-automation-engineer`、`ui-designer`（3.0 MB）、`user-experience-researcher`
+  均为 agent 型、字段/头像/README 齐全；`api-dev` 缺 `avatars/expert.png`、
+  `product-management` 缺全部展示字段与头像，**不入选**。
+- **建议的第二批（5 个）**：`carousel-content-growth-expert`、
+  `user-experience-architect`（本机已落盘核验，零成本）+ `security-engineer`、
+  `mcp-build-expert`、`ai-engineer`（bundle 直下）→ 专家数 16 → 21。
 - **批次规模**：每批 3–5 个，保证人工审阅与门禁覆盖。
 - **挂账**：`carousel-content-growth-expert`、`user-experience-architect`（本机已落盘核验、
   未入站）；`senior-developer` 版本差异（本机 1.1.0 / 本站 1.0.0，暂不覆盖）。
