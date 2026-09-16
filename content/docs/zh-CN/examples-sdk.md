@@ -435,6 +435,23 @@ const created = await client.workspaces.create("/abs/path/to/project"); // 服�
 await client.workspaces.revoke(created.workspace_id); // 软删除，既有会话保留
 ```
 
+**读技能的全部文件**（技能是目录：`SKILL.md` 之外还有 `references/` / `scripts/` 等；
+`skills.get()` 的正文摘要约 1200 字截断，所以附属文件只能这样读）：
+
+```ts
+if (client.initializeInfo?.capabilities.skill_files) {   // 宿主可以只接目录不接文件面
+  const inventory = await client.skills.files("release-notes");
+  for (const file of inventory.files) {
+    console.log(file.path, file.size, file.digest);
+  }
+  console.log("tree digest:", inventory.content_digest); // 该技能目录的摘要，不是快照摘要
+  if (inventory.truncated) console.warn("inventory incomplete");
+
+  const bytes = await client.skills.readFile("release-notes", "references/guide.md");
+  console.log(new TextDecoder().decode(bytes));
+}
+```
+
 ## 10. 工具面控制：`AGENT_STORE_TOOLS`
 
 宿主的工具面来自 `~/.agent-store/config.toml` 的 `[tools]` 表。**自己 spawn 宿主时不必改那份文件**——用环境变量 `AGENT_STORE_TOOLS` 传 JSON，`launchClient` 会把它合并进子进程环境：
@@ -563,6 +580,6 @@ console.log(Object.keys(httpRouteTable()).length);
 - **连接器装完是 disabled**：`store.install` 会先 enable 再探针；用顶层 `installStoreEntry` 则要自己 `enableInstall`。
 - **没有更新动词**：`checkUpdates()` / `updateHint()` → `uninstall_reinstall`。
 - **技能禁用只是目录标记**：`store.setEnabled(item, false)` 对技能返回 `code: "skill_disable_flag_only"`；要让技能离开运行时只能 `uninstall`。
-- **协议指纹**：就绪行的 `protocol_version` 与 SDK 不一致时，SDK 直接杀掉子进程并报错——它是契约指纹，不是版本号。
+- **协议指纹**：就绪行的 `protocol_version` 与 SDK 不一致时，SDK 直接杀掉子进程并报错——它是契约指纹，**不是版本号、也不是日期**（现行形状是 `fp-<n>` 计数器；早期用过日期戳，那个日期只是标签，不代表变更日或发布日）。
 - **二进制不下载**：`bin` → `AGENT_STORE_BIN` → 平台运行时包的 `vendor/` → `PATH`，找不到直接报错。
 - **实时事件尽力而为**：会丢、会乱序；持久性靠 `run/events` 游标重放，`rearm()` 会重放全部历史（自行按 `sequence` 去重）。

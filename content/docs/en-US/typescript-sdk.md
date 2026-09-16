@@ -28,8 +28,8 @@ bun add @flowy-agent-store/protocol
 
 All packages ship ESM + CJS (`exports` maps `import` / `require` / `types`); they work out of the box in Node and bundlers.
 
-> **Version status**: all three packages are `0.1.0-beta.*` pre-releases (the API is not frozen, and **no backward compatibility is promised during beta**). Pin an **exact** version in production — this page and the repo currently correspond to `0.1.0-beta.3`. Do not rely on a bare `bun add`: the registry's `latest` currently points at `0.1.0-beta.2`, **not** the newest `0.1.0-beta.3`. For dist-tag semantics, per-version upgrade steps and self-check commands see the [Upgrade and migration guide](/en-US/docs/upgrade).
-> **Protocol surface scope**: the `APP_SERVER_PROTOCOL_VERSION` example in §2 and the method counts in §5.3 follow the **working tree (source)**, which is already ahead of every published version (the three MCP declaration methods, `store/list`'s `published_at`, and the `conversation/list-changed` notification are in no release yet). For the unpublished diff see §8 of the [Upgrade and migration guide](/en-US/docs/upgrade) and §4 of the [Changelog](/en-US/docs/changelog).
+> **Version status**: all three packages are `0.1.0-beta.*` pre-releases (the API is not frozen, and **no backward compatibility is promised during beta**). Pin an **exact** version in production — this page and the repo currently correspond to `0.1.0-beta.4` (the `beta` tag). Do not rely on a bare `bun add`: the registry's `latest` currently points at `0.1.0-beta.2`, **not** the newest `0.1.0-beta.4`. For dist-tag semantics, per-version upgrade steps and self-check commands see the [Upgrade and migration guide](/en-US/docs/upgrade).
+> **Protocol surface scope**: as of `0.1.0-beta.4`, the `APP_SERVER_PROTOCOL_VERSION` example in §2 and the method counts in §5.3 (`48 / 71`) **match the published artifacts** (before that, the working tree was ahead of every published version). This is what decides whether a client can connect at all: the fingerprint is compared for **strict equality**, and `0.1.0-beta.4` changed its shape from a date stamp to an `fp-<n>` counter (currently `fp-1`) — a client built against the old value cannot connect to the new runtime; the upgrade steps are in §6.3 of the [Upgrade and migration guide](/en-US/docs/upgrade).
 > **Runtime**: Node.js **≥ 22** (relies on the global `WebSocket`) or Bun; the lower bound is declared by each package's `engines.node`.
 
 ---
@@ -44,7 +44,7 @@ The single TypeScript source of truth for the wire contract: every request/respo
 
 | Export | Meaning |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | Protocol version string (**currently** `"2026-09-19"` in the working tree; each wire change takes a new date); the handshake and SDK checks compare it for strict equality |
+| `APP_SERVER_PROTOCOL_VERSION` | A contract **fingerprint** (**currently** `"fp-1"` in the working tree; the shape is an `fp-<n>` counter, incremented on each wire change and never reusing a past value. It was once a date stamp, but that is a *label, not the day of the change* — consecutive changes advanced it a day each, so it ran ahead of the calendar); the handshake and SDK checks compare it for strict equality |
 | `InitializeRequest` / `InitializeResult` | Handshake request/response (incl. `protocol_version`, server info) |
 | `ClientInfo` / `ClientCapabilities` | Caller self-description |
 | `StoreList` / `StoreInstallResult` | Winget-style unified catalog |
@@ -181,12 +181,17 @@ client.teams.list(): Promise<TeamSummary[]>;
 client.teams.get(teamId: string): Promise<TeamDetail>;
 ```
 
-#### `skills` — Skill catalog
+#### `skills` — catalog / file tree
 
 ```ts
 client.skills.list(): Promise<SkillSummary[]>;
 client.skills.get(skillId: string): Promise<SkillDetail>;
+client.skills.files(skillId: string): Promise<SkillFileList>;          // inventory + directory digest
+client.skills.readFile(skillId: string, path: string): Promise<Uint8Array>; // WebSocket binding, base64 decoded for you
+client.skills.readFileWithType(skillId: string, path: string): Promise<SkillFileContent>;
 ```
+
+> A Skill is a **directory**, not a single document: alongside `SKILL.md` it ships `references/` / `scripts/` / `templates/` / `assets/`. `skills.get()`'s `instructions_summary` is a **bounded summary** (~1200 chars, truncated), so companion files are only reachable through these three methods. Check `capabilities.skill_files` first — a host may wire the catalog without the file face, in which case they answer `unsupported_operation`. `path` accepts only a skill-relative path (absolute paths, `..`, drive letters and backslashes are refused), and a single file is capped at 2 MiB. `SkillFileList.content_digest` is the digest of **that skill directory**, and is **not** the snapshot's `content_digest` (which covers the whole imported source tree) — do not compare it against `import/get`.
 
 #### `connectors` — catalog / status / OAuth
 
@@ -198,7 +203,12 @@ client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;  // 
 client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>;
 client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // start host browser OAuth flow; poll authStatus until authenticated
 client.connectors.logout(connectorId: string): Promise<void>;                // revoke token
+client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // call proxy
 ```
+
+> `call()` runs one MCP tool through the **host's own connection**: the transport, its headers and its OAuth token stay on the host — you send a tool name and an argument object, and you **cannot** name a URL, a command or a header. Whether the pair is callable is the host's `[connector_proxy]` allowlist, so **`policy_denied` is the default state** (the host operator has not listed this tool), not a misconfiguration.
+>
+> **A tool-level failure is not a rejection**: when the server answers `isError: true` the promise still **resolves**, with `is_error` set. It rejects only when the call never reached the tool: `connector_call_timeout`, `connector_call_failed`, `response_too_large`, `connector_unavailable`, `policy_denied`, `not_found`. Check `capabilities.connector_calls` first (the method existing does **not** mean any tool is callable). The result object is passed through verbatim (`content`, `structuredContent`, … nothing dropped), capped at 1 MiB, default timeout 30s. All three connector transports are supported: stdio, Streamable HTTP and SSE.
 
 > Tokens never pass through this package: the OAuth browser flow is owned by the trusted host; clients only trigger and poll.
 
@@ -448,7 +458,8 @@ const routes = httpRouteTable();
 // { "market/remove": { verb: "POST", path: "/markets/:marketplace_id/remove", source: "…" }, … }
 ```
 
-- Covers **46 / 68** methods. The 22 without an HTTP binding: `initialize`, `initialized`, `workspace/create`, `conversation/model-options`, `conversation/update`, `conversation/subscribe`, `conversation/unsubscribe`, `run/subscribe`, `run/unsubscribe`, `agent/list`, `agent/get`, `team/list`, `team/get`, `config/get`, `config/set`, `skill/create`, `skill/update`, `skill/delete`, `skill/copy`, `config/get-mcp`, `config/set-mcp`, `config/set-mcp-enabled`.
+- Covers **48 / 71** methods. The 23 outside the route table: `initialize`, `initialized`, `workspace/create`, `conversation/model-options`, `conversation/update`, `conversation/subscribe`, `conversation/unsubscribe`, `run/subscribe`, `run/unsubscribe`, `agent/list`, `agent/get`, `team/list`, `team/get`, `config/get`, `config/set`, `skill/create`, `skill/update`, `skill/delete`, `skill/copy`, `config/get-mcp`, `config/set-mcp`, `config/set-mcp-enabled`, `skill/file`.
+  - Of those, **only `skill/file` has an HTTP route on the server** (`GET /api/app-server/skills/{skill_id}/files/{path}`), but it answers with **raw bytes plus a `content-type`** rather than a JSON envelope, so it is not in the JSON transport's route table — use `client.skills.readFile()` (WebSocket, base64) or `fetch` the route directly.
 - `config/get` / `config/set` (the host settings file `~/.agent-store/config.toml`) are **host management surface** (`16` §6): wire methods with no HTTP binding, and deliberately **not part of this package's client** — the Web UI calls them through its own transport helpers. Contract in `05` §4.10.
 - `config/get-mcp` / `config/set-mcp` / `config/set-mcp-enabled` (the MCP declaration file `~/.agent-store/mcp.json`) are host management surface by the same `16` §6 judgement: wire-only, no HTTP binding, and not in this package. The write face is **fail-closed** (an unparseable file, or an entry the parser rejects, leaves the file byte-identical) and the toggle is a **text-level minimal edit** (only that entry's `enabled` value moves; comments and indentation survive). Note that `config/get-mcp` is the **only** read that returns the file's own text (for the host's own editor, on demand, inside the loopback + owner gate); every other read (`config/get.mcp`) still carries no `env` / `headers` values. Contract in `05` §4.10.
 - `skill/create` / `skill/update` / `skill/delete` / `skill/copy` (the skill write face, `16` R17 / W12) are host management surface by the same `16` §6 judgement: a third-party consumer must not be able to write files into the host's skill tree, so they are wire-only, have no HTTP binding, and are not in this package. `skill/update` is a **field-level patch** (only the named fields move; `name` is not editable) and `skill/copy` derives a writable user skill from any origin. The read face's `SkillSummary` gains `origin` / `writable` (additive); contract in `05` §4.11.

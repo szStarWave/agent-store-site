@@ -110,6 +110,11 @@ prerender 请求失败（构建卡在准备输出目录阶段）。因此由
 **发布方式：** 推送到 `main` 触发 EdgeOne Makers 构建并上线（也可在其控制台手动触发）。
 市场内容更新走 `bun run sync` → 提交 → 部署，无需在构建期访问任何外部源。
 
+**一次发布含两个出口**（npm 的 `@flowy-agent-store/*` 与本站的 GitHub Release）：站点侧动作、
+顺序约束与部署后自检见 [`docs/release-process.md`](docs/release-process.md)，权威清单在源仓库
+`Michael-Lfx/allo` 的 `docs/agent-store/25-release-runbook.zh.md`。发版前先在源仓库跑
+`bun run release:check`，再在本仓跑 `bun run check:release`。
+
 **待定：** 自定义域名与 HTTPS 尚未绑定；EdgeOne 的预览域名带签名 `eo_token`
 会过期，不能作为长期对外公布的市场源地址。
 

@@ -435,6 +435,24 @@ const created = await client.workspaces.create("/abs/path/to/project"); // canon
 await client.workspaces.revoke(created.workspace_id); // soft delete; existing sessions survive
 ```
 
+**Reading every file a Skill ships** (a Skill is a directory: alongside `SKILL.md` it carries
+`references/`, `scripts/` and friends; `skills.get()`'s body summary is truncated at ~1200
+chars, so companion files are only reachable this way):
+
+```ts
+if (client.initializeInfo?.capabilities.skill_files) {   // a host may wire the catalog without this
+  const inventory = await client.skills.files("release-notes");
+  for (const file of inventory.files) {
+    console.log(file.path, file.size, file.digest);
+  }
+  console.log("tree digest:", inventory.content_digest); // that skill directory, not the snapshot
+  if (inventory.truncated) console.warn("inventory incomplete");
+
+  const bytes = await client.skills.readFile("release-notes", "references/guide.md");
+  console.log(new TextDecoder().decode(bytes));
+}
+```
+
 ## 10. Controlling the tool surface: `AGENT_STORE_TOOLS`
 
 A host's tool surface comes from the `[tools]` table of `~/.agent-store/config.toml`. When you **spawn the host yourself** you do not have to edit that file — pass the `AGENT_STORE_TOOLS` environment variable as JSON and `launchClient` merges it into the child environment:
@@ -563,6 +581,6 @@ console.log(Object.keys(httpRouteTable()).length);
 - **A freshly installed connector is disabled**: `store.install` enables it and probes; the flat `installStoreEntry` leaves that to you (`enableInstall`).
 - **No update verb**: `checkUpdates()` / `updateHint()` → `uninstall_reinstall`.
 - **Disabling a skill is only a catalogue marker**: `store.setEnabled(item, false)` returns `code: "skill_disable_flag_only"` for a skill; only `uninstall` removes it from the runtime.
-- **Protocol fingerprint**: when the readiness line's `protocol_version` differs from the SDK's, the SDK kills the child and throws — it is a contract fingerprint, not a version number.
+- **Protocol fingerprint**: when the readiness line's `protocol_version` differs from the SDK's, the SDK kills the child and throws — it is a contract fingerprint, **not a version number and not a date** (the shape is now an `fp-<n>` counter; earlier values were date stamps, and that date was only a label — never the day of the change or of a release).
 - **No binary downloads**: `bin` → `AGENT_STORE_BIN` → the platform runtime package's `vendor/` → `PATH`, and a miss is an error.
 - **Live events are best-effort**: they can drop or arrive out of order; durability comes from `run/events` cursor replay, and `rearm()` replays the whole history (de-duplicate by `sequence` yourself).

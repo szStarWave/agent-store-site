@@ -14,6 +14,7 @@ TypeScript 的**纯静态**站点。它同时承担三件事：产品落地页�
 | `bun run check:docs-sync` | 双语文档结构门禁，改过 `content/docs/` 后必跑；`bun run test:docs-sync` 是它自身的测试。 |
 | `bun run sync` | 市场树同步（`sync:tree` + `sync:market`）。这是唯一允许写 `market-source/` 与 `content/market.json` 的入口，流程见 [市场维护](docs/market-maintenance.md)。 |
 | `bun run check:market` | 市场门禁：查清单内重复登记，并核对 `market-source/` 与 `content/market.json` 是否一致（条目数、条目集合、头像文件是否存在、`_files.txt` 与树）。改过任一产物后必跑；`bun run test:market` 是它自身的测试。 |
+| `bun run check:release` | 发布门禁（站点半边）：`check:docs-sync` + `test:docs-sync` + `check:market` + `test:market` + `typecheck`。发版时与源仓库的 `bun run release:check` 一起跑，流程见 [发布流程](docs/release-process.md)。 |
 
 提交信息用 Conventional Commits + 中文主题，沿用现有 scope：`feat(landing): …`、
 `chore(market): …`、`fix(dev): …`、`docs(market): …`。用户文档一律中文
@@ -63,5 +64,6 @@ SPA 空壳，SEO 与社交预览都是空的。
 | --- | --- |
 | [`README.md`](README.md) | 构建、部署、市场源地址、内容来源 |
 | [`docs/market-maintenance.md`](docs/market-maintenance.md) | 市场相关问题的入口：条目规范、更新流程、换机与多人协作、冲突处理、门禁报错与故障排查 |
+| [`docs/release-process.md`](docs/release-process.md) | 发布流程（本站仓这一半）：本仓在发布里的四个角色、站点侧有序步骤、顺序约束、部署后自检、已知缺口。权威清单在源仓库 `allo` 的 `docs/agent-store/25-release-runbook.zh.md` |
 | [`docs/connector-coverage.md`](docs/connector-coverage.md) | 连接器覆盖现状、近似项甄别方法 |
 | [`docs/modelscope-mcp-api.md`](docs/modelscope-mcp-api.md) | ModelScope MCP 开放接口（当前未接入本站） |

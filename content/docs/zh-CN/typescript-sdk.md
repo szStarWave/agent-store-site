@@ -28,8 +28,8 @@ bun add @flowy-agent-store/protocol
 
 包均发布为 ESM + CJS 双格式（`exports` 提供 `import` / `require` / `types`），Node 与打包器开箱即用。
 
-> **版本状态**：三个包当前均为 `0.1.0-beta.*` 预发布（API 尚未冻结，beta 期间**不承诺向后兼容**）。生产接入请固定**确切版本**——本文与仓库当前对应 `0.1.0-beta.3`。注意不要依赖裸 `bun add`：注册表 `latest` 当前指向 `0.1.0-beta.2`，**不是**最新的 `0.1.0-beta.3`。dist-tag 语义、逐版本升级步骤与自查命令见[升级与迁移指引](/zh-CN/docs/upgrade)。
-> **协议面口径**：§2 的 `APP_SERVER_PROTOCOL_VERSION` 示例与 §5.3 的方法计数按**仓库工作区（源码）**取值——工作区已领先于任何已发布版本（MCP 声明文件的三个方法、`store/list` 的 `published_at`、以及通知 `conversation/list-changed` 都尚未随版本发布）。未发布差异见[升级与迁移指引](/zh-CN/docs/upgrade) §8 与[变更日志](/zh-CN/docs/changelog) §4。
+> **版本状态**：三个包当前均为 `0.1.0-beta.*` 预发布（API 尚未冻结，beta 期间**不承诺向后兼容**）。生产接入请固定**确切版本**——本文与仓库当前对应 `0.1.0-beta.4`（`beta` tag）。注意不要依赖裸 `bun add`：注册表 `latest` 当前指向 `0.1.0-beta.2`，**不是**最新的 `0.1.0-beta.4`。dist-tag 语义、逐版本升级步骤与自查命令见[升级与迁移指引](/zh-CN/docs/upgrade)。
+> **协议面口径**：§2 的 `APP_SERVER_PROTOCOL_VERSION` 示例与 §5.3 的方法计数（`48 / 71`）**自 `0.1.0-beta.4` 起与已发布产物一致**（此前工作区领先于已发布的任何版本）。它与「客户端装不装得上」直接相关：指纹按**严格相等**校验，而 `0.1.0-beta.4` 把指纹形状从日期戳换成了 `fp-<n>` 计数器（现行 `fp-1`）——按旧值编出来的客户端连不上新运行时，升级做法见[升级与迁移指引](/zh-CN/docs/upgrade) §6.3。
 > **运行环境**：Node.js **≥ 22**（依赖全局 `WebSocket`）或 Bun；版本下限由各包 `engines.node` 声明。
 
 ---
@@ -44,7 +44,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出 | 说明 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 协议版本字符串（**仓库工作区当前为** `"2026-09-19"`；每次 wire 变更取新日期），握手与 SDK 校验做严格相等 |
+| `APP_SERVER_PROTOCOL_VERSION` | 契约**指纹**（**仓库工作区当前为** `"fp-1"`；形状是 `fp-<n>` 计数器，每次 wire 变更递增、不复用任何历史值。旧值曾是日期戳，那是**标签不是变更日**——连续改动每次加一天，故常超前于日历），握手与 SDK 校验做严格相等 |
 | `InitializeRequest` / `InitializeResult` | 握手请求/响应（含 `protocol_version`、`server` 信息） |
 | `ClientInfo` / `ClientCapabilities` | 连接方自述 |
 | `StoreList` / `StoreInstallResult` | winget 式统一目录 |
@@ -181,12 +181,17 @@ client.teams.list(): Promise<TeamSummary[]>;
 client.teams.get(teamId: string): Promise<TeamDetail>;
 ```
 
-#### `skills` — Skill 目录
+#### `skills` — Skill 目录 / 文件树
 
 ```ts
 client.skills.list(): Promise<SkillSummary[]>;
 client.skills.get(skillId: string): Promise<SkillDetail>;
+client.skills.files(skillId: string): Promise<SkillFileList>;          // 文件清单 + 目录树摘要
+client.skills.readFile(skillId: string, path: string): Promise<Uint8Array>; // WS 绑定，自动解 base64
+client.skills.readFileWithType(skillId: string, path: string): Promise<SkillFileContent>;
 ```
+
+> 技能是**目录**而不是单个文档：`SKILL.md` 之外还有 `references/` / `scripts/` / `templates/` / `assets/`。`skills.get()` 的 `instructions_summary` 是**有界摘要**（约 1200 字截断），所以附属文件只能经这三个方法读。先查 `capabilities.skill_files`——宿主可以只接目录不接文件面，此时回 `unsupported_operation`。`path` 只接受技能目录内的相对路径（绝对路径 / `..` / 盘符 / 反斜杠一律拒），单文件上限 2 MiB。`SkillFileList.content_digest` 是**该技能目录**的树摘要，**不等于**快照的 `content_digest`（后者覆盖整棵导入来源树），不要拿去和 `import/get` 对账。
 
 #### `connectors` — Connector 目录 / 状态 / OAuth
 
@@ -198,7 +203,12 @@ client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;  // 
 client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>;
 client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // 发起宿主浏览器 OAuth 流，轮询 authStatus 至 authenticated
 client.connectors.logout(connectorId: string): Promise<void>;                // 吊销令牌
+client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // 调用代理
 ```
+
+> `call()` 经**宿主自己的连接**执行一个 MCP 工具：连接参数、headers 与 OAuth token 都留在宿主，你只发工具名与参数对象——**无法**指定 URL / 命令 / header。是否可调由宿主 `[connector_proxy]` 的 allowlist 决定，所以 **`policy_denied` 是默认状态**（宿主操作者没把这个工具写进白名单），不是配错。
+>
+> **工具级失败不是 promise 拒绝**：上游 `isError: true` 时它仍然 **resolve**，`is_error` 为真。只有根本没够着工具才 reject：`connector_call_timeout`、`connector_call_failed`、`response_too_large`、`connector_unavailable`、`policy_denied`、`not_found`。先查 `capabilities.connector_calls`（方法是否存在**不等于**有工具可调）。结果对象逐字透传（`content` / `structuredContent` 等不断字段），上限 1 MiB，默认超时 30s。stdio、Streamable HTTP 与 SSE 三种连接器都支持。
 
 > Token 永不经过此包：OAuth 浏览器流由可信宿主持有，客户端只触发与轮询。
 
@@ -448,7 +458,8 @@ const routes = httpRouteTable();
 // { "market/remove": { verb: "POST", path: "/markets/:marketplace_id/remove", source: "…" }, … }
 ```
 
-- 覆盖 **46 / 68** 个方法。HTTP 无绑定的 22 个方法：`initialize`、`initialized`、`workspace/create`、`conversation/model-options`、`conversation/update`、`conversation/subscribe`、`conversation/unsubscribe`、`run/subscribe`、`run/unsubscribe`、`agent/list`、`agent/get`、`team/list`、`team/get`、`config/get`、`config/set`、`skill/create`、`skill/update`、`skill/delete`、`skill/copy`、`config/get-mcp`、`config/set-mcp`、`config/set-mcp-enabled`。
+- 覆盖 **48 / 71** 个方法。路由表外的 23 个方法：`initialize`、`initialized`、`workspace/create`、`conversation/model-options`、`conversation/update`、`conversation/subscribe`、`conversation/unsubscribe`、`run/subscribe`、`run/unsubscribe`、`agent/list`、`agent/get`、`team/list`、`team/get`、`config/get`、`config/set`、`skill/create`、`skill/update`、`skill/delete`、`skill/copy`、`config/get-mcp`、`config/set-mcp`、`config/set-mcp-enabled`、`skill/file`。
+  - 其中**只有 `skill/file` 在服务端有 HTTP 路由**（`GET /api/app-server/skills/{skill_id}/files/{path}`），但它回的是**原始字节 + `content-type`**，不是 JSON 信封，所以没有进 JSON 传输的路由表——用 `client.skills.readFile()`（WS，base64）或 `fetch` 直连该路由。
 - `config/get` / `config/set`（宿主设置文件 `~/.agent-store/config.toml`）是**宿主管理面**（`16` §6）：只有 wire 方法，没有 HTTP 绑定，也**不在本包客户端内**——Web UI 自己经 transport 调用。契约见 `05` §4.10。
 - `config/get-mcp` / `config/set-mcp` / `config/set-mcp-enabled`（MCP 声明文件 `~/.agent-store/mcp.json`）同样按 `16` §6 判定为**宿主管理面**：只有 wire 方法、没有 HTTP 绑定，也不在本包客户端内。写面是**失败即不写**（整文件解析不过、或目标条目不合法 → 磁盘逐字节不变），开关是**文本级最小编辑**（只改那一条的 `enabled`，注释与缩进原样保留）。注意 `config/get-mcp` 是**唯一**返回文件原文的读面（供宿主自己的编辑器按需调用，全程只在回环与 owner 闸门内）；其余读面（`config/get.mcp`）仍然不含 `env` / `headers` 的取值。契约见 `05` §4.10。
 - `skill/create` / `skill/update` / `skill/delete` / `skill/copy`（技能写面，`16` R17 / W12）同样按 `16` §6 判定为**宿主管理面**：第三方消费者不应能往宿主的技能树里写文件，因此只有 wire 方法、没有 HTTP 绑定，也不在本包客户端内。`skill/update` 是**字段级补丁**（只改点名的字段，`name` 不可改），`skill/copy` 从任意来源派生一份可写的用户技能。读面的 `SkillSummary` 新增 `origin` / `writable` 两个字段（增量），契约见 `05` §4.11。
