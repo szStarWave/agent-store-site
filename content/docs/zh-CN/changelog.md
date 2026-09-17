@@ -106,6 +106,8 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 再叠加 **`fp-4` → `fp-5`**：`conversation/create` 新增可选的 `team_id`（同样**加字段**），用来**打开某个专家团的 Leader 会话**——与 `team/run` 共用同一段编排（成员校验、物化/复用执行模板、会话栅栏），唯一区别是**不发 `goal` 首轮**，第一句话由调用方说。`agent_id` 与 `team_id` **互斥**。仍然**无方法增删**。
 
+再叠加 **`fp-5` → `fp-6`**：`conversation/send` 与 `agent/run` 各新增可选的 `model` 与 `reasoning_effort`（都是**给现有 DTO 加字段**），让调用方在**发起这次调用时**指定模型与思考等级；`ConversationView` 同时新增 `reasoning_effort`，把会话当前的等级**读得回来**（此前三条写入路径存在、却没有任何读面）。语义是**粘性**的：`send` 上带的值写进会话行，**从这条消息起生效**、此后每轮沿用——Nomi 运行时按会话行构建，所以这**不是**「只影响这一轮」；`agent/run` 上带的值只作用于**那次运行**（优先级：显式 > preset 自带 > 宿主默认），随快照落到该运行的每个 attempt。会话正跑着一个 turn 时 `send` 的切换会被拒（`conflict`）。仍然**无方法增删**，`48 / 71` 不变。
+
 再往前：`0.1.0-beta.3` 之后积累的那批改动——`event_type` 收窄、协议方法面增量、`conversation/list-changed`、技能文件树读面、`connector/call`、协议指纹形状变更——已全部随 `0.1.0-beta.4` 发布，逐条见 §2.1。
 
 「已发布产物里到底有什么」可以自己复现，做法是把相邻两版取回来对读：`0.1.0-beta.3` 的 `event_type` 仍带 `| string` 兜底、指纹是日期戳；`0.1.0-beta.4` 已是封闭联合 `ConversationEventType`、指纹是 `fp-1`。具体命令见[升级与迁移指引](/zh-CN/docs/upgrade) §8。

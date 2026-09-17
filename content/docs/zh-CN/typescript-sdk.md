@@ -44,7 +44,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出 | 说明 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 契约**指纹**（**仓库工作区当前为** `"fp-5"`；形状是 `fp-<n>` 计数器，每次 wire 变更递增、不复用任何历史值。旧值曾是日期戳，那是**标签不是变更日**——连续改动每次加一天，故常超前于日历），握手与 SDK 校验做严格相等 |
+| `APP_SERVER_PROTOCOL_VERSION` | 契约**指纹**（**仓库工作区当前为** `"fp-6"`；形状是 `fp-<n>` 计数器，每次 wire 变更递增、不复用任何历史值。旧值曾是日期戳，那是**标签不是变更日**——连续改动每次加一天，故常超前于日历），握手与 SDK 校验做严格相等 |
 | `InitializeRequest` / `InitializeResult` | 握手请求/响应（含 `protocol_version`、`server` 信息） |
 | `ClientInfo` / `ClientCapabilities` | 连接方自述 |
 | `StoreList` / `StoreInstallResult` | winget 式统一目录 |
@@ -255,6 +255,17 @@ client.conversations.send(id, content, key, {
 
 > **`mentions` 只认 `kind: "skill"`**（`fp-3` 加入）。技能是**每轮**载荷：正文与不可变快照都随这一轮走，会话创建时冻结的快照不受影响、也不可改写。`agent` / `connector` 两类在 `send` 上**没有载体**（专家是会话身份、连接器是宿主级开关），传进来是 `invalid_request` ——**显式拒绝，不是静默不挂**。`id` 用 `skill/list` 公布的 id（即技能名），不是 `install/status` 的组件 id。两个字段都缺省不上 wire。
 
+`send()` 还可以顺带**切换会话的模型与思考等级**（`fp-6` 加入）：
+
+```ts
+await client.conversations.send(id, content, key, {
+  model: { provider_id: "opencode", model: "mimo-v2.5" }, // 也可以是 config.toml 里的 provider 名
+  reasoningEffort: "high",                                 // low | medium | high | xhigh
+});
+```
+
+> **这是会话级设置，不是「只影响这一轮」**：值写进会话行，**从这条消息起生效**，此后每一轮沿用——Nomi 运行时是按会话行构建的，所以「发送前把设置切好」恰好就是本轮生效。要还原就再发一次带旧值的调用。`model` 与 `create` / `update` 同一形状与解析（注册过的 provider UUID 原样使用，`config.toml` 的 provider 名会被幂等注册），`reasoningEffort` 同一词表。**会话正跑着一个 turn 时会被拒**（`conflict`）：换模型要拆掉运行时，不能在轮中做。当前等级可用 `conversation/get` 从 `ConversationView.reasoning_effort` **读回**（缺席＝未指定）——三条写入路径都存在，视图就必须报得出它。不带这两个字段的调用与从前逐字一致；等级是否真的生效，取决于该模型在目录里是否声明了这个等级。
+
 `create()` 也可以用 `agentId` **把会话建成某个专家**（`fp-4` 加入）：
 
 ```ts
@@ -309,6 +320,19 @@ client.runs.events({ runId, afterSequence, limit }): Promise<RunEvent[]>; // 游
 client.runs.cancel({ runId, expectedVersion, commandId, idempotencyKey }): Promise<RunView>;
 await client.runs.follow(runId): Promise<EventSubscription>;
 ```
+
+`runs.agent()` 可以指定**这一次运行**的模型与思考等级（`fp-6` 加入）：
+
+```ts
+await client.runs.agent({
+  agentId: architect!.id,
+  goal: "把这版需求拆成计划",
+  model: { provider_id: "opencode", model: "mimo-v2.5" },
+  reasoningEffort: "high",
+});
+```
+
+> 优先级是 **显式 > preset 自带 > 宿主默认**（`~/.agent-store/config.toml` 的 `default_model`）：给了 `model` 就无条件赢过 preset 里绑定的那个。`reasoningEffort` 作用于这次运行的**每一个 attempt**。不带这两个字段时，行为与从前逐字一致。
 
 ```ts
 const sub = await client.runs.follow(runId);

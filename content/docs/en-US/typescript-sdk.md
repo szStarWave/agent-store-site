@@ -44,7 +44,7 @@ The single TypeScript source of truth for the wire contract: every request/respo
 
 | Export | Meaning |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | A contract **fingerprint** (**currently** `"fp-5"` in the working tree; the shape is an `fp-<n>` counter, incremented on each wire change and never reusing a past value. It was once a date stamp, but that is a *label, not the day of the change* — consecutive changes advanced it a day each, so it ran ahead of the calendar); the handshake and SDK checks compare it for strict equality |
+| `APP_SERVER_PROTOCOL_VERSION` | A contract **fingerprint** (**currently** `"fp-6"` in the working tree; the shape is an `fp-<n>` counter, incremented on each wire change and never reusing a past value. It was once a date stamp, but that is a *label, not the day of the change* — consecutive changes advanced it a day each, so it ran ahead of the calendar); the handshake and SDK checks compare it for strict equality |
 | `InitializeRequest` / `InitializeResult` | Handshake request/response (incl. `protocol_version`, server info) |
 | `ClientInfo` / `ClientCapabilities` | Caller self-description |
 | `StoreList` / `StoreInstallResult` | Winget-style unified catalog |
@@ -255,6 +255,17 @@ client.conversations.send(id, content, key, {
 
 > **`mentions` honours `kind: "skill"` only** (added in `fp-3`). A Skill is a **per-turn** payload: its instructions and immutable snapshot travel with that one turn, while the conversation's create-time snapshot is neither changed nor rewritable. `agent` and `connector` have **no carrier** on `send` (an expert is the conversation's identity, a connector is a host-level switch), so they are **refused with `invalid_request`** — explicitly, never silently not-mounted. `id` is the id `skill/list` publishes (the skill's name), not an `install/status` component id. Both fields stay off the wire when omitted.
 
+`send()` can also **switch the conversation's model and reasoning level** (added in `fp-6`):
+
+```ts
+await client.conversations.send(id, content, key, {
+  model: { provider_id: "opencode", model: "mimo-v2.5" }, // a config.toml provider name works too
+  reasoningEffort: "high",                                 // low | medium | high | xhigh
+});
+```
+
+> **This is a conversation-level setting, not "this turn only"**: the value is written to the conversation row and takes effect **from this message onwards**, every later turn included — the Nomi runtime is built from that row, which is exactly why "set it before sending" is what makes it apply to this turn. To revert, send the old value once more. `model` has the same shape and resolution as `create` / `update` (a registered provider UUID is used verbatim, a `config.toml` provider name is registered idempotently), and `reasoningEffort` shares their vocabulary. **A conversation running a turn refuses the switch** (`conflict`): changing the model tears the runtime down, which cannot happen mid-turn. The current level is **readable** from `ConversationView.reasoning_effort` via `conversation/get` (absent = unspecified) — three paths can write it, so the view has to report it. Calls without either field stay byte-identical to before; whether the level actually takes effect depends on the model's catalog declaration.
+
 `create()` can also build a conversation **as a named expert** with `agentId` (added in `fp-4`):
 
 ```ts
@@ -310,6 +321,19 @@ client.runs.events({ runId, afterSequence, limit }): Promise<RunEvent[]>; // cur
 client.runs.cancel({ runId, expectedVersion, commandId, idempotencyKey }): Promise<RunView>;
 await client.runs.follow(runId): Promise<EventSubscription>;
 ```
+
+`runs.agent()` can name the model and reasoning level **for that one run** (added in `fp-6`):
+
+```ts
+await client.runs.agent({
+  agentId: architect!.id,
+  goal: "turn this requirement into a plan",
+  model: { provider_id: "opencode", model: "mimo-v2.5" },
+  reasoningEffort: "high",
+});
+```
+
+> The precedence is **explicit > the preset's own > the host default** (`default_model` in `~/.agent-store/config.toml`): passing `model` unconditionally beats whatever the preset binds. `reasoningEffort` applies to **every attempt** of that run. Omitting either field keeps the previous behaviour byte for byte.
 
 ```ts
 const sub = await client.runs.follow(runId);
