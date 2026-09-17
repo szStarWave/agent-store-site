@@ -18,6 +18,7 @@
  *   3. snapshot.entry           snapshot identity set vs its manifest
  *   4. snapshot.avatar-missing  snapshot avatar path vs the mirrored tree
  *   5. listing.*                `_files.txt` vs the tree
+ *   6. listing.undeliverable    `_files.txt` vs what git will actually deliver
  *
  * Duplicates get a rule of their own because neither the gate nor
  * `sync-market-data.mjs` deduplicates: a manifest listing one connector twice
@@ -27,11 +28,17 @@
  * `sync-market-tree.mjs` rather than restated — that script produces the listing,
  * so its definition must not be copied here where it could drift.
  *
+ * Rule 6 is the one rule that shells out to git, so it runs from the CLI rather
+ * than inside `checkMarkets`: that keeps the exported function a filesystem-only
+ * unit the test file can drive. It is skipped, with a note, where git cannot
+ * answer (no checkout) rather than passing silently.
+ *
  *   node scripts/check-market.mjs
  *   node scripts/check-market.mjs --json
  *   bun test scripts/check-market.test.mjs
  */
 
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,7 +46,11 @@ import { fileURLToPath } from "node:url";
 import { LISTING, MANIFESTS, listFiles, sourceRoot } from "./sync-market-tree.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const SNAPSHOT = path.resolve(here, "..", "content", "market.json");
+const siteRoot = path.resolve(here, "..");
+const SNAPSHOT = path.resolve(siteRoot, "content", "market.json");
+
+/** Repo-relative prefix of one market's tree — what the listings are relative to. */
+const marketPrefix = (market) => `market-source/${market}`;
 
 /** `./plugins/x` → `plugins/x`; the manifests use both spellings. */
 const normalizeSource = (value) => String(value ?? "").replace(/^\.\//, "").trim();
@@ -243,6 +254,83 @@ export function compareListing(market, listed, actual) {
   return findings;
 }
 
+/**
+ * `_files.txt` against what git will actually deliver.
+ *
+ * Every rule above compares a listing against the filesystem, which is not the
+ * set a clone receives: `git add` drops paths `.gitignore` matches, silently. A
+ * listing that advertises one is worse than a missing file — the App Server
+ * mirrors every listed path over HTTP, so the client sees a 404 it cannot
+ * explain, and the machine that ran the sync never notices (its disk has the
+ * file). An unanchored `.codebuddy/` did exactly that to 84 expert payload
+ * files.
+ *
+ * `undeliverable` holds repo-relative paths, as `undeliverablePaths` returns.
+ */
+export function compareDeliverable(market, listed, undeliverable) {
+  const prefix = `${marketPrefix(market)}/`;
+  const offending = listed.filter((rel) => undeliverable.has(`${prefix}${rel}`));
+  if (!offending.length) return [];
+  return [
+    finding(
+      market,
+      "listing.undeliverable",
+      `${market}: ${LISTING} lists ${offending.length} path(s) git will not deliver (ignored and untracked), e.g. ${offending[0]}`,
+    ),
+  ];
+}
+
+/**
+ * The repository-relative paths in `paths` that `git add` would refuse: matched
+ * by an ignore pattern and not tracked.
+ *
+ * `git check-ignore` answers by pattern and skips tracked paths, which is the
+ * distinction that matters — a tracked path reaches a clone whether or not a
+ * pattern matches it (the skills market ships `…/.codebuddy/` files that
+ * predate the rule). Indexed paths are filtered out first because the check
+ * costs ~0.3 ms per path handed to it: on this market the unfiltered call is
+ * ~8 s.
+ *
+ * Returns `null` when git cannot answer, so the caller can say so instead of
+ * reporting a clean tree.
+ */
+export function undeliverablePaths(paths) {
+  const run = (args, input) => {
+    const result = spawnSync("git", args, { cwd: siteRoot, encoding: "utf8", input, maxBuffer: 8 << 20 });
+    // `check-ignore` exits 1 when nothing matches; anything above that is fatal.
+    if (result.error || result.status === null || result.status > 1) return null;
+    return result.stdout ?? "";
+  };
+
+  const indexed = run(["ls-files", "-z", "--", "market-source"]);
+  if (indexed === null) return null;
+  const tracked = new Set(indexed.split("\0"));
+  const unchecked = paths.filter((rel) => !tracked.has(rel));
+  if (!unchecked.length) return new Set();
+
+  const ignored = run(["check-ignore", "--stdin"], `${unchecked.join("\n")}\n`);
+  return ignored === null ? null : new Set(ignored.split("\n").filter((line) => line !== ""));
+}
+
+/** Rule 6 for every market, as `checkMarkets` results ready to merge by market. */
+function deliverableFindings(markets) {
+  const listed = new Map(
+    markets.map((market) => [
+      market,
+      readFileSync(path.join(sourceRoot, market, LISTING), "utf8")
+        .split("\n")
+        .filter((line) => line !== ""),
+    ]),
+  );
+  const paths = [...listed].flatMap(([market, rels]) => rels.map((rel) => `${marketPrefix(market)}/${rel}`));
+  const undeliverable = undeliverablePaths(paths);
+  if (undeliverable === null) {
+    console.error(`[check-market] ! git cannot answer here — ${LISTING} was not checked against what git delivers`);
+    return [];
+  }
+  return [...listed].flatMap(([market, rels]) => compareDeliverable(market, rels, undeliverable));
+}
+
 export function readSnapshot() {
   return JSON.parse(readFileSync(SNAPSHOT, "utf8"));
 }
@@ -312,6 +400,10 @@ async function main() {
   const results = await checkMarkets(snapshot);
   const asJson = argv.includes("--json");
   let errors = 0;
+
+  for (const extra of deliverableFindings(results.map((result) => result.market))) {
+    results.find((result) => result.market === extra.market)?.findings.push(extra);
+  }
 
   for (const result of results) {
     errors += result.findings.length;

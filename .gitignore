@@ -25,7 +25,12 @@ dist-release/
 Thumbs.db
 
 
-.codebuddy/
+# The IDE's own project folder. Anchored on purpose: an unanchored
+# `.codebuddy/` also matches directories of that name *inside* the mirrored
+# market trees (`…/skills/<skill>/.codebuddy/`). That silently kept real
+# payload files out of the commit while `_files.txt` still advertised them —
+# 84 phantom entries in the experts market, see scripts/sync-market-tree.mjs.
+/.codebuddy/
 
 # Tencent Cloud EdgeOne
 .env
