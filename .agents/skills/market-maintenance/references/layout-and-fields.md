@@ -39,6 +39,12 @@ connectors/
 └── _files.txt
 ```
 
+注意专家内置技能里出现的 `.codebuddy/`：例如
+`plugins/<name>/skills/fbs-bookwriter/.codebuddy/{agents,providers}/*.md`。它是上游的合法载荷，
+要随树一起交付。因此 `.gitignore` 里那条忽略规则必须锚到仓库根（`/.codebuddy/`）——写成
+不带锚点的 `.codebuddy/` 会命中这里，把这些文件挡在提交之外，而清单仍在收录它们
+（判据 `listing.undeliverable`，见 `references/checks-and-collaboration.md`）。
+
 图标命名规则：`icons/<source 的 basename>.<ext>`，扩展名依次探测
 `png → svg → jpg → jpeg → webp → gif`。专家则探测条目目录内
 `avatars/expert.png` → `avatars/avatar.png` → `avatar.png` → `icon.png`，

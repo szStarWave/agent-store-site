@@ -33,9 +33,10 @@ bun run sync:tree -- --dry-run
 bun run check:market          # 退出码非 0 即有问题；--json 供脚本消费
 ```
 
-它逐市场检查五件事：重复登记（`manifest.duplicate`）、快照条目数与清单是否一致
+它逐市场检查六件事：重复登记（`manifest.duplicate`）、快照条目数与清单是否一致
 （`snapshot.count`）、快照条目集合是否与清单一一对应（`snapshot.entry`）、快照里的头像
-路径是否真有文件（`snapshot.avatar-missing`）、`_files.txt` 与树是否互相覆盖（`listing.*`）。
+路径是否真有文件（`snapshot.avatar-missing`）、`_files.txt` 与树是否互相覆盖（`listing.*`）、
+清单里有没有 git 不会交付的路径（`listing.undeliverable`）。
 正常时：
 
 ```text
@@ -44,25 +45,58 @@ bun run check:market          # 退出码非 0 即有问题；--json 供脚本�
 ✓ connectors — 0 finding(s)
 
 3 market(s), 0 finding(s)
-[check-market] content/market.json: experts=13 skills=268 connectors=228 avatars=349
+[check-market] content/market.json: experts=381 skills=268 connectors=228 avatars=648
 ```
 
 出现重复时**去上游删掉多余条目**，不要改镜像。`_files.txt` 里的重复行不必担心：
 每次 `sync:tree` 都整份重写它。
 
+### `listing.undeliverable`：清单说了、git 不做
+
+前五条都以**磁盘**为准；第六条补的是「磁盘有、提交没有」这一类。清单由 `listFiles()` 扫磁盘
+生成，而 `git add` 会静默跳过 `.gitignore` 命中的路径：被忽略且未跟踪的文件留在同步机的
+磁盘上与 `_files.txt` 里，却进不了提交。客户端按清单逐个拉取，拿到的是 404——而同步机、
+门禁、构建全都正常。2026-09-17 实测到一处：不带根锚点的 `.codebuddy/` 命中市场树里的同名
+目录，让专家市场多出 84 条幽灵条目（4 个专家的 `skills/fbs-bookwriter/.codebuddy/{agents,providers}`，
+共 21 × 4 个文件）。
+
+判定与修法：
+
+```powershell
+# 1. 哪条规则命中了它
+git check-ignore -v market-source/experts/plugins/<专家>/skills/<技能>/.codebuddy/agents/x.md
+#    → .gitignore:28:.codebuddy/    ← 把规则锚到根：/.codebuddy/
+
+# 2. 修好规则后重出清单（只读镜像，不碰上游）
+bun run sync:tree -- --listing-only
+bun run check:market
+```
+
+两点要知道：
+
+- `check-ignore` **不报告已跟踪的路径**，这正是需要的判据：技能市场里同形状的 21 个
+  `.codebuddy` 文件是早于该规则入库的，一直都在交付，不该被当成问题。
+- 被这条规则点出来的文件未必「不重要」：它们是 git 交付不了的合法载荷。规则修正后，
+  下一次在**拥有上游副本的机器**上跑 `bun run sync` 会把它们随树与清单一起补回来；
+  本机源里没有这些文件时补不回来（只能重出不含它们的清单，让清单如实反映交付集）。
+
 ## 提交前自检
 
 ```powershell
-bun run check:market             # 查重 + 两个产物是否一致
+bun run check:market             # 查重 + 两个产物是否一致 + 清单是否都是 git 会交付的路径
 bun run sync:tree -- --dry-run   # 应为 +0 -0 ~0（幂等）
 git status --short               # 两个产物成对出现，且没有手改过的文件
+git ls-files --others --ignored --exclude-standard -- market-source   # 应为空
 ```
 
 1. `bun run check:market` 退出码为 0。
 2. `sync:tree` 的门禁输出 `validation passed — tree is publishable`；出现任何 `✗` 都不提交。
 3. `git status` 里 `market-source/` 与 `content/market.json` **成对出现**，且没有手改过的文件。
+4. 最后一条列的是「镜像里有、但 git 不会交付」的文件。输出为空才通过：其中任何一个出现在
+   清单里，客户端就会去拉一个永远 404 的地址（判读与修法见上文 `listing.undeliverable`）。
 
-这几条是唯一能挡住「静默丢失」与「重复上线」的检查——门禁本身不负责这两件事。
+这几条是唯一能挡住「静默丢失」「重复上线」与「清单说了但拉不到」的检查——门禁本身不负责
+这三件事。
 
 ## 多人协作
 
@@ -126,13 +160,18 @@ bun run sync:tree
 bun run sync:market
 ```
 
-## 基线（2026-09-16 实测，用于对照）
+## 基线（2026-09-17 实测，用于对照）
 
 | 项 | 数值 |
 | --- | --- |
 | 条目总数 | 877（专家 381、技能 268、连接器 228） |
 | 带图标条目 | 648（专家 306 / 381、技能 114 / 268、连接器 228 / 228） |
-| `market-source/` 文件数 | 22,696（含三份 `_files.txt`） |
+| `market-source/` 文件数 | 22,612（含三份 `_files.txt`） |
+| 三份清单行数 | 专家 14,713、技能 4,633、连接器 3,263 |
+
+> 文件数 2026-09-17 更正：此前记的 22,696 含 84 个只存在于同步机磁盘、进不了提交的文件
+> （`….codebuddy/{agents,providers}`，见上文 `listing.undeliverable`）。它们从未进入已发布的
+> 树，清单中的对应行已删除。
 
 2026-09-16 批量收录：专家 16 → 381（agent 378 / team 3），覆盖目录 375 个 agent 中的
 374 个；`vietnam-finance-tax-expert` 明确放弃。批次与指标见

@@ -55,6 +55,12 @@ content/market.json                            提交进仓库，目录页数据
 `_files.txt` 是镜像契约：一行一个相对 POSIX 路径、不含自身，客户端据此镜像整棵树。
 静态托管没有动态枚举端点，所以它必须在发布前生成好。
 
+**清单还必须等于「git 真正交付的集合」。** 清单由 `listFiles()` 扫磁盘生成，而 `git add`
+会静默跳过 `.gitignore` 命中的路径：被忽略且未跟踪的文件留在同步机的磁盘上、留在清单里，
+却进不了提交。客户端按清单逐个拉取，拿到的是 404；而同步机自己看不出任何异常——它的磁盘
+上确实有这些文件。2026-09-17 修掉的正是这样一处：不带根锚点的 `.codebuddy/` 让专家市场
+多出 84 条幽灵条目（见 4.3、7）。所以改 `.gitignore` 时不要写会命中市场树的宽松规则。
+
 ## 2. 四类资源的文件与字段规范
 
 三个市场的**清单位置、条目键、`source` 的解析基准**各不相同——这是最容易出错的地方：
@@ -211,9 +217,14 @@ bun run sync          # = sync:tree + sync:market
 也可以分开跑：
 
 ```powershell
-bun run sync:tree     # 只镜像与生成清单
-bun run sync:market   # 只由 market-source/ 重新生成 content/market.json
+bun run sync:tree                # 只镜像与生成清单
+bun run sync:market              # 只由 market-source/ 重新生成 content/market.json
+bun run sync:tree -- --listing-only   # 只由镜像重出三份清单，不读上游源
 ```
+
+`--listing-only` 是给「排除规则变了、但本机没有上游副本」准备的：上游工作目录是每台机器
+一份，而镜像随仓库走，所以只有它能在这种机器上把清单与树重新拉齐（清单本来就是由镜像生成
+的）。它同样会跑门禁；不镜像、不删文件。
 
 `sync:market` 的输出是本次更新的**核对基线**：
 
@@ -344,8 +355,10 @@ bun run sync:tree -- --dry-run
 bun run check:market          # 退出码非 0 即有问题；--json 供脚本消费
 ```
 
-它逐市场检查五件事：清单内重复登记、快照条目数与清单是否一致、快照条目集合是否与清单
-一一对应、快照里的头像路径是否真有文件、`_files.txt` 与树是否互相覆盖。
+它逐市场检查六件事：清单内重复登记（`manifest.duplicate`）、快照条目数与清单是否一致
+（`snapshot.count`）、快照条目集合是否与清单一一对应（`snapshot.entry`）、快照里的头像路径
+是否真有文件（`snapshot.avatar-missing`）、`_files.txt` 与树是否互相覆盖（`listing.*`）、
+清单里有没有 git 不会交付的路径（`listing.undeliverable`）。
 
 ```text
 ✓ experts — 0 finding(s)
@@ -355,6 +368,10 @@ bun run check:market          # 退出码非 0 即有问题；--json 供脚本�
 3 market(s), 0 finding(s)
 [check-market] content/market.json: experts=381 skills=268 connectors=228 avatars=648
 ```
+
+前五条都以**磁盘**为准，第六条补的正是「磁盘有、提交没有」那一类：被 `.gitignore` 忽略且
+未跟踪的路径，`git add` 会静默丢掉它。它需要 git（`git check-ignore`）来判定，所以只在
+CLI 里跑；git 不可用时打一行提示而不是当作通过。
 
 出现重复时**去上游删掉多余条目**，不要改镜像。`_files.txt` 里的重复行不必担心：
 每次 `sync:tree` 都整份重写它。
@@ -496,6 +513,9 @@ git status --short               # 两个产物成对出现，且没有手改过
 | `listing references N missing file(s)` | 清单引用了不存在的文件 | 同上；若上游刚删文件，重跑即可 |
 | `listing must exclude itself` / `illegal path in listing` | 清单格式被手工破坏 | 重跑 `sync:tree` |
 
+> 门禁比对的是**磁盘上的镜像**，所以它发现不了「清单收录了 git 不会交付的路径」——那些文件
+> 就在磁盘上。这一类由 `bun run check:market` 的 `listing.undeliverable` 判定，见 7。
+
 ### 警告项（不阻断发布）
 
 ```text
@@ -532,6 +552,27 @@ git status --short               # 两个产物成对出现，且没有手改过
 | 门禁报 `listing misses` / `listing references` | 合并动过 `market-source/` 但没重跑同步（见 4.5） | 按 4.6 重跑 `sync:tree` 与 `sync:market` |
 | `check:market` 报 `snapshot.count` / `snapshot.entry` | 只改或只提交了两个产物中的一个 | 跑 `bun run sync:market` 重新生成快照，再成对提交 |
 | `check:market` 报 `snapshot.avatar-missing` | 快照指向的图标文件不在树里（通常是被剪除或没随树提交） | 重新同步；若上游确实没有图标，让快照回落为 `null`（即重新生成） |
+| `check:market` 报 `listing.undeliverable` | 清单收录了被 `.gitignore` 忽略且未跟踪的路径——同步机的磁盘有这些文件，`git add` 不会把它们放进提交 | 用 `git check-ignore -v <路径>` 看是哪条规则：把规则锚到根（`/.codebuddy/`）或收窄，再 `bun run sync:tree -- --listing-only` 重出清单；若这些文件确实不该上架，就按 4.6 的思路重跑同步 |
+| `check:market` 报 `listing.phantom`（或有人比对出「清单里有文件、提交里没有」），本机磁盘上文件都在 | 与上一条同源：清单由磁盘生成，提交由 git 决定，两侧对「被忽略的文件」看法不同 | 同上；排查命令见 7 末「一条命令自检清单与提交是否一致」 |
+| `check:market` 报 `listing.missing`（例：`…/fbsir-super-partner/.DS_Store`），但 `git status` 里看不到这些文件 | 镜像里有**未跟踪且被忽略**的垃圾文件（macOS 元数据等） | 删掉即可；`sync:tree` 的 `FILE_EXCLUDES` 已把 `.DS_Store` / `Thumbs.db` 排除在清单外，重出清单不会再收录它们 |
+
+### 一条命令自检「清单与提交是否一致」
+
+```powershell
+git ls-files --others --ignored --exclude-standard -- market-source
+# 输出为空才算通过：列出什么，就说明镜像里有什么是 git 不会交付的
+```
+
+它列的是**镜像里存在、被忽略、且未跟踪**的文件。其中任何一个出现在 `_files.txt` 里，客户端
+就会去拉一个永远 404 的地址。要定位是哪条规则命中：
+
+```powershell
+git check-ignore -v market-source/experts/plugins/<专家>/skills/<技能>/.codebuddy/agents/x.md
+# 形如：.gitignore:28:.codebuddy/  …   ← 第 28 行的规则命中了它
+```
+
+`bun run check:market` 的 `listing.undeliverable` 做的就是这件事，只是它会自己比对三份清单，
+并且把结果算进退出码。
 
 ## 8. 不要做的事
 
@@ -551,17 +592,25 @@ git status --short               # 两个产物成对出现，且没有手改过
 8. **不要在 `push` 被拒后直接合并含 `market-source/` 的分支再推。** 先按 4.5 处理。
 9. **不要手工合并生成物**（`_files.txt`、`content/market.json`）。它们由脚本整份重写，
    冲突时重跑脚本（见 4.6）。
+10. **不要在 `.gitignore` 里写会命中市场树的宽松规则**，尤其是不带根锚点的目录名与宽通配
+    （`.codebuddy/`、`*.log` 这类）。命中就等于让清单指向客户端拉不到的 404，而且是静默的：
+    同步机、门禁、构建全都正常（见 1、7）。要忽略仓库自己的东西就锚到根（`/.codebuddy/`）。
 
 ## 9. 当前基线（供交接时对照）
 
-截至 **2026-09-16** 实测（批量收录后）：
+截至 **2026-09-17** 实测（批量收录后）：
 
 | 项 | 数值 |
 | --- | --- |
 | 条目总数 | 877（专家 381、技能 268、连接器 228） |
 | 带图标条目 | 648（专家 306 / 381、技能 114 / 268、连接器 228 / 228） |
-| `market-source/` 文件数 | 22,696（含三份 `_files.txt`） |
+| `market-source/` 文件数 | 22,612（含三份 `_files.txt`） |
+| 三份清单行数 | 专家 14,713、技能 4,633、连接器 3,263 |
 | 仓库体积 | `market-source` 695.3 MB、`build/client` 699.1 MB、`.git` 约 277 MB |
+
+> **2026-09-17 更正**：此前记的 22,696 含 84 个只存在于同步机磁盘、进不了提交的文件
+> （4 个专家的 `skills/fbs-bookwriter/.codebuddy/{agents,providers}`）。它们从未出现在已发布
+> 的树里；清单中的对应行已删除，误伤的 `.gitignore` 规则也已修正（见 1、7）。
 
 2026-09-16 批量收录：专家 16 → **381**（agent 378 / team 3），覆盖目录 375 个 agent 中的
 374 个；唯一未收 `vietnam-finance-tax-expert` 已明确放弃（bundle 495 MB）。获取通道
@@ -577,6 +626,10 @@ git status --short               # 两个产物成对出现，且没有手改过
 - 75 个专家没有 `avatars/expert.png`，页面显示字母徽标（多数为 B 档回落收录，判定见
   计划 §8.2）。
 - 清单没有分类字段，因此目录页没有分类筛选。
+- 4 个专家的技能载荷缺失：`behavioral-nudge-engine`、`book-co-creator`、
+  `feedback-synthesis-analyst`、`seo-expert` 的 `skills/fbs-bookwriter/.codebuddy/{agents,providers}`
+  （共 84 个文件）曾因 `.gitignore` 误伤而进不了提交。规则已修正，下一次在**拥有上游副本的
+  机器**上跑 `bun run sync` 会随树与清单一起自动补回（本机源不含这些文件时补不回来）。
 
 ## 10. 相关文档
 
@@ -585,8 +638,9 @@ git status --short               # 两个产物成对出现，且没有手改过
 | [`../README.md`](../README.md) | 命令速查、市场源地址表、部署说明 |
 | [`connector-coverage.md`](./connector-coverage.md) | 连接器覆盖现状、近似项甄别方法 |
 | [`modelscope-mcp-api.md`](./modelscope-mcp-api.md) | ModelScope MCP 开放接口（当前**未接入**本站） |
-| `scripts/sync-market-tree.mjs` | 门禁与警告判定的权威定义；排除项（`logs`/`dist`/`market-icons`/`.git`/`node_modules`）也在这里 |
-| `scripts/check-market.mjs` | 查重与两产物一致性的权威定义（`bun run check:market`） |
+| `scripts/sync-market-tree.mjs` | 门禁与警告判定的权威定义；排除项（`logs`/`dist`/`market-icons`/`.git`/`node_modules`/`FILE_EXCLUDES`）、`--listing-only` 也在这里 |
+| `scripts/check-market.mjs` | 查重、两产物一致性、清单与 git 交付集的权威定义（`bun run check:market`） |
+| `.gitignore` | 哪条规则会命中市场树——`listing.undeliverable` 的判据来源（规则要锚到根） |
 | `scripts/sync-market-data.mjs` | 快照字段映射与回落规则的权威定义 |
 | `scripts/copy-market-tree.mjs` | 构建期拷贝逻辑（纯拷贝，不做过滤：被排除的东西根本没进 `market-source/`） |
 | `app/lib/market.ts` | 目录页读取快照的规则 |
