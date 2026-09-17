@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mol* PDB Viewer</title>
+  <link rel="stylesheet" href="molstar.css" />
+  <style>
+    html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#1a1d24; color:#e6e8eb; }
+    #app { position:relative; width:100vw; height:100vh; }
+    #viewer { position:absolute; inset:0; }
+
+    /* 右下角状态 toast */
+    #status {
+      position:absolute; bottom:16px; right:16px; z-index:20;
+      padding:8px 14px; background:rgba(20,24,32,0.9);
+      border:1px solid rgba(255,255,255,0.12); border-radius:8px;
+      font-size:12px; color:#d3d8e0; max-width:55vw;
+      white-space:pre-wrap; pointer-events:none;
+      transition:opacity 0.3s;
+    }
+    #status.loading::before {
+      content:""; display:inline-block; width:11px; height:11px; margin-right:7px;
+      border:2px solid #4a9eff; border-top-color:transparent;
+      border-radius:50%; vertical-align:-2px;
+      animation:spin 0.8s linear infinite;
+    }
+    #status.error { color:#ff7a7a; border-color:rgba(255,120,120,0.35); }
+    #status.ok { color:#7fd97f; border-color:rgba(127,217,127,0.3); }
+    #status.hidden { opacity:0; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* 左上角命令日志面板（仅 ?debug=1 可见） */
+    #cmd-log {
+      position:absolute; top:8px; left:8px; z-index:20;
+      width:340px; max-height:260px; overflow-y:auto;
+      background:rgba(10,12,18,0.88); border:1px solid rgba(100,180,100,0.3);
+      border-radius:6px; padding:8px 10px;
+      font-size:11px; font-family:monospace; color:#7fd97f;
+      display:none;
+    }
+    #cmd-log.visible { display:block; }
+    #cmd-log .log-line { margin:1px 0; line-height:1.5; }
+    #cmd-log .log-err { color:#ff7a7a; }
+    #cmd-log .log-warn { color:#ffc96e; }
+    #cmd-log .log-ok { color:#7fd97f; }
+
+    /* 保存确认弹窗 */
+    #save-dialog {
+      display:none; position:absolute; inset:0; z-index:50;
+      align-items:center; justify-content:center;
+      background:rgba(0,0,0,0.6);
+    }
+    #save-dialog.visible { display:flex; }
+    #save-dialog .box {
+      background:#1e2430; border:1px solid rgba(255,255,255,0.2);
+      border-radius:12px; padding:24px 28px; max-width:440px; width:90%;
+    }
+    #save-dialog h3 { margin:0 0 10px; font-size:14px; color:#ffca7a; }
+    #save-dialog p { margin:0 0 20px; font-size:12px; color:#b0b8c8; line-height:1.6; }
+    #save-dialog .btns { display:flex; gap:10px; justify-content:flex-end; }
+    #save-dialog button {
+      padding:7px 18px; border-radius:6px; border:1px solid rgba(255,255,255,0.2);
+      font-size:12px; cursor:pointer; background:transparent; color:#e6e8eb;
+    }
+    #save-dialog .btn-confirm { background:#c0392b; border-color:#c0392b; color:#fff; }
+    #save-dialog .btn-confirm:hover { background:#e74c3c; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="viewer"></div>
+  <div id="status" class="loading">正在初始化 Mol*…</div>
+  <div id="cmd-log"></div>
+
+  <!-- 保存确认弹窗 -->
+  <div id="save-dialog">
+    <div class="box">
+      <h3>⚠ 确认保存到文件</h3>
+      <p id="save-dialog-msg">此操作将覆盖原始 PDB 文件。建议先导出为新文件。是否继续？</p>
+      <div class="btns">
+        <button onclick="closeSaveDialog()">取消</button>
+        <button class="btn-confirm" onclick="confirmSave()">确认覆盖保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="molstar.js"></script>
+<!-- [DBG-LOAD] 调试时取消注释以下行以启用日志推送到服务端 -->
+<!-- <script src="js/debug-logger.js"></script> -->
+
+<!-- 工具与基础模块（无依赖，先加载）-->
+<script src="js/utils.js"></script>
+<script src="js/loader.js"></script>
+<script src="js/sse.js"></script>
+
+<!-- 操作模块（依赖 utils.js，按字母顺序）-->
+<script src="js/ops/a1-load.js"></script>
+<script src="js/ops/a2-select.js"></script>
+<script src="js/ops/a3-visibility.js"></script>
+<script src="js/ops/a4-repr.js"></script>
+<script src="js/ops/a5-color-opacity.js"></script>
+<script src="js/ops/a7-label.js"></script>
+<script src="js/ops/a8-camera.js"></script>
+<script src="js/ops/a9-measure.js"></script>
+<script src="js/ops/a10-interact.js"></script>
+<script src="js/ops/a11-query.js"></script>
+<script src="js/ops/a12-export.js"></script>
+
+<!-- 执行器（依赖所有操作模块，最后加载）-->
+<script src="js/executor.js"></script>
+
+<script>
+// 主流程：Viewer.create + fetchAndLoad + connectSSE
+(function() {
+  if (typeof molstar === 'undefined' || !molstar.Viewer) {
+    setStatus('Mol* 库加载失败，请检查本地 molstar.js 文件', 'error');
+    log('❌ Mol* 加载失败: typeof molstar=' + typeof molstar, 'error');
+    return;
+  }
+  log('Mol* 库已加载，开始 Viewer.create...');
+  molstar.Viewer.create('viewer', {
+    layoutIsExpanded: false,
+    layoutShowControls: true,
+    layoutShowRemoteState: false,
+    layoutShowSequence: true,
+    layoutShowLog: false,
+    layoutShowLeftPanel: true,
+    viewportShowExpand: true,
+    viewportShowSelectionMode: true,
+    viewportShowAnimation: true,
+    pdbProvider: 'rcsb'
+  }).then(function(viewer) {
+    window.__molstarViewer = viewer;
+    window.__molPlugin = viewer.plugin;
+    log('Mol* Viewer 初始化完成');
+    setStatus('正在获取 PDB 文件…', 'loading');
+    // 启动 SSE 实时通道
+    connectSSE();
+    // 心跳：每 3 秒告知服务端页面存活，关闭页面后服务端 watchdog 自动退出
+    setInterval(function() {
+      fetch('/api/heartbeat', { cache: 'no-store' }).catch(function(){});
+    }, 3000);
+    window.addEventListener('beforeunload', function() {
+      navigator.sendBeacon('/api/heartbeat');
+    });
+    fetchAndLoad(viewer.plugin).catch(function(e) {
+      log('fetchAndLoad 失败: ' + e.message, 'error');
+      setStatus('加载失败: ' + e.message, 'error');
+    });
+  }).catch(function(e) {
+    setStatus('Mol* 初始化失败: ' + e.message, 'error');
+  });
+})();
+</script>
+</body>
+</html>
