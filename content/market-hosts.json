@@ -1,0 +1,23 @@
+{
+  "host": "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master",
+  "markets": {
+    "experts": {
+      "url": "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip",
+      "sha256": "5cd0ab947c7ed4978402bb60cf3044b19b6ab4665d9d80f4e30d0e626fd63a55",
+      "bytes": 303624783,
+      "files": 14713
+    },
+    "skills": {
+      "url": "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/skills.zip",
+      "sha256": "fca2fead19d914809feea122d38bd8fea6c8d57b1e8638a7d7dee343a2f861ae",
+      "bytes": 18732558,
+      "files": 4633
+    },
+    "connectors": {
+      "url": "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip",
+      "sha256": "4c35ed10007c60715b0facdc0de7005a899958626eecad756a075f1869ff75b5",
+      "bytes": 17500163,
+      "files": 3263
+    }
+  }
+}

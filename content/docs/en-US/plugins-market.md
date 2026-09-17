@@ -17,32 +17,35 @@ A plugin can carry the following components, which become reusable, standardized
 
 ## 2. Where marketplaces come from
 
-Marketplace sources are declared in [`~/.agent-store/config.toml`](/en-US/docs/configuration) with four `source_kind` values:
+Marketplace sources are declared in [`~/.agent-store/config.toml`](/en-US/docs/configuration) with five `source_kind` values:
 
 | source_kind | source | Notes |
 | --- | --- | --- |
+| `zip` | HTTP(S) archive URL | **What all three official markets use**: one archive whose **root is the market root** (the manifest sits at the archive root, not inside a wrapper folder), fetched in a single request |
 | `url` | HTTPS/HTTP manifest URL | A directory listing (`_files.txt`) is recommended so entry trees can mirror over HTTP |
 | `github` | GitHub repository | Fetches the marketplace manifest from GitHub |
 | `git` | Git repository URL | Syncs over the Git protocol |
 | `directory` | Local directory path | Points directly at a local market/plugin root |
 
 ```toml
-# This site (agent-store.flowyaipc.cn) hosts all three market sources itself, under /source/<market>/…;
+# Each official market is a zip archive hosted on ModelScope;
 # with no [default_marketplaces] declared, these are exactly what the runtime registers
 [default_marketplaces.experts]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
 
 [default_marketplaces.skills]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/skills/.codebuddy-skill/marketplace.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/skills.zip"
 
 [default_marketplaces.connectors]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/connectors/.codebuddy-connector/connectors.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
 ```
 
-The `_files.txt` in each market root is a pre-generated directory listing (one relative path per line) that clients use to mirror the whole entry tree.
+A `zip` source uses the archive's own sha256 for both freshness and integrity: the client sends a `HEAD` to the stable URL and reads `X-Linked-Etag` (that sha256); an unchanged digest means no download, and the downloaded bytes are verified against the same digest. On ModelScope a `.zip` goes through LFS, so the stable address answers **302** to a CDN URL carrying a time-limited `auth_key` signature — **write only the stable address, and never copy the CDN URL into a config or a doc**.
+
+`url` / `git` / `github` / `directory` all remain: third-party sources can still mirror a whole tree — a `url` source may ship a pre-generated `_files.txt` in the market root (one relative path per line) that clients walk to mirror the entry tree file by file.
 
 At startup the runtime fetches and parses these manifests, and the **Market** page (top navigation / footer) lets you browse every entry: experts, skills and connectors.
 
@@ -185,7 +188,7 @@ The SDK's connector client is **catalog reads + OAuth pass-through + the call pr
 
 To let others install your server from a marketplace in one click, package it as:
 
-- **A connector marketplace entry**: `.codebuddy-connector/connectors.json` + `connectors/<slug>/`, published to a marketplace source (`source_kind` supports `url` / `github` / `git` / `directory`);
+- **A connector marketplace entry**: `.codebuddy-connector/connectors.json` + `connectors/<slug>/`, published to a marketplace source (`source_kind` supports `zip` / `url` / `github` / `git` / `directory`);
 - **Plugin-level MCP**: a `.mcp.json` (`mcpServers` field) inside a `.codebuddy-plugin/` plugin package.
 
 After installation both paths land in `mcp_servers` — the two paths converge. Note that V1 OAuth only supports standard PKCE Loopback; custom URI schemes, public relays and other complex auth flows are not yet supported.

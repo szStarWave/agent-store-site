@@ -18,14 +18,21 @@
 # Dependencies
 node_modules/
 
-# Market tree is committed on purpose: the site itself serves it as the
-# marketplace source. It lives outside `public/` (Vite would copy it during the
-# build and stall prerender) and is copied into the output by
-# scripts/copy-market-tree.mjs — see scripts/sync-market-tree.mjs.
+# Market tree is committed on purpose — but since doc 30 it is the **packing
+# input**, not what the site serves: the three markets ship as zip archives on
+# ModelScope (`scripts/pack-market-zips.mjs` packs them, `scripts/publish-market-zips.mjs`
+# uploads them), and only the catalog-page icons still reach the build output.
+# It lives outside `public/` (Vite would copy it during the build and stall
+# prerender) and is copied into the output by scripts/copy-market-tree.mjs —
+# see scripts/sync-market-tree.mjs.
 
 # Release artifacts (zips are built per release by scripts/release.mjs and
 # uploaded to GitHub Releases; never commit them)
 /dist-release/
+
+# Market archives (built by `bun run pack:market`, uploaded by
+# `bun run publish:market`; the recorded digests live in content/market-hosts.json)
+/dist-market/
 
 # Logs — the dev server writes dev.log / dev.err / dev-server.log at the root.
 # Anchored: an unanchored `*.log` also matches a payload file inside the market

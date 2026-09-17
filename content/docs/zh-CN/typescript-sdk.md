@@ -44,7 +44,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出 | 说明 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 契约**指纹**（**仓库工作区当前为** `"fp-6"`；形状是 `fp-<n>` 计数器，每次 wire 变更递增、不复用任何历史值。旧值曾是日期戳，那是**标签不是变更日**——连续改动每次加一天，故常超前于日历），握手与 SDK 校验做严格相等 |
+| `APP_SERVER_PROTOCOL_VERSION` | 契约**指纹**（**仓库工作区当前为** `"fp-7"`；形状是 `fp-<n>` 计数器，每次 wire 变更递增、不复用任何历史值。旧值曾是日期戳，那是**标签不是变更日**——连续改动每次加一天，故常超前于日历），握手与 SDK 校验做严格相等 |
 | `InitializeRequest` / `InitializeResult` | 握手请求/响应（含 `protocol_version`、`server` 信息） |
 | `ClientInfo` / `ClientCapabilities` | 连接方自述 |
 | `StoreList` / `StoreInstallResult` | winget 式统一目录 |

@@ -108,6 +108,8 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 再叠加 **`fp-5` → `fp-6`**：`conversation/send` 与 `agent/run` 各新增可选的 `model` 与 `reasoning_effort`（都是**给现有 DTO 加字段**），让调用方在**发起这次调用时**指定模型与思考等级；`ConversationView` 同时新增 `reasoning_effort`，把会话当前的等级**读得回来**（此前三条写入路径存在、却没有任何读面）。语义是**粘性**的：`send` 上带的值写进会话行，**从这条消息起生效**、此后每轮沿用——Nomi 运行时按会话行构建，所以这**不是**「只影响这一轮」；`agent/run` 上带的值只作用于**那次运行**（优先级：显式 > preset 自带 > 宿主默认），随快照落到该运行的每个 attempt。会话正跑着一个 turn 时 `send` 的切换会被拒（`conflict`）。仍然**无方法增删**，`48 / 71` 不变。
 
+再叠加 **`fp-6` → `fp-7`**：`AppServerMarketplaceSourceKind` 新增枚举值 `zip`——一个 **HTTP(S) 归档**，**归档根目录即市场根**（清单在归档根，不套一层目录）。官方三个市场（`experts` / `skills` / `connectors`）随之从本站的 `/source/<market>/…` 逐文件树迁到 ModelScope 上的三个 zip 归档；归档的 sha256 就是 revision（对稳定 URL 发 `HEAD`、读 `X-Linked-Etag`），内容未变即不下载。`url` / `github` / `git` / `directory` 全部保留，第三方源继续可用整树镜像。仍然**无方法增删**，`48 / 71` 不变；手改配置的迁移做法见[升级与迁移指引](/zh-CN/docs/upgrade) §8。
+
 再往前：`0.1.0-beta.3` 之后积累的那批改动——`event_type` 收窄、协议方法面增量、`conversation/list-changed`、技能文件树读面、`connector/call`、协议指纹形状变更——已全部随 `0.1.0-beta.4` 发布，逐条见 §2.1。
 
 「已发布产物里到底有什么」可以自己复现，做法是把相邻两版取回来对读：`0.1.0-beta.3` 的 `event_type` 仍带 `| string` 兜底、指纹是日期戳；`0.1.0-beta.4` 已是封闭联合 `ConversationEventType`、指纹是 `fp-1`。具体命令见[升级与迁移指引](/zh-CN/docs/upgrade) §8。

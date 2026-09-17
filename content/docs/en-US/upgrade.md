@@ -164,7 +164,40 @@ When the three disagree, trust the **lockfile and the installed `package.json`**
 
 ## 8. Published-artifact differences and how to check them
 
-As of `0.1.0-beta.4` (2026-09-16), **the working tree leads the published artifacts**: after `0.1.0-beta.4` it accumulated the protocol fingerprint move `fp-1` → **`fp-2`** — each connector tool's `input_schema` (a `ConnectorTool` field) plus `tools_truncated` on `ConnectorDetail` / `ConnectorProbeResult`, with **no methods added or removed** (still `48 / 71` mapped); the same batch also changed the host's `[connector_proxy]` grant shape (`allow` became optional narrowing, `deny` was added, and an enabled proxy now means callable). None of this has shipped in any version yet; for what `0.1.0-beta.4` changed relative to `0.1.0-beta.3`, see §2.1 of the [Changelog](/en-US/docs/changelog).
+As of `0.1.0-beta.4` (2026-09-16), **the working tree leads the published artifacts**: after `0.1.0-beta.4` it accumulated the protocol fingerprint move `fp-1` → **`fp-2`** — each connector tool's `input_schema` (a `ConnectorTool` field) plus `tools_truncated` on `ConnectorDetail` / `ConnectorProbeResult`, with **no methods added or removed** (still `48 / 71` mapped); the same batch also changed the host's `[connector_proxy]` grant shape (`allow` became optional narrowing, `deny` was added, and an enabled proxy now means callable). The working tree went on to `fp-2` → `fp-3` (`mentions` on `conversation/send`), `fp-3` → `fp-4` (`agent_id` on `conversation/create`), `fp-4` → `fp-5` (`team_id`) and `fp-5` → `fp-6` (`model` and `reasoning_effort` on `send` / `agent/run`), and at `fp-6` → `fp-7` moved the official marketplace sources onto zip archives on ModelScope. None of this has shipped in any version yet; for what `0.1.0-beta.4` changed relative to `0.1.0-beta.3`, see §2.1 of the [Changelog](/en-US/docs/changelog).
+
+### 8.1 Migrating a config's marketplace sources
+
+The three official marketplace sources (`experts` / `skills` / `connectors`) moved off this site's `/source/<market>/…` file-per-entry tree and onto zip archives on ModelScope, and the site no longer hosts the market trees. **No address is rewritten automatically**, so an upgrade needs one manual pass — it only affects machines whose config already declares `[default_marketplaces]` (both `agent-store init` and hand-copying the URLs from older docs write those blocks in).
+
+First check whether `~/.agent-store/config.toml` carries these three blocks:
+
+```toml
+[default_marketplaces.experts]
+source_kind = "url"
+source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
+```
+
+If it does, take one of two routes:
+
+- **Delete the three `[default_marketplaces.*]` blocks** — with no table declared, the runtime's built-in defaults (the zip addresses below) apply;
+- **Repoint them at the new zip addresses** — one archive per market, with `source_kind = "zip"`:
+
+```toml
+[default_marketplaces.experts]
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
+
+[default_marketplaces.skills]
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/skills.zip"
+
+[default_marketplaces.connectors]
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
+```
+
+If the config has no such blocks, there is nothing to do. **Failure is benign**: a failed fetch never touches the last-good local copy, so entries do not disappear — they stay at their old data. The first fetch after the switch downloads the whole archive (the largest of the three is `experts` at 289.0 MiB).
 
 To check for yourself what a published artifact actually contains, reading two adjacent versions side by side is the clearest way:
 

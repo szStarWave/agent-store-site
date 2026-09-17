@@ -37,11 +37,15 @@ model = "laguna-s-2.1-free"
 max_context_size = 256000
 display_name = "Laguna S 2.1 Free"
 
-# 默认市场源（首次调 store/market 时自动注册；由官网站点自托管）
+# 默认市场源（首次调 store/market 时自动注册；官方三个市场各是一个 ModelScope 上的 zip 归档）
 [default_marketplaces.experts]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
 ```
+
+> 官方三个市场（`experts` / `skills` / `connectors`）现在各发布为**一个 zip 归档**，托管在 ModelScope；本站只再提供文档与目录页用到的约 648 张图标。归档的 **sha256 即 revision**：客户端对稳定 URL 发 `HEAD`、读 `X-Linked-Etag`（内容 sha256），摘要没变就不再下载，下载下来的字节也按同一个摘要校验。
+
+`[default_marketplaces]` 是你自己的表：**一旦声明，运行时只注册你写的源，内置默认源不再生效**。所以跑过 `agent-store init`（或照旧文档手抄过地址）的机器，配置里冻着已退役的 `/source/<market>/…` 站点树地址，要手工处理：改成上面的 zip 地址，或把这三段整块删掉回落到内置默认。改完第一次拉取会下整个归档（三个市场里最大的是 experts 的 289.0 MiB；旧的逐文件树要发 14,714 次请求）。失败是温和的：拉取失败不会碰上一次成功留下的本地副本，条目不会消失，只是停在旧数据上。
 
 ## 顶层字段
 
@@ -88,25 +92,25 @@ source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/mark
 
 默认市场源（winget 风格的软件源）。App Server 在首次 `store` / `market` 调用时自动注册；同 id 已存在时按新 source 重新激活。
 
-下面这三个源就是**发布版内置默认源**：`config.toml` 缺失、或文件里没有 `[default_marketplaces]` 时，运行时会自动注册它们（每个源都带 `_files.txt`，整棵条目树会被镜像）；一旦你自己声明了这张表，就只注册你写的源。官方源与第三方源的区别见 [插件与市场](/zh-CN/docs/plugins-market)：只有官方源默认开启自动更新。
+下面这三个源就是**发布版内置默认源**：`config.toml` 缺失、或文件里没有 `[default_marketplaces]` 时，运行时会自动注册它们（每个源都是**一个 zip 归档**，一次请求取回整棵条目树）；一旦你自己声明了这张表，就只注册你写的源。官方源与第三方源的区别见 [插件与市场](/zh-CN/docs/plugins-market)：只有官方源默认开启自动更新。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `source_kind` | `string` | `url` \| `github` \| `git` \| `directory` |
-| `source` | `string` | 具体地址；`url` 类型建议同时提供目录枚举（`_files.txt`）以支持条目树镜像 |
+| `source_kind` | `string` | `zip` \| `url` \| `github` \| `git` \| `directory` |
+| `source` | `string` | 具体地址；`url` 类型建议同时提供目录枚举（`_files.txt`）以支持条目树镜像，`zip` 类型只接受 `http(s)://` 归档地址 |
 
 ```toml
 [default_marketplaces.experts]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
 
 [default_marketplaces.skills]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/skills/.codebuddy-skill/marketplace.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/skills.zip"
 
 [default_marketplaces.connectors]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/connectors/.codebuddy-connector/connectors.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
 ```
 
 ## `memory`

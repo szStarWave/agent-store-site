@@ -17,32 +17,35 @@ Agent Store 原生支持**插件**与**插件市场**：插件是打包好的能
 
 ## 2. 市场从哪里来
 
-市场来源在 [`~/.agent-store/config.toml`](/zh-CN/docs/configuration) 中声明，支持四种 `source_kind`：
+市场来源在 [`~/.agent-store/config.toml`](/zh-CN/docs/configuration) 中声明，支持五种 `source_kind`：
 
 | source_kind | source | 说明 |
 | --- | --- | --- |
+| `zip` | HTTP(S) 归档地址 | **官方三个市场用的就是这一种**：一个归档，**归档根目录即市场根**（清单在归档根，不套一层目录），一次请求取回整棵条目树 |
 | `url` | HTTPS/HTTP 清单地址 | 建议同时提供目录枚举（`_files.txt`）以支持条目树镜像 |
 | `github` | GitHub 仓库 | 从 GitHub 拉取市场清单 |
 | `git` | Git 仓库地址 | 通过 Git 协议同步 |
 | `directory` | 本地目录路径 | 直接指向本地市场/插件根 |
 
 ```toml
-# 本站（agent-store.flowyaipc.cn）即托管这三个市场源，路径形如 /source/<market>/…；
+# 官方三个市场各是一个托管在 ModelScope 上的 zip 归档；
 # 未声明 [default_marketplaces] 时，运行时的内置默认源就是它们
 [default_marketplaces.experts]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
 
 [default_marketplaces.skills]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/skills/.codebuddy-skill/marketplace.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/skills.zip"
 
 [default_marketplaces.connectors]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/connectors/.codebuddy-connector/connectors.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
 ```
 
-每个市场根目录下的 `_files.txt` 是预生成的目录清单（一行一个相对路径），客户端据此镜像整棵条目树。
+`zip` 源的新鲜度与完整性都用归档自身的 sha256：客户端对稳定 URL 发 `HEAD`，读 `X-Linked-Etag`（就是内容 sha256）；摘要没变就不下载，下载下来的字节也按同一个摘要校验。`.zip` 在 ModelScope 上走 LFS，稳定地址会 **302** 到带临时签名（`auth_key`）的 CDN 地址——**只写稳定地址，永远不要把 CDN 地址抄进配置或文档**。
+
+`url` / `git` / `github` / `directory` 全部保留，第三方源可以继续用整树镜像：`url` 源的市场根目录下可以放一份预生成的 `_files.txt`（一行一个相对路径），客户端据此逐文件镜像整棵条目树。
 
 启动时运行时会拉取并解析这些市场清单，Web UI 的 **市场** 页面（顶部导航 / 页脚入口）即可浏览全部条目：专家、技能与连接器。
 
@@ -185,7 +188,7 @@ SDK 的连接器客户端是**目录读面 + OAuth 直通 + 调用代理**：`li
 
 希望别人能从市场一键安装时，把自研 MCP Server 打包为：
 
-- **连接器市场条目**：`.codebuddy-connector/connectors.json` + `connectors/<slug>/`，发布到一个市场源（`source_kind` 支持 `url` / `github` / `git` / `directory`）；
+- **连接器市场条目**：`.codebuddy-connector/connectors.json` + `connectors/<slug>/`，发布到一个市场源（`source_kind` 支持 `zip` / `url` / `github` / `git` / `directory`）；
 - **插件级 MCP**：插件包内 `.codebuddy-plugin/` 附带 `.mcp.json`（`mcpServers` 字段）。
 
 用户安装后同样落到 `mcp_servers`——两条路径最终殊途同归。注意 V1 的 OAuth 仅支持标准 PKCE Loopback，自定义 URI scheme、公网 relay 等复杂授权暂不支持。

@@ -37,11 +37,15 @@ model = "laguna-s-2.1-free"
 max_context_size = 256000
 display_name = "Laguna S 2.1 Free"
 
-# Default marketplace sources (auto-registered on first store/market call; hosted by this site)
+# Default marketplace sources (auto-registered on first store/market call; each official market is a zip archive on ModelScope)
 [default_marketplaces.experts]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
 ```
+
+> The three official markets (`experts` / `skills` / `connectors`) now publish as **one zip archive each**, hosted on ModelScope; this site only serves the docs plus the ~648 catalog-page icons. The archive's **sha256 is the revision**: the client sends a `HEAD` to the stable URL and reads `X-Linked-Etag` (the content sha256), skips the download when the digest is unchanged, and verifies the downloaded bytes against that same digest.
+
+`[default_marketplaces]` is your table: **once you declare it, the runtime registers your sources and the built-in defaults no longer apply**. So a machine that ran `agent-store init` (or hand-copied the addresses from older docs) has the retired `/source/<market>/…` site tree frozen in its config and must be fixed by hand. Either repoint those three blocks at the zip addresses above, or delete them and fall back to the built-in defaults; the first fetch after the switch downloads the whole archive (289.0 MiB for the largest, `experts`), where the old file-per-entry tree took 14,714 requests. Failure is benign: a failed fetch never touches the last-good local copy, so entries do not disappear — they stay at their old data.
 
 ## Top-level fields
 
@@ -88,25 +92,25 @@ A table keyed by `"<provider>/<model>"`. `provider` must point to a key declared
 
 Default marketplace sources (winget-style software sources). The App Server auto-registers them on the first `store` / `market` call; an existing id is reactivated with the new source.
 
-The three sources below are the **built-in defaults a release ships with**: when `config.toml` is missing or declares no `[default_marketplaces]`, the runtime registers exactly these (each carries a `_files.txt`, so the whole entry tree is mirrored); as soon as you declare your own table, only your sources are registered. For the official-versus-third-party distinction see [Plugins and marketplaces](/en-US/docs/plugins-market): only official sources default to auto-update.
+The three sources below are the **built-in defaults a release ships with**: when `config.toml` is missing or declares no `[default_marketplaces]`, the runtime registers exactly these (each is **one zip archive**, fetched in a single request); as soon as you declare your own table, only your sources are registered. For the official-versus-third-party distinction see [Plugins and marketplaces](/en-US/docs/plugins-market): only official sources default to auto-update.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `source_kind` | `string` | `url` \| `github` \| `git` \| `directory` |
-| `source` | `string` | Concrete address; for `url` kinds also provide a directory listing (`_files.txt`) so entry trees can mirror over HTTP |
+| `source_kind` | `string` | `zip` \| `url` \| `github` \| `git` \| `directory` |
+| `source` | `string` | Concrete address; for `url` kinds also provide a directory listing (`_files.txt`) so entry trees can mirror over HTTP, while `zip` accepts only an `http(s)://` archive address |
 
 ```toml
 [default_marketplaces.experts]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
 
 [default_marketplaces.skills]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/skills/.codebuddy-skill/marketplace.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/skills.zip"
 
 [default_marketplaces.connectors]
-source_kind = "url"
-source = "https://agent-store.flowyaipc.cn/source/connectors/.codebuddy-connector/connectors.json"
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
 ```
 
 ## `memory`
