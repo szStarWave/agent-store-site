@@ -1886,6 +1886,26 @@
       "name": "yahoo-finance-cli",
       "source": "./plugins/yahoo-finance-cli",
       "description": "Query comprehensive real-time stock quotes, key fundamentals, earnings estimates, analyst ratings and recommendations, historical price trends and valuation insights for global equities, ETFs and crypto. Discover trending market symbols, perform fuzzy symbol lookup by company name, and run side-by-side multi-asset comparisons."
+    },
+    {
+      "name": "malaysia-hr-admin",
+      "source": "./plugins/malaysia-hr-admin",
+      "description": "Malaysia HR & Administration compliance expert with corpus-first engine: 52 reference texts (Employment Act 1955 / PDPA 2010 / Companies Act 2016), 77 DuckDB analytics tables (labor/payroll/EPF/SOCSO), and 7 official data sources (JTK/PERKESO/EPF/IMMI/SSM). Covers labor law advisory, payroll benchmarking, foreign worker permits, office setup, corporate compliance, and recruitment budget planning."
+    },
+    {
+      "name": "malaysia-legal",
+      "source": "./plugins/malaysia-legal",
+      "description": "Malaysia Legal & Compliance expert: company registration (SSM), contract drafting & review, intellectual property (MyIPO), industry licensing, product certification, PDPA data compliance, dispute resolution & litigation, and local legal risk assessment — corpus-first with legal text search engine."
+    },
+    {
+      "name": "malaysia-finance-tax",
+      "source": "./plugins/malaysia-finance-tax",
+      "description": "Comprehensive Malaysia finance and tax intelligence covering taxation, banking, forex, financing, auditing, subsidies, insurance, Islamic finance, monetary policy and fiscal analysis for enterprise operations."
+    },
+    {
+      "name": "indonesia-digital-law-expert",
+      "source": "./plugins/indonesia-digital-law-expert",
+      "description": "Focused on foreign investment, data compliance & commercial transactions—streamlines business registration, financial regulation & IP protection for cross-border SaaS and AI."
     }
   ]
 }

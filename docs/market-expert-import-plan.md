@@ -398,6 +398,51 @@ content/market.json
   `scripts/import-expert-bundles.mjs`（`--slugs`、`--dry-run`），下一批只给 slug 列表即可；
   先在站外副本灰度，再接标准流程。
 
+## 10. 批量收录执行记录（2026-09-16）
+
+### 10.1 结果
+
+专家 **16 → 377**（新增 361 个：A 档 260 + B 档 101），另 3 个 team 为历史存量。站点现有
+agent 370 个；目录 agent 375 个，未收 5 个（见 §10.4）。
+
+### 10.2 工具与修复
+
+- 新增 `scripts/import-expert-bundles.mjs`（bundle 拉取 → A/B/X 档判定 → 解包 → 登记副本 → 报告）
+  与 `scripts/lib/tar-lite.mjs`（Node 原生 tar 解析）。
+- 修复 1：Windows `tar.exe` 在中文文件名上解包失败（`Invalid empty pathname`）并残留半成品目录；
+  改为 Node 实现，中文名全部通过。
+- 修复 2：`plugin.json` 的 `agents` / `skills` 允许「目录形态」（如 `"./agents/"`）。
+- 修复 3：解包失败时清理目标目录，避免「未登记目录」泄漏进树（批次 5–6 曾泄漏 8 个，已剪除）。
+
+### 10.3 批次与体积指标
+
+| 批次 | 数量 | 备注 |
+| --- | --- | --- |
+| 灰度 A | 20 | 全部 A 档 |
+| 主体 1–5 | 221 | 5 × 65，A 档判定后入库 |
+| 补录 | 10 | 原 8 个中文名失败 + 2 个误判复核 |
+| 2–5 MB 档 | 9 | 15 个中 6 个 B 档挂起，后并入 B 批 |
+| B 档批 | 101 | 缺头像 69 / 仅缺 README 32（回落按 §8.2） |
+
+- 下载合计约 220 MB（压缩态），入库后 `market-source/` 从 112 MB 增至 **461.1 MB**（解包膨胀 ≈1.6×）。
+- `build/client` **464.9 MB**、构建 **1.4 分钟**（阈值 500 MB / 10 分钟，均未触发）。
+- `check:market` 每批 0 findings；`sync:tree` 每批 `-removed=0`；幂等复检通过。
+
+### 10.4 剩余与挂账
+
+| slug | bundle | 解包（实测） | 状态 |
+| --- | --- | --- | --- |
+| `malaysia-hr-admin` | 39.8 MB | 67.8 MB | 挂账：4 个重包合计约 +234 MB，入库将越过 500 MB 熔断 |
+| `malaysia-legal` | 18.0 MB | 111.3 MB | 同上（最大单文件 47.7 MB，未超 GitHub 100 MB 限） |
+| `malaysia-finance-tax` | 15.4 MB | 40.0 MB | 同上 |
+| `indonesia-digital-law-expert` | 14.1 MB | 15.2 MB | 同上 |
+| `vietnam-finance-tax-expert` | 495.5 MB | 未实测 | 单独立项：先解包验证单文件是否 >100 MB |
+
+### 10.5 提交状态
+
+全部改动为**本地提交、未推送**（市场产物与工具/文档分开成笔）。待决策：4 个重包是否放宽
+熔断收录、495 MB 特大包如何处理。
+
 ## 8. 第二批执行计划（2026-09-16 规划，分支 `feat/market-add-experts-batch-2`）
 
 目标（2026-09-16 修订）：**本批 20 个，专家 16 → 36**；最终目标是把目录中 375 个 agent
