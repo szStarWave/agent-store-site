@@ -33,10 +33,11 @@ bun run sync:tree -- --dry-run
 bun run check:market          # 退出码非 0 即有问题；--json 供脚本消费
 ```
 
-它逐市场检查六件事：重复登记（`manifest.duplicate`）、快照条目数与清单是否一致
+它逐市场检查七件事：重复登记（`manifest.duplicate`）、快照条目数与清单是否一致
 （`snapshot.count`）、快照条目集合是否与清单一一对应（`snapshot.entry`）、快照里的头像
 路径是否真有文件（`snapshot.avatar-missing`）、`_files.txt` 与树是否互相覆盖（`listing.*`）、
-清单里有没有 git 不会交付的路径（`listing.undeliverable`）。
+清单里有没有 git 不会交付的路径（`listing.undeliverable`）、`.gitignore` 会不会命中市场树里的
+载荷（`ignore.market-tree`）。
 正常时：
 
 ```text
@@ -79,6 +80,35 @@ bun run check:market
 - 被这条规则点出来的文件未必「不重要」：它们是 git 交付不了的合法载荷。规则修正后，
   下一次在**拥有上游副本的机器**上跑 `bun run sync` 会把它们随树与清单一起补回来；
   本机源里没有这些文件时补不回来（只能重出不含它们的清单，让清单如实反映交付集）。
+
+### `ignore.market-tree`：给 `.gitignore` 做规则体检
+
+比上一条更早一步：不比对清单，而是拿一组**代表名**去问 `.gitignore` 会不会命中市场树**内部**
+的路径。命中意味着「这类载荷进不了提交」，只是还没真发生。代表名覆盖的是各种「写太宽」的
+形态（`build/`、`dist/`、`logs/`、`market-icons/`、`.codebuddy/`、`.cache/`、`tmp/`、
+`dev.log`、`server.err`…），探针挂在各市场的内容基准目录下（专家 `plugins/`、技能 `skills/`、
+连接器 `connectors/`）。刻意**不探**两侧同口径排除的名字（`node_modules/`、`.DS_Store`、
+`Thumbs.db`——`sync` 的排除集合与之相同），也不探有意保持全局的 `.env`。
+
+它是**烟雾测试而非证明**：`git check-ignore` 没有「列出你的规则」这种模式，覆盖面取决于代表名
+是否覆盖了那类写法。它按市场逐个报，因为同一条规则同时压在三个市场上。看到它报错时：
+
+```powershell
+git check-ignore --no-index -v -- market-source/skills/skills/_probe/build/out.js
+#  → .gitignore:16:build/      ← 把规则锚到根：/build/
+```
+
+改完规则**不必**重出清单（清单没变）；只有当这条规则此前已经吞掉过文件时，症状才会是上一条
+`listing.undeliverable`，那时才需要按上面的流程重出清单。
+
+安全写法速记：
+
+| 写法 | 只作用于本仓库？ | 说明 |
+| --- | --- | --- |
+| `/build/`、`/*.log`、`/.codebuddy/` | 是 | 锚到根 |
+| `.edgeone/*`、`docs/*.md` | 是 | 中间带 `/` 的 pattern，git 同样按根锚定 |
+| `build/`、`*.log`、`.codebuddy/` | **否** | 任意层级都命中，会咬进市场树 |
+| `node_modules/`、`.DS_Store`、`Thumbs.db` | 否，但可接受 | `sync` 侧排除集合完全相同，两侧一致 |
 
 ## 提交前自检
 

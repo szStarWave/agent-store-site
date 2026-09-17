@@ -19,6 +19,7 @@
  *   4. snapshot.avatar-missing  snapshot avatar path vs the mirrored tree
  *   5. listing.*                `_files.txt` vs the tree
  *   6. listing.undeliverable    `_files.txt` vs what git will actually deliver
+ *   7. ignore.market-tree       `.gitignore` vs the payload inside the trees
  *
  * Duplicates get a rule of their own because neither the gate nor
  * `sync-market-data.mjs` deduplicates: a manifest listing one connector twice
@@ -28,10 +29,10 @@
  * `sync-market-tree.mjs` rather than restated — that script produces the listing,
  * so its definition must not be copied here where it could drift.
  *
- * Rule 6 is the one rule that shells out to git, so it runs from the CLI rather
- * than inside `checkMarkets`: that keeps the exported function a filesystem-only
- * unit the test file can drive. It is skipped, with a note, where git cannot
- * answer (no checkout) rather than passing silently.
+ * Rules 6 and 7 shell out to git, so they run from the CLI rather than inside
+ * `checkMarkets`: that keeps the exported function a filesystem-only unit the
+ * test file can drive. Both are skipped, with a note, where git cannot answer
+ * (no checkout) rather than passing silently.
  *
  *   node scripts/check-market.mjs
  *   node scripts/check-market.mjs --json
@@ -280,6 +281,22 @@ export function compareDeliverable(market, listed, undeliverable) {
   ];
 }
 
+/** Rule 7: no ignore rule may catch a payload path inside a market tree. */
+export function compareIgnoreRules(market, probes, matched) {
+  const caught = probes.filter((path) => matched.has(path));
+  if (!caught.length) return [];
+  const [first] = caught;
+  const rel = first.slice(marketPrefix(market).length + 1);
+  const more = caught.length > 1 ? ` (+${caught.length - 1} more)` : "";
+  return [
+    finding(
+      market,
+      "ignore.market-tree",
+      `${market}: .gitignore catches payload inside the tree — probe ${rel} is ignored by ${matched.get(first)}${more}; a payload file of that name would be listed but never delivered`,
+    ),
+  ];
+}
+
 /**
  * The repository-relative paths in `paths` that `git add` would refuse: matched
  * by an ignore pattern and not tracked.
@@ -310,6 +327,77 @@ export function undeliverablePaths(paths) {
 
   const ignored = run(["check-ignore", "--stdin"], `${unchecked.join("\n")}\n`);
   return ignored === null ? null : new Set(ignored.split("\n").filter((line) => line !== ""));
+}
+
+/**
+ * One probe per kind of ignore rule that would be too broad: a rule that catches
+ * any of these is dropping market payload, not ignoring a file of this
+ * repository's own.
+ *
+ * The names the two sides deliberately share are absent on purpose —
+ * `node_modules/`, `.DS_Store` and `Thumbs.db` are excluded by
+ * `sync-market-tree.mjs` too, and `.env` is kept global for secret hygiene, so
+ * listings can never advertise them and probing them would only add noise.
+ *
+ * `git check-ignore` has no "list your patterns" mode, so this is a smoke test
+ * over representative names, not a proof. It costs one batched call, which is
+ * why it can run on every gate.
+ */
+const PROBE_NAMES = [
+  "build/out.js",
+  "dist/out.js",
+  "logs/run.md",
+  "market-icons/a.svg",
+  ".codebuddy/agents/a.md",
+  ".react-router/x.ts",
+  ".tef_dist/a.js",
+  ".edgeone/a.json",
+  ".cache/a.json",
+  "tmp/a.txt",
+  "coverage/lcov.info",
+  "__pycache__/a.pyc",
+  "dev.log",
+  "server.err",
+];
+
+/**
+ * Where payload actually lives, so probes sit as deep in the tree as an entry's
+ * content does. Probing at the market root would instead flag rules covering
+ * `logs/`, `dist/` or `market-icons/` *there* — the sync's own top-level
+ * exclusions, which agree with git and are therefore not a defect.
+ */
+const probeBase = (market) => `${marketPrefix(market)}/${MANIFESTS[market].contentRoot || "plugins"}/_probe`;
+
+/** The rule behind each path, as `<source>:<line>:<pattern>`; `null` when git cannot answer. */
+export function ignoreRuleMatches(paths) {
+  const result = spawnSync("git", ["check-ignore", "--no-index", "-v", "--stdin"], {
+    cwd: siteRoot,
+    encoding: "utf8",
+    input: paths.length ? `${paths.join("\n")}\n` : "",
+    maxBuffer: 8 << 20,
+  });
+  // `check-ignore` exits 1 when nothing matches; anything above that is fatal.
+  if (result.error || result.status === null || result.status > 1) return null;
+  const matched = new Map();
+  for (const line of (result.stdout ?? "").split("\n")) {
+    const [rule, path] = line.split("\t");
+    if (path) matched.set(path, rule);
+  }
+  return matched;
+}
+
+/** Rule 7 for every market, as `checkMarkets` results ready to merge by market. */
+function ignoreRuleFindings(markets) {
+  const probes = markets.map((market) => ({
+    market,
+    paths: PROBE_NAMES.map((name) => `${probeBase(market)}/${name}`),
+  }));
+  const matched = ignoreRuleMatches(probes.flatMap((probe) => probe.paths));
+  if (matched === null) {
+    console.error("[check-market] ! git cannot answer here — .gitignore was not checked against the market trees");
+    return [];
+  }
+  return probes.flatMap(({ market, paths }) => compareIgnoreRules(market, paths, matched));
 }
 
 /** Rule 6 for every market, as `checkMarkets` results ready to merge by market. */
@@ -401,7 +489,8 @@ async function main() {
   const asJson = argv.includes("--json");
   let errors = 0;
 
-  for (const extra of deliverableFindings(results.map((result) => result.market))) {
+  const markets = results.map((result) => result.market);
+  for (const extra of [...deliverableFindings(markets), ...ignoreRuleFindings(markets)]) {
     results.find((result) => result.market === extra.market)?.findings.push(extra);
   }
 

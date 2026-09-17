@@ -1,8 +1,19 @@
+# Rules in this file describe *this repository's own* files. Two shapes are safe:
+# anchored to the root (`/build/`), or directory-scoped with a middle slash
+# (`.edgeone/*` — git anchors those too). Everything else also matches paths
+# *inside* `market-source/`, which is mirrored market payload: the sync copies
+# it and lists it in `_files.txt`, git then silently refuses to commit it, and
+# every client that mirrors the listing gets a 404 — invisible on the machine
+# that ran the sync, because its disk still has the file. Exclusions for the
+# market tree belong in `scripts/sync-market-tree.mjs` (keep the two in step).
+# `bun run check:market` guards this with probes; that is what `ignore.market-tree`
+# reports. Never add an unanchored directory name or a bare `*.ext` glob.
+
 # React Router generated types/cache
-.react-router/
+/.react-router/
 
 # Build output (React Router SSG → static files)
-build/
+/build/
 
 # Dependencies
 node_modules/
@@ -14,26 +25,34 @@ node_modules/
 
 # Release artifacts (zips are built per release by scripts/release.mjs and
 # uploaded to GitHub Releases; never commit them)
-dist-release/
+/dist-release/
 
-# Logs
-*.log
-*.err
+# Logs — the dev server writes dev.log / dev.err / dev-server.log at the root.
+# Anchored: an unanchored `*.log` also matches a payload file inside the market
+# tree. A market payload *may* ship its own logs; the dependency is on the sync's
+# exclusions, not on these rules.
+/*.log
+/*.err
 
 # OS / editor
 .DS_Store
 Thumbs.db
 
 
-# The IDE's own project folder. Anchored on purpose: an unanchored
-# `.codebuddy/` also matches directories of that name *inside* the mirrored
-# market trees (`…/skills/<skill>/.codebuddy/`). That silently kept real
-# payload files out of the commit while `_files.txt` still advertised them —
-# 84 phantom entries in the experts market, see scripts/sync-market-tree.mjs.
+# The IDE's own project folder. This rule was unanchored until 2026-09-17 and
+# cost the experts market 84 payload files, exactly as the header describes.
 /.codebuddy/
 
 # Tencent Cloud EdgeOne
 .env
 .edgeone/*
 .tef_dist/*
-  
+
+# Deliberately global, unlike the rules above — each one keeps its market-tree
+# counterpart in `scripts/sync-market-tree.mjs`, so nothing is listed that git
+# would refuse:
+#   node_modules/        — npm creates it at any depth; DEEP_EXCLUDES agrees
+#   .DS_Store, Thumbs.db — OS junk; FILE_EXCLUDES agrees
+#   .env above           — secret hygiene outranks market fidelity. If a payload
+#                          ever ships one, `ignore.market-tree` reports it rather
+#                          than dropping it silently.
