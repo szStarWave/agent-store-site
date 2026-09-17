@@ -1,48 +1,42 @@
 #!/usr/bin/env node
 /**
- * Mirror the three local marketplace working trees into `market-source/` and
- * emit a static `_files.txt` listing per market.
+ * 把三个本地市场工作树镜像到 `market-source/`，并为每个市场生成静态 `_files.txt` 清单。
  *
- * Why static listings: the App Server's `url` market fetcher detects
- * `{base}/{market}/_files.txt` and mirrors every listed file over HTTP, so a
- * market served by plain static hosting (EdgeOne Makers) needs the listing
- * pre-generated at publish time — there is no dynamic directory endpoint.
+ * 为什么要静态清单：App Server 的 `url` 市场抓取器会探测
+ * `{base}/{market}/_files.txt`，并通过 HTTP 镜像其中列出的每个文件，所以由纯静态托管
+ * （EdgeOne Makers）提供的市场必须在发布时预先算好清单——不存在动态目录接口。
  *
- * Usage:
- *   bun run sync:tree                     # mirror + emit listings + validate
- *   bun run sync:tree -- --dry-run        # show the diff, change nothing
- *   bun run sync:tree -- --listing-only   # re-emit listings from the mirror, no sources needed
+ * 用法：
+ *   bun run sync:tree                     # 镜像 + 生成清单 + 校验
+ *   bun run sync:tree -- --dry-run        # 只显示差异，不写任何东西
+ *   bun run sync:tree -- --listing-only   # 只从镜像重生成清单，不需要源
  *   bun run sync:tree -- --markets experts=D:\\exp skills=D:\\skl connectors=D:\\con
  *
- * Defaults: each market is read from the runtime's standard working directory
- * (see `DEFAULT_SOURCES` below). Override per market with the env vars
- * MARKET_SRC_EXPERTS / MARKET_SRC_SKILLS / MARKET_SRC_CONNECTORS, or per run
- * with `--markets`.
+ * 默认值：每个市场从运行环境的标准工作目录读取（见下面的 `DEFAULT_SOURCES`）。
+ * 可用环境变量 MARKET_SRC_EXPERTS / MARKET_SRC_SKILLS / MARKET_SRC_CONNECTORS 按市场覆盖，
+ * 或用 `--markets` 按次覆盖。
  *
- * Publish gate (fails the run, so a broken tree never reaches a deployment):
- *   - each market's discovery manifest exists and parses;
- *   - every manifest entry `source` is a relative path that resolves inside
- *     the tree (no absolute paths, no `..`, no backslashes);
- *   - the emitted listing covers every file in the tree (minus itself),
- *     one relative POSIX path per line, no blank/illegal entries.
+ * 发布门禁（不通过即整轮失败，坏树绝不会进到部署）：
+ *   - 每个市场的发现清单存在且能解析；
+ *   - 清单里每个条目的 `source` 都是相对路径，且解析后落在树内
+ *     （不允许绝对路径、不允许 `..`、不允许反斜杠）；
+ *   - 生成的清单覆盖树里的每个文件（除了它自己），每行一个 POSIX 相对路径，
+ *     不留空行与非法条目。
  *
- * Warned, not failed — an entry whose declared `source` ships no payload in the
- * source tree (`grill-me`, `web-access`, … are listed upstream as metadata only).
- * The site mirrors whatever the upstream market actually contains; blocking the
- * whole publish on upstream metadata the site cannot fix would be worse.
+ * 只告警、不失败——条目的 `source` 在源树里没有载荷（`grill-me`、`web-access` 等在上游
+ * 只是元数据）。站点镜像的是上游市场实际有的东西；为站点修不了的上游元数据卡住整个
+ * 发布，只会更糟。
  *
- * Excluded from the mirror (top-level only, so entry content is never
- * silently dropped): `logs/`, `dist/`, `market-icons/`, plus `.git/` and
- * `node_modules/` at any depth, plus the junk file names in `FILE_EXCLUDES`.
+ * 镜像时排除（只排顶层，因此条目内容永远不会被悄悄丢掉）：`logs/`、`dist/`、
+ * `market-icons/`，外加任意层级的 `.git/` 与 `node_modules/`，再加 `FILE_EXCLUDES`
+ * 里的垃圾文件名。
  *
- * **The listing has to describe what git actually delivers.** `listFiles` is
- * the single definition of "in the market" — the sync copies by it, emits the
- * listing from it, and `check-market.mjs` compares against it — so a name
- * `git add` silently refuses must never reach a listing: the App Server mirrors
- * every listed path over HTTP, and one git dropped is a 404 for every client,
- * invisible on the machine that ran the sync (whose disk still has the file).
- * `.gitignore`'s unanchored `.codebuddy/` did exactly that to the experts
- * market: 84 advertised files with nothing behind them in the commit.
+ * **清单必须描述 git 真正会交付的内容。** `listFiles` 是「什么算在市场里」的唯一
+ * 定义——同步按它拷贝、按它生成清单、`check-market.mjs` 拿它做比对——所以 `git add`
+ * 会悄悄拒绝的名字绝不允许进入清单：App Server 会通过 HTTP 镜像清单里的每个路径，
+ * 而一个被 git 丢掉的路径就是每个客户端的一次 404，且在跑同步的机器上完全看不出来
+ * （那台机器的磁盘上还有这个文件）。`.gitignore` 里没锚定的 `.codebuddy/` 对专家市场
+ * 干的正是这件事：84 个文件被列了出来，提交里却什么都没有。
  */
 
 import { createHash } from "node:crypto";
@@ -64,14 +58,12 @@ const DEFAULT_SOURCES = {
 };
 
 /**
- * doc 18 §3 discovery order; the first hit identifies the market kind.
+ * doc 18 §3 的发现顺序；第一个命中项决定了市场种类。
  *
- * `contentRoot` is the directory an entry's `source` is relative to. The plugin
- * market keeps `source: "./plugins/<name>"` at the market root, while the skill
- * and connector markets declare a bare slug (`source: "tencent-docs"`) that
- * lives under a same-named subdirectory — `.codebuddy-skill/marketplace.json`
- * plus `skills/<slug>/`, `.codebuddy-connector/connectors.json` plus
- * `connectors/<slug>/`.
+ * `contentRoot` 是条目 `source` 相对的目录。插件市场在市场根写
+ * `source: "./plugins/<name>"`，而技能与连接器市场声明的是裸 slug
+ * （`source: "tencent-docs"`），它位于同名子目录下——`.codebuddy-skill/marketplace.json`
+ * 加 `skills/<slug>/`，`.codebuddy-connector/connectors.json` 加 `connectors/<slug>/`。
  */
 export const MANIFESTS = {
   experts: { rel: ".codebuddy-plugin/marketplace.json", entries: "plugins", contentRoot: "" },
@@ -83,10 +75,9 @@ export const LISTING = "_files.txt";
 const TOP_EXCLUDES = new Set(["logs", "dist", "market-icons"]);
 const DEEP_EXCLUDES = new Set([".git", "node_modules"]);
 /**
- * Junk file names, excluded at any depth. `git add` refuses them (`.gitignore`)
- * and `import-expert-bundles.mjs` grades a bundle carrying one as junk, so a
- * market tree can hold them on disk while the published tree cannot — see the
- * header note on why the listing must not advertise them.
+ * 垃圾文件名，任意层级都排除。`git add` 会拒绝它们（`.gitignore`），
+ * `import-expert-bundles.mjs` 也把带这类文件的 bundle 判为垃圾，所以市场树在磁盘上
+ * 可以有、已发布的树里不能有——见文件头关于「清单为何不能宣传它们」的说明。
  */
 const FILE_EXCLUDES = new Set([".DS_Store", "Thumbs.db"]);
 
@@ -112,13 +103,11 @@ function parseArgs(argv) {
 const { sources, dryRun, listingOnly } = parseArgs(process.argv.slice(2));
 
 /**
- * Recursively list files under `dir` as POSIX paths relative to it.
+ * 递归列出 `dir` 下的文件，返回相对它的 POSIX 路径。
  *
- * Order is per-level `localeCompare` (the order the published listing uses).
- * Note it is ICU-backed, so CJK filenames can order differently between a
- * zh-CN workstation and a CI runner — expect a handful of reordered lines
- * when syncing from a machine with a different locale. Nothing consumes the
- * order, so it is not worth pinning.
+ * 顺序为逐层 `localeCompare`（已发布清单用的就是这个顺序）。注意它依赖 ICU，
+ * 因此 CJK 文件名在 zh-CN 工作站与 CI runner 上可能排出不同顺序——换一台 locale 不同的
+ * 机器同步时，会有少数几行换位。没有任何东西消费这个顺序，所以不值得钉死。
  */
 export async function listFiles(dir, prefix = "") {
   const out = [];
@@ -139,7 +128,7 @@ export async function listFiles(dir, prefix = "") {
 
 const sha256 = async (file) => createHash("sha256").update(await readFile(file)).digest("hex");
 
-/** added / removed / changed file sets between the tree and its mirror. */
+/** 树与其镜像之间的新增 / 删除 / 变更文件集合。 */
 async function diffMarket(name, srcDir, destDir) {
   const srcFiles = await listFiles(srcDir);
   const destFiles = existsSync(destDir) ? await listFiles(destDir) : [];
@@ -156,7 +145,7 @@ async function diffMarket(name, srcDir, destDir) {
   return { name, srcDir, destDir, srcFiles, added, removed, changed };
 }
 
-/** Delete files that no longer exist upstream, then prune empty directories. */
+/** 删掉上游已不存在的文件，再剪掉空目录。 */
 async function prune(destDir, removed) {
   for (const rel of removed) await rm(path.join(destDir, rel), { force: true });
   const dirs = [...new Set(removed.map((rel) => path.dirname(path.join(destDir, rel))))].sort((a, b) => b.length - a.length);
@@ -165,7 +154,7 @@ async function prune(destDir, removed) {
     try {
       if ((await readdir(dir)).length === 0) await rm(dir, { recursive: true, force: true });
     } catch {
-      // directory already gone
+      // 目录已经没了
     }
   }
 }
@@ -179,9 +168,9 @@ async function copyAll(srcDir, destDir, files) {
 }
 
 /**
- * Publish gate: manifest shape + entry sources + listing/tree agreement.
- * Returns `{ findings, warnings }` — findings block the publish, warnings are
- * upstream gaps the mirror can only report (see the header note).
+ * 发布门禁：清单形状 + 条目 source + 清单/树一致性。
+ * 返回 `{ findings, warnings }`——findings 阻止发布，warnings 是镜像只能上报的
+ * 上游缺口（见文件头说明）。
  */
 async function validate(name, destDir) {
   const findings = [];
@@ -205,7 +194,7 @@ async function validate(name, destDir) {
   for (const [index, entry] of entries.entries()) {
     const label = `${name}: entries[${index}]`;
     const source = entry?.source;
-    if (source === undefined) continue; // source is optional (manifest-only entry)
+    if (source === undefined) continue; // source 可省略（仅登记在清单里的条目）
     if (typeof source !== "string" || source.trim() === "") {
       findings.push(`${label}: source must be a non-empty string`);
       continue;
@@ -227,8 +216,8 @@ async function validate(name, destDir) {
     }
   }
 
-  // The listing is the mirroring contract: it must cover the tree exactly.
-  // Order is not part of the contract — it is emitted in `listFiles` order.
+  // 清单就是镜像契约：它必须与树完全一致。
+  // 顺序不属于契约——它按 `listFiles` 的顺序生成。
   const listed = (await readFile(path.join(destDir, LISTING), "utf8")).split("\n").filter((line) => line !== "");
   const actual = await listFiles(destDir);
   const missing = actual.filter((rel) => !listed.includes(rel));
@@ -245,7 +234,7 @@ async function validate(name, destDir) {
   return { findings, warnings };
 }
 
-/** Validate every market and exit non-zero when anything blocks a publish. */
+/** 校验每个市场，只要有东西挡住发布就以非零码退出。 */
 async function report(markets) {
   const results = await Promise.all(markets.map(({ name, destDir }) => validate(name, destDir)));
   const findings = results.flatMap((r) => r.findings);
@@ -265,8 +254,8 @@ async function report(markets) {
 }
 
 /**
- * Emit one market's listing from the mirror itself — that is what the listing
- * is derived from, so writing it needs nothing else.
+ * 从镜像本身生成某个市场的清单——清单正是由它推导出来的，
+ * 所以写它不需要任何别的东西。
  */
 async function writeListing(destDir) {
   const files = await listFiles(destDir);
@@ -275,13 +264,11 @@ async function writeListing(destDir) {
 }
 
 /**
- * Re-emit the listings from the mirror alone, without reading any source.
+ * 只靠镜像重生成清单，不读任何源。
  *
- * The upstream working copies are per-machine (see `DEFAULT_SOURCES`), while
- * the mirror travels with the repository. So when the exclusion rules change,
- * a machine that does not own the sources has no other way to bring the
- * committed listings back in line — and a listing that disagrees with the tree
- * is exactly the drift this script's gate exists to catch.
+ * 上游工作副本是每台机器各自的（见 `DEFAULT_SOURCES`），而镜像是跟仓库走的。
+ * 所以当排除规则变了，一台没有源的机器别无办法把已提交的清单重新对齐——
+ * 而清单与树不一致，正是本脚本门禁存在的理由。
  */
 async function relist() {
   const markets = Object.keys(MANIFESTS);
@@ -353,7 +340,7 @@ export async function main() {
   await report(diffs);
 }
 
-// Exported for `check-market.mjs` (shared listing/manifest definitions). Only run
-// the mirror when invoked as a CLI, so importing this file stays side-effect free.
+// 供 `check-market.mjs` 导入（共享清单/市场定义）。只在作为 CLI 调用时才执行镜像，
+// 因此 import 本文件没有副作用。
 const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (invokedDirectly) await main();

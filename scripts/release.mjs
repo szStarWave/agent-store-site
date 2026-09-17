@@ -134,9 +134,9 @@ function zipSingle(zipPath, entryName, { data, crc, usize }, mtime) {
 
   const lfh = Buffer.alloc(30);
   lfh.writeUInt32LE(0x04034b50, 0);
-  lfh.writeUInt16LE(20, 4); // version needed
-  lfh.writeUInt16LE(0x0800, 6); // flags: UTF-8 entry name
-  lfh.writeUInt16LE(8, 8); // deflate
+  lfh.writeUInt16LE(20, 4); // 需要的版本
+  lfh.writeUInt16LE(0x0800, 6); // 标志位：UTF-8 条目名
+  lfh.writeUInt16LE(8, 8); // deflate 压缩
   lfh.writeUInt16LE(time, 10);
   lfh.writeUInt16LE(date, 12);
   lfh.writeUInt32LE(crc, 14);
@@ -148,8 +148,8 @@ function zipSingle(zipPath, entryName, { data, crc, usize }, mtime) {
 
   const cd = Buffer.alloc(46);
   cd.writeUInt32LE(0x02014b50, 0);
-  cd.writeUInt16LE(20, 4); // version made by
-  cd.writeUInt16LE(20, 6); // version needed
+  cd.writeUInt16LE(20, 4); // 创建者版本
+  cd.writeUInt16LE(20, 6); // 需要的版本
   cd.writeUInt16LE(0x0800, 8);
   cd.writeUInt16LE(8, 10);
   cd.writeUInt16LE(time, 12);
@@ -158,15 +158,15 @@ function zipSingle(zipPath, entryName, { data, crc, usize }, mtime) {
   cd.writeUInt32LE(data.length, 20);
   cd.writeUInt32LE(usize, 24);
   cd.writeUInt16LE(name.length, 28);
-  cd.writeUInt32LE(0, 42); // relative offset of local header
+  cd.writeUInt32LE(0, 42); // 本地文件头的相对偏移
   const central = Buffer.concat([cd, name]);
 
   const eocd = Buffer.alloc(22);
   eocd.writeUInt32LE(0x06054b50, 0);
-  eocd.writeUInt16LE(1, 8); // entries on this disk
-  eocd.writeUInt16LE(1, 10); // total entries
+  eocd.writeUInt16LE(1, 8); // 本磁盘上的条目数
+  eocd.writeUInt16LE(1, 10); // 条目总数
   eocd.writeUInt32LE(central.length, 12);
-  eocd.writeUInt32LE(local.length, 16); // central directory offset
+  eocd.writeUInt32LE(local.length, 16); // 中央目录偏移
   writeFileSync(zipPath, Buffer.concat([local, central, eocd]));
 }
 

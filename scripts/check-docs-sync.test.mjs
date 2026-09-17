@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { checkDocs, compareSkeletons, scanDoc, selfTestCases } from "./check-docs-sync.mjs";
 
-/** Build a fixture document from explicit lines (keeps backticks readable). */
+/** 用显式行拼一个夹具文档（这样反引号更好读）。 */
 const doc = (...lines) => `${lines.join("\n")}\n`;
 
 const SAMPLE = doc(
@@ -97,8 +97,8 @@ describe("compareSkeletons", () => {
       scanDoc(SAMPLE),
       scanDoc(SAMPLE.replace("[other](./other.md)", "[other](./elsewhere.md)")),
     );
-    // Renaming a target is two facts — one lost on the zh side, one added on
-    // the en side — so both directions must be reported.
+    // 改链接目标是两件事——zh 侧丢了一个、en 侧多了一个——
+    // 所以两个方向都必须报出来。
     expect(findings.map((entry) => entry.rule)).toEqual(["link.targets", "link.targets"]);
     expect(findings[0].message).toContain("only in zh: other.md");
     expect(findings[1].message).toContain("only in en: elsewhere.md");

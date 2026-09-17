@@ -1,29 +1,27 @@
 #!/usr/bin/env node
 /**
- * Guard this site's bilingual documentation against structural drift.
+ * 守住本站双语文档的结构一致性，防止译文悄悄跑偏。
  *
- * `content/docs/{zh-CN,en-US}/` ships the same 9 pages in two languages.
- * Translations are free to change words, but they must not change *structure*:
- * a dropped section, a lost code sample, a table that gained a column or a
- * relative link that only exists in one language is a defect a reader hits.
- * Line counts are NOT a criterion — they coincide by accident today and would
- * be a false gate tomorrow.
+ * `content/docs/{zh-CN,en-US}/` 是同样 9 个页面的两种语言。译文可以自由改措辞，
+ * 但不能改*结构*：掉了一节、丢了一个代码示例、表格多了一列、相对链接只存在于一种
+ * 语言里——这些都是读者会真撞上的缺陷。行数不是判据——它们今天碰巧接近，
+ * 明天就会变成误报的门禁。
  *
- * Moved here from the `nomifun-tauri` monorepo when the site became its own
- * repository: the pages this guards live here, so the guard lives here too.
+ * 站点独立成仓时从 `nomifun-tauri` monorepo 挪到这里：被守护的页面在这里，
+ * 守护脚本自然也在这里。
  *
- * What is compared, per page:
- *   1. heading level sequence      (`#` / `##` / `###` …)
- *   2. fenced code blocks          (count, then language tag sequence)
- *   3. table column counts         (sequence of widths)
- *   4. relative link targets       (set of `[..](path)` targets, anchors stripped)
+ * 逐页比较的内容：
+ *   1. 标题层级序列        （`#` / `##` / `###` …）
+ *   2. 围栏代码块          （数量，然后是语言标记序列）
+ *   3. 表格列数            （列宽序列）
+ *   4. 相对链接目标        （`[..](path)` 目标集合，剥掉锚点）
  *
- * Every finding points at both sides: `zh-CN/<file>:<line> ↔ en-US/<file>:<line>`.
+ * 每条发现都同时指向两侧：`zh-CN/<file>:<line> ↔ en-US/<file>:<line>`。
  *
- *   node scripts/check-docs-sync.mjs                 # check every page (exit 1 on drift)
- *   node scripts/check-docs-sync.mjs --doc cli.md    # one page
+ *   node scripts/check-docs-sync.mjs                 # 检查全部页面（有漂移则退出码 1）
+ *   node scripts/check-docs-sync.mjs --doc cli.md    # 只查一页
  *   node scripts/check-docs-sync.mjs --json
- *   node scripts/check-docs-sync.mjs --self-test     # the checker itself must reject drift
+ *   node scripts/check-docs-sync.mjs --self-test     # 检查器自身必须能拒绝漂移
  */
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -39,25 +37,25 @@ const TABLE_ROW = /^\s*\|.*\|\s*$/;
 const TABLE_SEP = /^\s*\|[\s:|-]*-[\s:|-]*\|\s*$/;
 const LINK = /\[[^\]]*\]\(([^)\s]+)\)/g;
 
-/** Link targets that are not repo-relative paths (external, anchors, mail). */
+/** 非仓库相对路径的链接目标（外链、锚点、邮件）。 */
 function isExternalTarget(target) {
   return /^(https?:|mailto:|tel:|#)/i.test(target);
 }
 
-/** Strip `./`, backslashes and any `#anchor` — only the file identity matters. */
+/** 剥掉 `./`、反斜杠和 `#锚点`——只有文件身份有意义。 */
 function normalizeTarget(target) {
   const withoutAnchor = target.split("#")[0];
   const slashed = withoutAnchor.replace(/\\/g, "/").replace(/^\.\//, "").trim();
-  // Site routes are language-scoped by design: `/zh-CN/docs/cli` and
-  // `/en-US/docs/cli` are the SAME page. The language segment therefore
-  // carries no structural information and must not read as drift.
+  // 站点路由按设计带语言前缀：`/zh-CN/docs/cli` 与
+  // `/en-US/docs/cli` 是同一个页面。因此语言段不携带任何
+  // 结构信息，不能算作漂移。
   for (const lang of LANGS) {
     if (slashed.startsWith(`/${lang}/`)) return slashed.slice(lang.length + 1);
   }
   return slashed;
 }
 
-/** Cells in a markdown table row, honouring `\|` escapes. */
+/** markdown 表格行里的单元格数，正确处理 `\|` 转义。 */
 function countCells(line) {
   const cells = line.replace(/\\\|/g, "\u0000").split("|");
   if (cells.length > 0 && cells[0].trim() === "") cells.shift();
@@ -66,8 +64,8 @@ function countCells(line) {
 }
 
 /**
- * Structural skeleton of one page. Deliberately blind to prose, so a
- * translation can be rewritten freely as long as the shape survives.
+ * 单页的结构骨架。刻意对正文视而不见，因此译文可以随意重写，
+ * 只要形状还在。
  */
 export function scanDoc(text) {
   const lines = text.split(/\r?\n/);
@@ -96,7 +94,7 @@ export function scanDoc(text) {
 
     if (TABLE_ROW.test(line) && TABLE_SEP.test(lines[i + 1] ?? "")) {
       tables.push({ cols: countCells(line), line: i + 1 });
-      // Consume the whole table so its body rows are not re-tested.
+      // 整张表一次消费掉，表体行不再重复匹配。
       i += 2;
       while (i + 1 < lines.length && TABLE_ROW.test(lines[i + 1])) i += 1;
       continue;
@@ -127,7 +125,7 @@ function finding(rule, message, zhLine, enLine) {
 }
 
 /**
- * Compare two skeletons. `file` is the shared page name, used only for messages.
+ * 比较两个骨架。`file` 是两语言共用的页面名，仅用于消息。
  */
 export function compareSkeletons(zh, en, file = "page.md") {
   const findings = [];
@@ -204,7 +202,7 @@ export function compareSkeletons(zh, en, file = "page.md") {
   return findings.map((entry) => ({ ...entry, file }));
 }
 
-/** Page names present in either language, plus the ones missing on one side. */
+/** 任一侧出现的页面名，外加只在单侧缺失的那些。 */
 function listPages(only) {
   const byLang = new Map();
   for (const lang of LANGS) {
@@ -245,7 +243,7 @@ export function checkDocs(only) {
   return results;
 }
 
-// ── self-test: the checker must reject drift, not just accept everything ─────
+// ── 自检：检查器必须能拒绝漂移，而不是照单全收 ──────────────────────────────
 
 const FIXTURE = [
   "# Title",
@@ -340,7 +338,7 @@ function runSelfTest() {
   return failures === 0;
 }
 
-// ── CLI ─────────────────────────────────────────────────────────────────────
+// ── 命令行入口 ───────────────────────────────────────────────────────────────
 
 function main() {
   const argv = process.argv.slice(2);
