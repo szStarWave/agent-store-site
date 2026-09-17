@@ -27,7 +27,8 @@ The table is derived from registry metadata and from the published artifacts (co
 | `0.1.0` | 2026-09-09T09:09:04Z | none | first publish; for all three packages the **code and type declarations are byte-identical to beta.2**, only `package.json` differs: the sdk had no `optionalDependencies` then (no platform runtime packages attached) |
 | `0.1.0-beta.2` | 2026-09-09T09:27:36Z | `latest` | adds the sdk `optionalDependencies` (five platform runtime packages for darwin / linux / win32, same version) |
 | `0.1.0-beta.3` | 2026-09-10T04:44:34Z | — | adds public declarations to client / sdk (reconnect lifecycle, exit observation, see §6.1); `package.json` gains `engines.node >= 22`, `repository` and `sideEffects`; the protocol declarations are unchanged byte for byte |
-| `0.1.0-beta.4` | 2026-09-16T10:24:02Z | `beta` | **breaking**: the protocol fingerprint became the strict-equality `fp-1` (older clients cannot connect to this runtime) and `event_type` was narrowed to the closed union `ConversationEventType`; it also carries the Skill file-tree read face, the `connector/call` proxy and `conversation/list-changed` (steps in §6.3); the client now maps `48 / 71` methods over HTTP |
+| `0.1.0-beta.5` | 2026-09-17T11:41:10Z | `beta` | **breaking**: the protocol fingerprint jumped from `fp-1` to `fp-7` (older clients cannot connect to the new runtime); everything else is additive — the connector tool's `input_schema` / `tools_truncated`, per-turn Skill mounting (`mentions` honours `kind: "skill"` only), `agent_id` / `team_id`, `model` / `reasoning_effort`, and the new `zip` marketplace source kind. No methods added or removed, still `48 / 71` (steps in §6.4) |
+| `0.1.0-beta.4` | 2026-09-16T10:24:02Z | — | **breaking**: the protocol fingerprint became the strict-equality `fp-1` (older clients cannot connect to this runtime) and `event_type` was narrowed to the closed union `ConversationEventType`; it also carries the Skill file-tree read face, the `connector/call` proxy and `conversation/list-changed` (steps in §6.3); the client now maps `48 / 71` methods over HTTP |
 
 Note that `0.1.0` is the **earliest** publish (about 18 minutes before beta.2) and yet no dist-tag points at it; it is neither a stable release nor newer than the beta line.
 
@@ -38,9 +39,9 @@ A `dist-tag` is a label the publisher can move; it says nothing about version or
 | dist-tag | Points at today |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.4` |
+| `beta` | `0.1.0-beta.5` |
 
-`0.1.0` carries no tag at all. The three packages and `@flowy-agent-store/runtime-*` agree on both tags (verified 2026-09-16).
+`0.1.0` carries no tag at all. The three packages and `@flowy-agent-store/runtime-*` agree on both tags (verified).
 
 ```bash
 npm view @flowy-agent-store/sdk versions dist-tags --json
@@ -48,14 +49,14 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.4", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.5", "latest": "0.1.0-beta.2" }
 }
 ```
 
 Two traps:
 
-1. `latest` is **not** the newest version — it points at `0.1.0-beta.2`, while the newest beta is `0.1.0-beta.4` under the `beta` tag.
+1. `latest` is **not** the newest version — it points at `0.1.0-beta.2`, while the newest beta is `0.1.0-beta.5` under the `beta` tag.
 2. `0.1.0` has no tag, but a version range can still resolve to it (see §4).
 
 Also note that the `versions` array is **not** in chronological order: `0.1.0` is listed last and was published first.
@@ -68,7 +69,7 @@ Measured in throwaway directories with an empty `node_modules`:
 
 ```bash
 bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2 (latest)
-bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.4
+bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.5
 bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → bun resolves 0.1.0-beta.2
 npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → npm resolves 0.1.0 (the untagged early publish)
 ```
@@ -79,14 +80,14 @@ Conclusion: **do not rely on range resolution**. A tag alias is no safer — `la
 
 ```bash
 # Write the exact version; avoid ^ and ~
-bun add @flowy-agent-store/sdk@0.1.0-beta.4
-bun add @flowy-agent-store/protocol@0.1.0-beta.4   # when you import wire types
+bun add @flowy-agent-store/sdk@0.1.0-beta.5
+bun add @flowy-agent-store/protocol@0.1.0-beta.5   # when you import wire types
 
 # same for npm / pnpm
-npm install @flowy-agent-store/sdk@0.1.0-beta.4
+npm install @flowy-agent-store/sdk@0.1.0-beta.5
 ```
 
-`package.json` should end up with `"@flowy-agent-store/sdk": "0.1.0-beta.4"` (**no** `^`). The sdk's platform runtime packages are pinned to the same version by its `optionalDependencies`, so they need no separate entry.
+`package.json` should end up with `"@flowy-agent-store/sdk": "0.1.0-beta.5"` (**no** `^`). The sdk's platform runtime packages are pinned to the same version by its `optionalDependencies`, so they need no separate entry.
 
 Commit the lockfile too: `bun.lock` / `package-lock.json` / `pnpm-lock.yaml` is the only authoritative record of what an install actually pulled.
 
@@ -118,11 +119,11 @@ If you point `AGENT_STORE_BIN` at a self-built binary, note that the SDK **check
 
 ```bash
 # move off the untagged 0.1.0 onto the current beta line (current beta: see §3)
-bun add @flowy-agent-store/sdk@0.1.0-beta.4
+bun add @flowy-agent-store/sdk@0.1.0-beta.5
 bun pm ls | grep '@flowy-agent-store'   # confirm 0.1.0 is gone
 ```
 
-The move from `0.1.0` to `beta.3` is additive: the public declaration surface only grew (the runtime packages added in `beta.2`, the reconnect and exit observation added in `beta.3`) — nothing was removed or renamed. **`beta.4` is not additive** — it carries type narrowing and a strict-equality protocol fingerprint, see §6.3.
+The move from `0.1.0` to `beta.3` is additive: the public declaration surface only grew (the runtime packages added in `beta.2`, the reconnect and exit observation added in `beta.3`) — nothing was removed or renamed. **`beta.4` is not additive** — it carries type narrowing and a strict-equality protocol fingerprint, see §6.3; **`beta.5` is not additive either** (the fingerprint is compared for strict equality again), but it needs **no code changes**, see §6.4.
 
 ### 6.3 From 0.1.0-beta.3 to 0.1.0-beta.4
 
@@ -147,6 +148,31 @@ Two differences you have to handle:
 
 The additive items need no code changes: the Skill file-tree read face (`skill/files` / `skill/file`), the Connector call proxy (`connector/call`, off by default), the `conversation/list-changed` notification, and so on.
 
+### 6.4 From 0.1.0-beta.4 to 0.1.0-beta.5
+
+The fingerprint is compared for strict equality again (`fp-1` → `fp-7`), so upgrading is **mandatory**; but this release has **no type narrowing and no methods added or removed**, so **no code changes are required**:
+
+```bash
+# 1) see what is actually installed
+bun pm ls | grep '@flowy-agent-store'          # npm projects: npm ls @flowy-agent-store/sdk
+# 2) pin 0.1.0-beta.5 (upgrade the packages you use, on one version)
+bun add @flowy-agent-store/sdk@0.1.0-beta.5
+bun add @flowy-agent-store/protocol@0.1.0-beta.5
+# 3) confirm what got resolved
+node -p "require('@flowy-agent-store/sdk/package.json').version"
+# 4) re-run your type check and tests — it should pass with zero changes
+bun run typecheck && bun run test
+```
+
+The only thing you have to handle is the **fingerprint**: `0.1.0-beta.4` reports `fp-1`, this release reports `fp-7`. If you point `AGENT_STORE_BIN` at a self-built binary, upgrade the SDK and the binary **together** (or move to `@flowy-agent-store/runtime-win32-x64@0.1.0-beta.5`).
+
+The optional fields added (none of which changes existing behaviour): `ConnectorTool.input_schema`, `ConnectorDetail.tools_truncated`, `ConnectorProbeResult.tools_truncated`, `ConversationCreateInput.agentId` / `teamId`, `AgentRunInput.model` / `reasoningEffort`, `ConversationView.reasoning_effort`, and `MarketplaceSourceKind`'s `"zip"`.
+
+Two **behaviour** changes (the signatures are unchanged, so type checking will not catch them):
+
+1. **The host config `[connector_proxy]` grant shape** (`fp-2`): `allow` went from a **mandatory per-tool allowlist** to an **optional narrowing**, and `deny` was added (it subtracts **after** `allow`). The semantics are now: `enabled = true` with **no** `allow` ⇒ every tool of that connector is **callable**; writing an `allow` narrows to it, and an `allow` that is present but empty (`allow = []`) ⇒ **nothing is callable**; with no such table at all ⇒ nothing is callable. So **a host that previously wrote only `enabled = true` without listing tools one by one ends up with a wider grant surface after upgrading** — re-read that table; a warning is logged at startup for exactly this case (`enabled with neither "allow" nor "deny"`), so use it as the checklist.
+2. **`conversation/send`'s `mentions` honours `kind: "skill"` only** (`fp-3`): `agent` / `connector` are explicitly refused with `invalid_request`. The field's type surface already shipped in `0.1.0-beta.4`, so this one is only visible at runtime.
+
 ## 7. Check which version you actually have
 
 ```bash
@@ -164,7 +190,7 @@ When the three disagree, trust the **lockfile and the installed `package.json`**
 
 ## 8. Published-artifact differences and how to check them
 
-As of `0.1.0-beta.4` (2026-09-16), **the working tree leads the published artifacts**: after `0.1.0-beta.4` it accumulated the protocol fingerprint move `fp-1` → **`fp-2`** — each connector tool's `input_schema` (a `ConnectorTool` field) plus `tools_truncated` on `ConnectorDetail` / `ConnectorProbeResult`, with **no methods added or removed** (still `48 / 71` mapped); the same batch also changed the host's `[connector_proxy]` grant shape (`allow` became optional narrowing, `deny` was added, and an enabled proxy now means callable). The working tree went on to `fp-2` → `fp-3` (`mentions` on `conversation/send`), `fp-3` → `fp-4` (`agent_id` on `conversation/create`), `fp-4` → `fp-5` (`team_id`) and `fp-5` → `fp-6` (`model` and `reasoning_effort` on `send` / `agent/run`), and at `fp-6` → `fp-7` moved the official marketplace sources onto zip archives on ModelScope. None of this has shipped in any version yet; for what `0.1.0-beta.4` changed relative to `0.1.0-beta.3`, see §2.1 of the [Changelog](/en-US/docs/changelog).
+As of `0.1.0-beta.5` (2026-09-17), **there is no unpublished protocol difference between the working tree and the published artifacts**: all six increments from `fp-1` to `fp-7` shipped with this version, listed one by one in §2.1 of the [Changelog](/en-US/docs/changelog); for what `0.1.0-beta.4` changed relative to `0.1.0-beta.3`, see §2.2 of the same page. The commands below are how you check that — fetch the published artifacts of any two versions and read them side by side.
 
 ### 8.1 Migrating a config's marketplace sources
 
@@ -216,9 +242,19 @@ grep -n 'event_type:\|APP_SERVER_PROTOCOL_VERSION' package/dist/index.d.mts
 # export declare const APP_SERVER_PROTOCOL_VERSION = "fp-1";
 # event_type: ConversationEventType;   ← ConversationEvent (narrowed)
 # event_type: string;                  ← RunEvent, a separate declaration, deliberately open
+
+# beta.5: the fingerprint jumps from fp-1 to fp-7, and the only additions are optional fields
+mkdir -p b4 b5
+(cd b4 && npm pack @flowy-agent-store/protocol@0.1.0-beta.4 --silent && tar xzf *.tgz)
+(cd b5 && npm pack @flowy-agent-store/protocol@0.1.0-beta.5 --silent && tar xzf *.tgz)
+grep -n 'APP_SERVER_PROTOCOL_VERSION' b5/package/dist/index.d.mts
+# export declare const APP_SERVER_PROTOCOL_VERSION = "fp-7";
+diff <(grep -o '^export [a-z]* [A-Za-z]*' b4/package/dist/index.d.mts) \
+     <(grep -o '^export [a-z]* [A-Za-z]*' b5/package/dist/index.d.mts)
+# (no output) 141 export names, neither more nor fewer → only fields were added, no declaration was narrowed or deleted
 ```
 
-The same works on the client side: install `@flowy-agent-store/client` into a throwaway directory and count the keys of `httpRouteTable()` — that is the mapped number quoted in §5.3 (`0.1.0-beta.4` reports 48).
+The same works on the client side: install `@flowy-agent-store/client` into a throwaway directory and count the keys of `httpRouteTable()` — that is the mapped number quoted in §5.3 (`0.1.0-beta.5` reports 48). For the protocol side's "no types added or removed", the `diff` above that counts export names is enough — `0.1.0-beta.4` and `0.1.0-beta.5` are both **141**.
 
 ## 9. Changelog and release notes boundary
 

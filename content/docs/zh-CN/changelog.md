@@ -21,27 +21,43 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.4", "latest": "0.1.0-beta.2" },
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.5", "latest": "0.1.0-beta.2" },
   "time": {
     "0.1.0": "2026-09-09T09:09:04.795Z",
     "0.1.0-beta.2": "2026-09-09T09:27:36.122Z",
     "0.1.0-beta.3": "2026-09-10T04:44:34.609Z",
-    "0.1.0-beta.4": "2026-09-16T10:24:02.588Z"
+    "0.1.0-beta.4": "2026-09-16T10:24:02.588Z",
+    "0.1.0-beta.5": "2026-09-17T11:41:10.171Z"
   }
 }
 ```
 
 | 版本 | 发布（UTC） | 变更类型 | 当前 dist-tag |
 | --- | --- | --- | --- |
-| `0.1.0-beta.4` | 2026-09-16 | 破坏性（协议指纹严格相等 + 类型收窄） | `beta` |
+| `0.1.0-beta.5` | 2026-09-17 | 破坏性（协议指纹严格相等：`fp-1` → `fp-7`） | `beta` |
+| `0.1.0-beta.4` | 2026-09-16 | 破坏性（协议指纹严格相等 + 类型收窄） | — |
 | `0.1.0-beta.3` | 2026-09-10 | 加法（无破坏性） | — |
 | `0.1.0-beta.2` | 2026-09-09 | 加法（无破坏性） | `latest` |
 | `0.1.0` | 2026-09-09 | 首次发布 | 无 |
 
 `versions` 的排列顺序**不是**时间顺序：`0.1.0` 排在最后，却是**最早**的一次发布（比 `beta.2` 早约 18 分钟），且不带任何 dist-tag。它不是稳定版，也不比 beta 线新——dist-tag 语义见[升级与迁移指引](/zh-CN/docs/upgrade) §3。
 
-### 2.1 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
+### 2.1 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
+
+> **本版含破坏性变更**：`0.1.0-beta.4` 及更早版本的客户端**连不上**本版运行时，必须一并升级（步骤见[升级与迁移指引](/zh-CN/docs/upgrade) §6.4）。
+
+- **破坏性 — 协议指纹从 `fp-1` 跳到 `fp-7`**：本版一次性发布工作区里积累的六次递增。指纹**不改变任何 wire 行为**，但握手与 SDK 对它做**严格相等**校验，所以按 `fp-1` 编出来的客户端会被本版运行时拒绝。经 `AGENT_STORE_BIN` 注入自建二进制时，SDK 与二进制必须同批升级。
+- **加法 — `fp-2` 连接器工具的参数面**：`ConnectorTool` 新增 `input_schema`（上游 `tools/list` 的原样 schema），`ConnectorDetail` / `ConnectorProbeResult` 新增 `tools_truncated`（为守住宿主的工具预算而**诚实省略**，schema 只会整条带或整条不带）。同一批改了**宿主配置** `[connector_proxy]` 的授权形状：`allow` 变为可选并收窄语义、新增 `deny`，`enabled = true` 即**默认可调**，取代此前强制的逐工具白名单——这是宿主配置面的变化，不改 npm 包的类型面，但自建宿主需要重读该表。
+- **加法 — `fp-3` 技能可按轮挂载**：`conversation/send` 的 `mentions` 只认 `kind: "skill"`，`agent` / `connector` 两类以 `invalid_request` **显式拒绝**。注意 `MentionRef` / `mentions` 的**类型面在 `0.1.0-beta.4` 的已发布声明里已经存在**（那版的 `index.d.mts` 已含 `MentionKind` / `MentionRef` 与两处 `mentions`）；本版带来的是宿主侧语义与随之而来的指纹递增。
+- **加法 — `fp-4` 会话可以建成一个已安装专家**：`conversation/create` 新增 `agent_id`。专家的 preset 身份、它自带的技能与连接器一并**冻结**进会话，此后不可改写（换专家＝新建会话）。
+- **加法 — `fp-5` 专家团的 Leader 会话**：`conversation/create` 新增 `team_id`，与 `team/run` 共用同一段编排（成员校验、模板、会话栅栏），唯一区别是**不发 `goal` 首轮**，第一句话由调用方说。`agent_id` 与 `team_id` **互斥**。
+- **加法 — `fp-6` 按调用选模型与思考等级**：`conversation/send` 与 `agent/run` 各新增 `model` / `reasoning_effort`，`ConversationView` 新增 `reasoning_effort`（此前三条写入路径存在、却没有任何读面）。语义是**粘性**的：`send` 上带的值写进会话行、**从这条消息起生效**并此后每轮沿用；`agent/run` 上带的值只作用于**那次运行**。会话正跑着一个 turn 时 `send` 的切换会被拒（`conflict`）。
+- **加法 — `fp-7` 市场源新增 `zip` 类型**：`MarketplaceSourceKind` 新增 `"zip"`——一个 **HTTP(S) 归档**，**归档根目录即市场根**（清单在归档根，不套一层目录）。官方三个市场（`experts` / `skills` / `connectors`）随之从本站的 `/source/<market>/…` 逐文件树迁到 ModelScope 上的三个 zip 归档；归档的 sha256 就是 revision（对稳定 URL 发 `HEAD` 读 `X-Linked-Etag`），内容未变即不下载。`url` / `github` / `git` / `directory` 全部保留，第三方源继续可用整树镜像。手改配置的迁移做法见[升级与迁移指引](/zh-CN/docs/upgrade) §8.1。
+- **无方法增删**：客户端映射到 HTTP 的方法数仍是 **48 / 71**。
+- **升级影响**：**必须升级**（指纹严格相等），**无需改代码**——把相邻两版的已发布产物取回来对读（命令见[升级与迁移指引](/zh-CN/docs/upgrade) §8），141 个导出**一个不多一个不少**，新增的只有可选字段，没有任何声明被收窄或删除。
+
+### 2.2 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
 
 > **本版含破坏性变更**：`0.1.0-beta.3` 及更早版本的客户端**连不上**本版运行时，必须一并升级（步骤见[升级与迁移指引](/zh-CN/docs/upgrade) §6.3）。
 
@@ -53,7 +69,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - **加法 — 新通知** `conversation/list-changed`：会话**列表**投影的 `created` / `updated` / `deleted`；不设订阅门槛、不带 `sequence`。
 - **升级影响**：**需要改代码**（类型收窄）且**必须升级**（指纹严格相等），步骤见[升级与迁移指引](/zh-CN/docs/upgrade) §6.3。
 
-### 2.2 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
+### 2.3 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
 
 - **client**：新增公开声明 `TransportLifecycle`、`onLifecycle`、`connectTimeoutMs`，以及订阅状态机的 `rearm()`。
 - **sdk**：新增公开声明 `assertProtocolCompatible`、`SpawnOptions.env` / `cwd` / `onExit`、`SpawnedServer.exited`、`SpawnExitInfo`。
@@ -61,13 +77,13 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - **protocol**：类型声明**逐字节未变**。
 - **升级影响**：从 `0.1.0-beta.2` 升级**无需改代码**，步骤见[升级与迁移指引](/zh-CN/docs/upgrade) §6.1。
 
-### 2.3 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
+### 2.4 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
 
 - **sdk**：补齐 `optionalDependencies`，按同一版本号钉住五个平台运行时包——`runtime-win32-x64`、`runtime-linux-x64`、`runtime-linux-arm64`、`runtime-darwin-x64`、`runtime-darwin-arm64`。
 - 此前的 `0.1.0` 没有这份依赖，`launchClient` 可能因此找不到可执行文件（见[升级与迁移指引](/zh-CN/docs/upgrade) §6.2）。
 - 它是 `latest` 标签当前指向的版本——**不是最新版**。
 
-### 2.4 `0.1.0` — 2026-09-09T09:09:04Z
+### 2.5 `0.1.0` — 2026-09-09T09:09:04Z
 
 - **首次发布**：三个包的第一个公开版本；没有更早的版本可破坏，因此不含破坏性变更。
 - 三个包的**代码与类型声明与 `0.1.0-beta.2` 逐字节相同**，差别只在 `package.json`——sdk 当时**没有** `optionalDependencies`。
@@ -98,21 +114,9 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-截至 `0.1.0-beta.4`（2026-09-16），**工作区（`web/packages/*`）领先于已发布产物**：`0.1.0-beta.4` 之后工作区又积累了协议指纹 `fp-1` → **`fp-2`** 的增量——连接器工具的 `input_schema`（`ConnectorTool` 加字段）与 `ConnectorDetail` / `ConnectorProbeResult` 的 `tools_truncated`，**无方法增删**（映射数仍是 `48 / 71`）——以及宿主配置 `[connector_proxy]` 授权形状的变更（`allow` 变可选收窄、新增 `deny`，`enabled` 为真即默认可调，取代此前的强制逐工具白名单）。这些**尚未随任何版本发布**，自查方法见[升级与迁移指引](/zh-CN/docs/upgrade) §8。
+截至 `0.1.0-beta.5`（2026-09-17），**工作区与已发布产物之间没有未发布的协议差异**：`0.1.0-beta.4` 之后积累的六次指纹递增（`fp-1` → `fp-7`）已全部随本版发布，逐条见 §2.1。上一版留下的这份台账因此清零。
 
-其上再叠加 **`fp-2` → `fp-3`** 的增量：`conversation/send` 新增可选的 `mentions`（现有 DTO **加字段**），**只认 `kind: "skill"`**，让单轮消息可以挂载技能；`agent` / `connector` 两类以 `invalid_request` **显式拒绝**（它们在 `send` 上没有载体）。同样**无方法增删**，`48 / 71` 不变。
-
-再叠加 **`fp-3` → `fp-4`**：`conversation/create` 新增可选的 `agent_id`（同为现有 DTO **加字段**），把一个会话**建成某个已安装专家**——该专家的 preset 身份、它自带的技能与连接器一并冻结进会话，此后不可改写（`conversation/update` 拒绝 preset / 技能 / 连接器键；换专家＝新建会话）。仍然**无方法增删**。
-
-再叠加 **`fp-4` → `fp-5`**：`conversation/create` 新增可选的 `team_id`（同样**加字段**），用来**打开某个专家团的 Leader 会话**——与 `team/run` 共用同一段编排（成员校验、物化/复用执行模板、会话栅栏），唯一区别是**不发 `goal` 首轮**，第一句话由调用方说。`agent_id` 与 `team_id` **互斥**。仍然**无方法增删**。
-
-再叠加 **`fp-5` → `fp-6`**：`conversation/send` 与 `agent/run` 各新增可选的 `model` 与 `reasoning_effort`（都是**给现有 DTO 加字段**），让调用方在**发起这次调用时**指定模型与思考等级；`ConversationView` 同时新增 `reasoning_effort`，把会话当前的等级**读得回来**（此前三条写入路径存在、却没有任何读面）。语义是**粘性**的：`send` 上带的值写进会话行，**从这条消息起生效**、此后每轮沿用——Nomi 运行时按会话行构建，所以这**不是**「只影响这一轮」；`agent/run` 上带的值只作用于**那次运行**（优先级：显式 > preset 自带 > 宿主默认），随快照落到该运行的每个 attempt。会话正跑着一个 turn 时 `send` 的切换会被拒（`conflict`）。仍然**无方法增删**，`48 / 71` 不变。
-
-再叠加 **`fp-6` → `fp-7`**：`AppServerMarketplaceSourceKind` 新增枚举值 `zip`——一个 **HTTP(S) 归档**，**归档根目录即市场根**（清单在归档根，不套一层目录）。官方三个市场（`experts` / `skills` / `connectors`）随之从本站的 `/source/<market>/…` 逐文件树迁到 ModelScope 上的三个 zip 归档；归档的 sha256 就是 revision（对稳定 URL 发 `HEAD`、读 `X-Linked-Etag`），内容未变即不下载。`url` / `github` / `git` / `directory` 全部保留，第三方源继续可用整树镜像。仍然**无方法增删**，`48 / 71` 不变；手改配置的迁移做法见[升级与迁移指引](/zh-CN/docs/upgrade) §8。
-
-再往前：`0.1.0-beta.3` 之后积累的那批改动——`event_type` 收窄、协议方法面增量、`conversation/list-changed`、技能文件树读面、`connector/call`、协议指纹形状变更——已全部随 `0.1.0-beta.4` 发布，逐条见 §2.1。
-
-「已发布产物里到底有什么」可以自己复现，做法是把相邻两版取回来对读：`0.1.0-beta.3` 的 `event_type` 仍带 `| string` 兜底、指纹是日期戳；`0.1.0-beta.4` 已是封闭联合 `ConversationEventType`、指纹是 `fp-1`。具体命令见[升级与迁移指引](/zh-CN/docs/upgrade) §8。
+一处口径更正（2026-09-17）：上一版台账把 `mentions` 记作「`fp-2` → `fp-3` 新增」的字段。把两版已发布产物对读可见，`MentionKind` / `MentionRef` 与两处 `mentions` **在 `0.1.0-beta.4` 的 `index.d.mts` 里就已经存在**，所以 §2.1 把它写成宿主侧的**语义**变化，不声称是 beta.5 新增的字段。已发布条目的版本号与发布时间不受此更正影响。
 
 发布节奏：条目在版本**发布之后**才追加（见 §3 的「新增」规则），本页不预告日期。
 
