@@ -7,6 +7,17 @@ import rehypeHighlight from "rehype-highlight";
 import { applyLanguage, type Language } from "../i18n";
 import { DOC_ORDER, extractHeadings, loadDoc } from "../lib/docs";
 
+/**
+ * A page with at least this many headings opens its in-page TOC by default.
+ *
+ * Below the wide-screen breakpoint the collapsible block is the only in-page
+ * navigation there is, so leaving it closed hides the TOC exactly where it is
+ * needed most — but a four-entry list costs more vertical space than it saves.
+ * Measured across these docs: 4 / 4 / 4 / 7 / 7 / 9 / 13 / 17 / 21 / 28, so the
+ * cut opens the four longest pages and leaves the short ones alone.
+ */
+const TOC_OPEN_MIN_HEADINGS = 10;
+
 export async function loader({ params }: LoaderFunctionArgs) {
   const lang: Language = params.lang === "en-US" ? "en-US" : "zh-CN";
   applyLanguage(lang);
@@ -48,6 +59,7 @@ export default function Docs() {
   // One list, two mount points: the right rail on wide screens and the
   // collapsible block above the prose below the breakpoint. CSS decides which
   // is shown (`display: none` also keeps the hidden one out of the a11y tree).
+  // Long pages start the collapsible one open — see `TOC_OPEN_MIN_HEADINGS`.
   const tocList = (
     <ol className="docs-page-toc-list">
       {toc.map(({ heading, children }) => (
@@ -84,7 +96,7 @@ export default function Docs() {
 
       <article className="docs-content markdown-body">
         {headings.length > 0 && (
-          <details className="docs-page-toc">
+          <details className="docs-page-toc" open={headings.length >= TOC_OPEN_MIN_HEADINGS}>
             <summary>
               {t("docs.onThisPage")}
               <span className="docs-page-toc-count">{headings.length}</span>

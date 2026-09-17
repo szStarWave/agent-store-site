@@ -58,12 +58,24 @@ export interface DocHeading {
 const FENCE = /^\s*(`{3,}|~{3,})\s*([^\s`]*)/;
 const ATX_HEADING = /^(#{2,3})\s+(.+?)\s*$/;
 
-/** Inline markdown off: links keep their label, code and emphasis lose their markers. */
+/**
+ * Inline markdown off: links keep their label, code and emphasis lose their
+ * markers.
+ *
+ * **`_` is deliberately not stripped.** These docs name config keys inside code
+ * spans (`connector_proxy`, `default_marketplaces`, `AGENT_STORE_TOOLS`), and a
+ * blanket `[*_]{1,3}` strip turned them into `connectorproxy` /
+ * `defaultmarketplaces` / `AGENTSTORETOOLS` — the TOC then said one thing while
+ * the heading right below it said another. CommonMark does not read an intraword
+ * `_` as emphasis either, so only `*` emphasis is removed; an underscore-emphasis
+ * heading would need its paired form handled explicitly, and no page has one.
+ */
 function headingText(raw: string): string {
   return raw
     .replace(/\[([^\]]*)\]\([^)\s]*\)/g, "$1")
     .replace(/`([^`]*)`/g, "$1")
-    .replace(/[*_]{1,3}/g, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
     .trim();
 }
 
