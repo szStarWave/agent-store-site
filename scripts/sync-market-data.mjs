@@ -19,7 +19,7 @@
  * 在 zh-CN 目录页上不再显示英文文案的原因。
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,13 +43,46 @@ async function readManifest(market, rel) {
   return JSON.parse(await readFile(file, "utf8"));
 }
 
+/** 在 `dir` 下按**大小写不敏感**的名字查找，返回磁盘上的真实拼写；找不到返回 null。 */
+function findRealName(dir, wanted) {
+  if (!existsSync(dir)) return null;
+  const lower = wanted.toLowerCase();
+  return readdirSync(dir).find((name) => name.toLowerCase() === lower) ?? null;
+}
+
+/**
+ * 把一个候选相对路径逐段按大小写不敏感匹配，返回**磁盘上真实拼写**的相对路径；
+ * 任一段找不到则返回 null。
+ *
+ * 为什么不能直接 `existsSync` + 原样返回：Windows 的文件系统大小写不敏感，
+ * `icons/fbs-bookwriter.png` 会匹配到磁盘上的 `icons/FBS-BookWriter.png`——于是**本机检查
+ * 通过，写进快照的却是小写路径**。两个后果都在别的机器上才爆：Linux 构建机上
+ * `copy-market-tree.mjs` 找不到该文件、构建直接失败（2026-09-17 线上构建就是这么挂的）；
+ * 就算构建过了，CDN 的 URL 也是大小写敏感的。
+ *
+ * 反过来，只做「精确匹配」也不行：那会让这条目直接丢掉图标（实测 648 → 647）。正解是
+ * **按不敏感匹配、按真实拼写输出**。
+ */
+function resolveRealCase(market, relative) {
+  let dir = path.join(sourceRoot, market);
+  const resolved = [];
+  for (const part of relative.split("/")) {
+    const match = findRealName(dir, part);
+    if (!match) return null;
+    resolved.push(match);
+    dir = path.join(dir, match);
+  }
+  return resolved.join("/");
+}
+
 /**
  * 返回第一个存在的候选者对应的站内相对路径
- * （`source/<market>/<candidate>`），条目未带图标时返回 null。
+ * （`source/<market>/<candidate>`，大小写取磁盘真实值），条目未带图标时返回 null。
  */
 function pickAvatar(market, candidates) {
   for (const suffix of candidates) {
-    if (existsSync(path.join(sourceRoot, market, suffix))) return `source/${market}/${suffix}`;
+    const resolved = resolveRealCase(market, suffix);
+    if (resolved) return `source/${market}/${resolved}`;
   }
   return null;
 }
