@@ -27,8 +27,14 @@
    bun run release:status
    ```
    `--exe` 用源仓库构建的那一个（**必须带 `--features static-webui`**，否则二进制没有内嵌 WebUI）；`--expect-sha256` 填**源仓库 `web/packages/runtime/vendor/flowy-agent-store.exe` 的哈希**，即 npm 里真正发布出去的那份字节。
-5. **部署**：commit → `git push origin main` → EdgeOne Makers 构建上线（也可在其控制台手动触发）。
-6. **部署后自检**：`/<lang>/docs/typescript-sdk` 中英两页有正文（不是 SPA 空壳）；**本站托管的市场**（`SITE_HOSTED_MARKETS`，默认三个）的 `/source/<market>/_files.txt` 可访问且带 `cache-control: no-cache`；首页下载直链真能下到 `v<版本>` 的 zip。
+5. **部署**：commit → `git push origin main` → **手动触发一次构建**。GitHub 自动触发自 2026-09-17 起失效，
+   且本站项目是 `Github` 型（CLI 的上传通道不可用），所以走 EdgeOne Makers 的 API 触发——完整做法、
+   接口形状与实测见 [`deploy-trigger.md`](deploy-trigger.md)。
+6. **部署后自检**：`/<lang>/docs/typescript-sdk` 中英两页有正文（不是 SPA 空壳）；构建日志里没有
+   `File count exceeds project limit` / `File size limit exceeded`；**退役路径应为 404**
+   （`/source/<market>/_files.txt` 等——自 doc 30 起市场改由 ModelScope 的 zip 托管，这条从「应可访问」
+   反转为「不应存在」，是新产物上线最省事的判据）；目录页头像可取（注意大小写）；
+   首页下载直链真能下到 `v<版本>` 的 zip。
 7. **台账**：`changelog` §2 追加「已发布事实」（版本号 + 发布时间 + 改了什么），本次的「未发布」条目从 §4 转正；`upgrade.md` §8 同步。
 
 > **顺序约束：先有 Release 资产，再推站点。** `content/release.json` 一上线，首页就在宣告那个版本；资产还不存在就是 404。所以在拿到 `release:status` 的正式 Release 之前不要 `push main`。
@@ -42,6 +48,7 @@
 
 ## 已知缺口
 
-- **本仓无 CI**：`check:release` 与部署后自检都是人工执行；EdgeOne 只在 `push main` 时构建。
+- **本仓无 CI**：`check:release` 与部署后自检都是人工执行；**EdgeOne 的 GitHub 自动构建自 2026-09-17 起失效**，
+  需要手动触发（见 [`deploy-trigger.md`](deploy-trigger.md)）。
 - **域名与 HTTPS 未定**：EdgeOne 预览域名带签名的 `eo_token` 会过期，不能长期对外公布为市场源地址（见 `README.md` §部署「待定」）。
 - **平台清单是两处字面量**：`app/lib/platform.ts` 的 `RELEASED_PLATFORMS` 与 `scripts/release.mjs` 的 `PLATFORM = "windows-x86_64"` 必须人工保持一致（跨仓的 `check:release-sync` 只守版本号与文档计数，不守这个）。

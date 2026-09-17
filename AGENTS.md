@@ -57,7 +57,7 @@ SPA 空壳，SEO 与社交预览都是空的。
 | `docs/` | 面向维护者的中文文档，不进站点 |
 | `react-router.config.ts` | 预渲染路由清单 + `routeDiscovery: initial` |
 | `vite.config.ts` | `BASE_PATH` → `base`；开发态托管 `/source/**` |
-| `edgeone.json` | EdgeOne Makers 的构建/部署配置：部署命令、`_files.txt` 缓存头、`.data` 重写。**推送到 `main` 即由它触发构建并上线** |
+| `edgeone.json` | EdgeOne Makers 的构建/部署配置：部署命令、`_files.txt` 缓存头、`.data` 重写。**推送到 `main` 本应触发构建，但该自动触发自 2026-09-17 起失效**，当前需按 [`docs/deploy-trigger.md`](docs/deploy-trigger.md) 手动触发 |
 
 ## 文档索引
 
@@ -66,5 +66,6 @@ SPA 空壳，SEO 与社交预览都是空的。
 | [`README.md`](README.md) | 构建、部署、市场源地址、内容来源 |
 | [`docs/market-maintenance.md`](docs/market-maintenance.md) | 市场相关问题的入口：条目规范、更新流程、换机与多人协作、冲突处理、门禁报错与故障排查 |
 | [`docs/release-process.md`](docs/release-process.md) | 发布流程（本站仓这一半）：本仓在发布里的四个角色、站点侧有序步骤、顺序约束、部署后自检、已知缺口。权威清单在源仓库 `allo` 的 `docs/agent-store/25-release-runbook.zh.md` |
+| [`docs/deploy-trigger.md`](docs/deploy-trigger.md) | **手动触发部署**：项目类型（`Github` 型不能用 CLI 上传通道）、三条只读接口、`CreatePagesDeployment` 的形状与实测、构建日志定位失败原因、令牌与部署后自检 |
 | [`docs/connector-coverage.md`](docs/connector-coverage.md) | 连接器覆盖现状、近似项甄别方法 |
 | [`docs/modelscope-mcp-api.md`](docs/modelscope-mcp-api.md) | ModelScope MCP 开放接口（当前未接入本站） |

@@ -3,7 +3,8 @@
 **Flowy Agent Store** 的营销 + 文档站点：一个本地优先、单文件形态的智能体
 运行时，内嵌 Web UI，并通过命令行启动。
 
-> 本站为纯静态站点（SSG），无需服务器。推送到 `main` 会触发 EdgeOne Makers 构建并上线；
+> 本站为纯静态站点（SSG），无需服务器。推送到 `main` **本应**触发 EdgeOne Makers 构建并上线，
+> 但该自动触发自 2026-09-17 起失效，当前需要手动触发（见 [`docs/deploy-trigger.md`](docs/deploy-trigger.md)）；
 > 构建、缓存与重写配置见[部署](#部署)一节。
 
 ## 技术栈
@@ -120,7 +121,11 @@ $env:SITE_HOSTED_MARKETS="skills,connectors"   # 未列出的市场只留目录�
 > 务必保证 `prerender()`（目前通过 `docSlugs(lang)` 遍历所有文档 slug）能
 > 枚举到它。
 
-**发布方式：** 推送到 `main` 触发 EdgeOne Makers 构建并上线（也可在其控制台手动触发）。
+**发布方式：** 推送到 `main` **本应**触发 EdgeOne Makers 构建并上线；但自 2026-09-17 起
+**GitHub 自动触发失效**（最后一次平台产生的部署是当日 07:38 的 `47bcdff5`，其后的推送都没有
+产生部署）。在控制台修好 Git 集成之前，发布必须用 **API 手动触发一次**，做法与实测见
+[`docs/deploy-trigger.md`](docs/deploy-trigger.md)。注意本站项目是 **`Github` 型**，
+`edgeone makers deploy`（上传通道）对它**不可用**。
 市场内容更新走 `bun run sync` → 提交 → 部署，无需在构建期访问任何外部源。
 
 **一次发布含两个出口**（npm 的 `@flowy-agent-store/*` 与本站的 GitHub Release）：站点侧动作、
