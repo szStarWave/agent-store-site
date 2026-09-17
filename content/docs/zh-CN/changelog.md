@@ -98,7 +98,15 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-截至 `0.1.0-beta.4`（2026-09-16），**工作区（`web/packages/*`）与已发布产物一致，没有未发布的差异**：`0.1.0-beta.3` 之后积累的那批改动——`event_type` 收窄、协议方法面增量、`conversation/list-changed`、技能文件树读面、`connector/call`、协议指纹形状变更——已全部随 `0.1.0-beta.4` 发布，逐条见 §2.1。
+截至 `0.1.0-beta.4`（2026-09-16），**工作区（`web/packages/*`）领先于已发布产物**：`0.1.0-beta.4` 之后工作区又积累了协议指纹 `fp-1` → **`fp-2`** 的增量——连接器工具的 `input_schema`（`ConnectorTool` 加字段）与 `ConnectorDetail` / `ConnectorProbeResult` 的 `tools_truncated`，**无方法增删**（映射数仍是 `48 / 71`）——以及宿主配置 `[connector_proxy]` 授权形状的变更（`allow` 变可选收窄、新增 `deny`，`enabled` 为真即默认可调，取代此前的强制逐工具白名单）。这些**尚未随任何版本发布**，自查方法见[升级与迁移指引](/zh-CN/docs/upgrade) §8。
+
+其上再叠加 **`fp-2` → `fp-3`** 的增量：`conversation/send` 新增可选的 `mentions`（现有 DTO **加字段**），**只认 `kind: "skill"`**，让单轮消息可以挂载技能；`agent` / `connector` 两类以 `invalid_request` **显式拒绝**（它们在 `send` 上没有载体）。同样**无方法增删**，`48 / 71` 不变。
+
+再叠加 **`fp-3` → `fp-4`**：`conversation/create` 新增可选的 `agent_id`（同为现有 DTO **加字段**），把一个会话**建成某个已安装专家**——该专家的 preset 身份、它自带的技能与连接器一并冻结进会话，此后不可改写（`conversation/update` 拒绝 preset / 技能 / 连接器键；换专家＝新建会话）。仍然**无方法增删**。
+
+再叠加 **`fp-4` → `fp-5`**：`conversation/create` 新增可选的 `team_id`（同样**加字段**），用来**打开某个专家团的 Leader 会话**——与 `team/run` 共用同一段编排（成员校验、物化/复用执行模板、会话栅栏），唯一区别是**不发 `goal` 首轮**，第一句话由调用方说。`agent_id` 与 `team_id` **互斥**。仍然**无方法增删**。
+
+再往前：`0.1.0-beta.3` 之后积累的那批改动——`event_type` 收窄、协议方法面增量、`conversation/list-changed`、技能文件树读面、`connector/call`、协议指纹形状变更——已全部随 `0.1.0-beta.4` 发布，逐条见 §2.1。
 
 「已发布产物里到底有什么」可以自己复现，做法是把相邻两版取回来对读：`0.1.0-beta.3` 的 `event_type` 仍带 `| string` 兜底、指纹是日期戳；`0.1.0-beta.4` 已是封闭联合 `ConversationEventType`、指纹是 `fp-1`。具体命令见[升级与迁移指引](/zh-CN/docs/upgrade) §8。
 

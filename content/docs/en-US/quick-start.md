@@ -18,6 +18,12 @@ The process starts the local App Server (default `http://localhost:8787`) and op
 
 The workbench imports experts (Agents), Skills and Connectors from CodeBuddy / WorkBuddy directories. Imported content becomes an **immutable snapshot** you can query and run from the catalog.
 
+To set up the default marketplace sources and a provider first, run the optional first-run wizard:
+
+```bash
+flowy-agent-store init
+```
+
 ## 3. Start a run
 
 Pick an Agent from the catalog and choose **Run**. The workbench submits a Run; events, the plan (DAG) and Artifacts stream into the timeline and artifact panels.

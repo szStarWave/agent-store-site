@@ -18,6 +18,12 @@ flowy-agent-store
 
 工作台支持从 CodeBuddy / WorkBuddy 格式的目录导入专家（Agent）、技能（Skill）与连接器（Connector）。导入后内容会被转为**不可变快照**，可在目录中查询与运行。
 
+想先看看自己这台机器上有什么、或配好默认市场源与供应商，可以跑一次首启向导（可选）：
+
+```bash
+flowy-agent-store init
+```
+
 ## 3. 启动一次运行
 
 在目录中选择一个 Agent，点击「运行」，工作台会提交一次 Run。运行事件、计划（DAG）与产物（Artifact）会实时呈现在时间线与产物面板中。

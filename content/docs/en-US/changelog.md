@@ -98,7 +98,15 @@ Rules for adding and correcting entries:
 
 ## 4. Unpublished changes and release cadence
 
-As of `0.1.0-beta.4` (2026-09-16), **the working tree (`web/packages/*`) and the published artifacts agree — nothing is unpublished**: the batch accumulated after `0.1.0-beta.3` — the `event_type` narrowing, the wire-method additions, `conversation/list-changed`, the Skill file-tree read face, `connector/call` and the fingerprint shape change — all shipped with `0.1.0-beta.4`; §2.1 lists them one by one.
+As of `0.1.0-beta.4` (2026-09-16), **the working tree (`web/packages/*`) leads the published artifacts**: after `0.1.0-beta.4` it accumulated the protocol fingerprint move `fp-1` → **`fp-2`** — each connector tool's `input_schema` (a `ConnectorTool` field) plus `tools_truncated` on `ConnectorDetail` / `ConnectorProbeResult`, with **no methods added or removed** (still `48 / 71` mapped) — and a change to the host's `[connector_proxy]` grant shape (`allow` became optional narrowing, `deny` was added, and an enabled proxy now means callable, replacing the mandatory per-tool allowlist). None of this has shipped in any version yet; see §8 of the [Upgrade and migration guide](/en-US/docs/upgrade) for how to check.
+
+On top of that sits the **`fp-2` → `fp-3`** increment: `conversation/send` gained an optional `mentions` list (a field **added** to an existing DTO) that honours **`kind: "skill"` only**, so a single turn can mount a Skill; `agent` and `connector` are **refused with `invalid_request`** because they have no carrier there. Again **no methods added or removed** — `48 / 71` is unchanged.
+
+Above that sits **`fp-3` → `fp-4`**: `conversation/create` gained an optional `agent_id` (another field **added** to an existing DTO) that builds a conversation **as an installed expert** — the expert's preset identity plus its own Skills and Connectors are frozen into that conversation and cannot be rewritten afterwards (`conversation/update` refuses preset / Skill / connector keys; changing the expert means creating another conversation). Still **no methods added or removed**.
+
+And **`fp-4` → `fp-5`**: `conversation/create` gained an optional `team_id` (another **added** field) that **opens a team's Leader conversation** — the same orchestration `team/run` uses (member checks, template materialization or reuse, conversation fences), except it **does not send the goal turn**: the caller speaks first. `agent_id` and `team_id` are **mutually exclusive**. Still **no methods added or removed**.
+
+Before that: the batch accumulated after `0.1.0-beta.3` — the `event_type` narrowing, the wire-method additions, `conversation/list-changed`, the Skill file-tree read face, `connector/call` and the fingerprint shape change — all shipped with `0.1.0-beta.4`; §2.1 lists them one by one.
 
 You can reproduce what a published artifact actually contains by reading two adjacent versions side by side: `0.1.0-beta.3` still carries the `| string` escape hatch and a date-stamp fingerprint, while `0.1.0-beta.4` has the closed `ConversationEventType` union and `fp-1`. The commands are in §8 of the [Upgrade and migration guide](/en-US/docs/upgrade).
 

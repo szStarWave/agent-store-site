@@ -29,7 +29,7 @@ bun add @flowy-agent-store/protocol
 包均发布为 ESM + CJS 双格式（`exports` 提供 `import` / `require` / `types`），Node 与打包器开箱即用。
 
 > **版本状态**：三个包当前均为 `0.1.0-beta.*` 预发布（API 尚未冻结，beta 期间**不承诺向后兼容**）。生产接入请固定**确切版本**——本文与仓库当前对应 `0.1.0-beta.4`（`beta` tag）。注意不要依赖裸 `bun add`：注册表 `latest` 当前指向 `0.1.0-beta.2`，**不是**最新的 `0.1.0-beta.4`。dist-tag 语义、逐版本升级步骤与自查命令见[升级与迁移指引](/zh-CN/docs/upgrade)。
-> **协议面口径**：§2 的 `APP_SERVER_PROTOCOL_VERSION` 示例与 §5.3 的方法计数（`48 / 71`）**自 `0.1.0-beta.4` 起与已发布产物一致**（此前工作区领先于已发布的任何版本）。它与「客户端装不装得上」直接相关：指纹按**严格相等**校验，而 `0.1.0-beta.4` 把指纹形状从日期戳换成了 `fp-<n>` 计数器（现行 `fp-1`）——按旧值编出来的客户端连不上新运行时，升级做法见[升级与迁移指引](/zh-CN/docs/upgrade) §6.3。
+> **协议面口径**：§2 的 `APP_SERVER_PROTOCOL_VERSION` 示例与 §5.3 的方法计数（`48 / 71`）取自**仓库工作区**，而工作区当前**领先于任何已发布产物**——差异逐条记在[升级与迁移指引](/zh-CN/docs/upgrade) §8，自查命令也在那一节。指纹按**严格相等**校验（按旧值编出来的客户端连不上新运行时），所以自己拉二进制或改协议时，请以 §2 常量为准，不要从本文正文里抄值。
 > **运行环境**：Node.js **≥ 22**（依赖全局 `WebSocket`）或 Bun；版本下限由各包 `engines.node` 声明。
 
 ---
@@ -44,7 +44,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出 | 说明 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 契约**指纹**（**仓库工作区当前为** `"fp-1"`；形状是 `fp-<n>` 计数器，每次 wire 变更递增、不复用任何历史值。旧值曾是日期戳，那是**标签不是变更日**——连续改动每次加一天，故常超前于日历），握手与 SDK 校验做严格相等 |
+| `APP_SERVER_PROTOCOL_VERSION` | 契约**指纹**（**仓库工作区当前为** `"fp-5"`；形状是 `fp-<n>` 计数器，每次 wire 变更递增、不复用任何历史值。旧值曾是日期戳，那是**标签不是变更日**——连续改动每次加一天，故常超前于日历），握手与 SDK 校验做严格相等 |
 | `InitializeRequest` / `InitializeResult` | 握手请求/响应（含 `protocol_version`、`server` 信息） |
 | `ClientInfo` / `ClientCapabilities` | 连接方自述 |
 | `StoreList` / `StoreInstallResult` | winget 式统一目录 |
@@ -199,14 +199,16 @@ client.skills.readFileWithType(skillId: string, path: string): Promise<SkillFile
 client.connectors.list(): Promise<ConnectorSummary[]>;
 client.connectors.get(connectorId: string): Promise<ConnectorDetail>;        // 命名空间工具 + 认证态
 client.connectors.status(connectorId: string): Promise<ConnectorStatusView>; // connected 仅在认证就绪且最近探测成功
-client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;  // 运行连接探测（结果持久化）
+client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;  // 运行连接探测（真连接、结果持久化）；工具签名从这里取
 client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>;
 client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // 发起宿主浏览器 OAuth 流，轮询 authStatus 至 authenticated
 client.connectors.logout(connectorId: string): Promise<void>;                // 吊销令牌
 client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // 调用代理
 ```
 
-> `call()` 经**宿主自己的连接**执行一个 MCP 工具：连接参数、headers 与 OAuth token 都留在宿主，你只发工具名与参数对象——**无法**指定 URL / 命令 / header。是否可调由宿主 `[connector_proxy]` 的 allowlist 决定，所以 **`policy_denied` 是默认状态**（宿主操作者没把这个工具写进白名单），不是配错。
+> `call()` 经**宿主自己的连接**执行一个 MCP 工具：连接参数、headers 与 OAuth token 都留在宿主，你只发工具名与参数对象——**无法**指定 URL / 命令 / header。是否可调由宿主 `[connector_proxy]` 决定：操作者一旦开启代理，**已启用的连接器即可调用**，`allow` / `deny` 是他的可选收窄与减法。所以 `policy_denied` 表示「宿主没开代理」或「这一对被收窄/明确排除」，**不再**表示「你漏写了名单」。
+>
+> **参数怎么知道**：`get()` / `test()` 返回的每个工具带 `input_schema`（上游 `tools/list` 的 `inputSchema` 逐字）。参数是任意 JSON Schema，客户端**不做**校验——传错参数得到的是 `is_error: true` 与服务器自己的报错，而不是 promise 拒绝。宿主若因体积上限省略了某些 schema，会置 `tools_truncated: true`（名字与描述永不省略）。
 >
 > **工具级失败不是 promise 拒绝**：上游 `isError: true` 时它仍然 **resolve**，`is_error` 为真。只有根本没够着工具才 reject：`connector_call_timeout`、`connector_call_failed`、`response_too_large`、`connector_unavailable`、`policy_denied`、`not_found`。先查 `capabilities.connector_calls`（方法是否存在**不等于**有工具可调）。结果对象逐字透传（`content` / `structuredContent` 等不断字段），上限 1 MiB，默认超时 30s。stdio、Streamable HTTP 与 SSE 三种连接器都支持。
 
@@ -236,11 +238,50 @@ client.conversations.modelOptions(): Promise<ConversationModelOptions>;
 client.conversations.list(limit = 100): Promise<ConversationView[]>;
 client.conversations.get(id): Promise<ConversationView>;
 client.conversations.messages(query): Promise<ConversationMessagesPage>; // page/page_size/cursor
-client.conversations.send(id, content, idempotencyKey): Promise<ConversationSendReceipt>; // 必须显式幂等键
+client.conversations.send(id, content, idempotencyKey, options?): Promise<ConversationSendReceipt>; // 必须显式幂等键
 client.conversations.cancel(id): Promise<ConversationView>;
 client.conversations.delete(id): Promise<{ conversation_id: string; deleted: boolean }>;
 await client.conversations.follow(id): Promise<ConversationSubscription>;
 ```
+
+`send()` 的第 4 个参数是**这一轮的选项**（也可传旧的 `string[]` 附件数组）：
+
+```ts
+client.conversations.send(id, content, key, {
+  attachments: ["/abs/path/inside/workspace.png"],   // 会话工作区内的绝对路径
+  mentions: [{ kind: "skill", id: "release-notes" }], // 本轮挂载的技能
+});
+```
+
+> **`mentions` 只认 `kind: "skill"`**（`fp-3` 加入）。技能是**每轮**载荷：正文与不可变快照都随这一轮走，会话创建时冻结的快照不受影响、也不可改写。`agent` / `connector` 两类在 `send` 上**没有载体**（专家是会话身份、连接器是宿主级开关），传进来是 `invalid_request` ——**显式拒绝，不是静默不挂**。`id` 用 `skill/list` 公布的 id（即技能名），不是 `install/status` 的组件 id。两个字段都缺省不上 wire。
+
+`create()` 也可以用 `agentId` **把会话建成某个专家**（`fp-4` 加入）：
+
+```ts
+const experts = await client.agents.list();
+const architect = experts.find((agent) => agent.name === "software-architect");
+
+const conv = await client.conversations.create({
+  name: "重构讨论",
+  agentId: architect!.id,     // agent/list 的 id；未安装会得到 agent_not_installed
+});
+```
+
+> 专家是会话的**身份**，只在创建时决定：它的 preset 快照、它自带的技能与连接器会一并冻结进这个会话，之后不可改写（`conversation/update` 拒绝 preset / 技能 / 连接器键）。**换专家 = 新建会话**。`agentId` 缺省时是普通会话，行为与从前逐字一致。
+
+`create()` 也可以用 `teamId` **打开某个专家团的 Leader 会话**（`fp-5` 加入）：
+
+```ts
+const teams = await client.teams.list();
+const company = teams.find((team) => team.name === "Software Company");
+
+const leader = await client.conversations.create({ teamId: company!.id });
+// 与 team/run 同一段编排（成员校验、物化/复用模板、会话栅栏），但**不发 goal 首轮**：
+// Leader 的第一句话由你来说，`delegation_policy` 已经是 automatic。
+await client.conversations.send(leader.conversation_id, "把这版需求拆成计划", crypto.randomUUID());
+```
+
+> `teamId` 与 `agentId` **互斥**（同时给是 `invalid_request`）：一个会话要么是某个专家，要么是某个团的 Leader。成员未安装 / 被停用 / 团绑定的连接器不可用，都会以各自的稳定错误码在**创建时**拒绝（`agent_not_installed` / `agent_disabled` / `connector_unavailable`），不会开出一个残缺的 Leader 会话。
 
 `modelOptions()` 的每个模型条目除 `name` / `display_name` / `context_limit` 外，还可能带 **models.dev 目录事实**：`cost_input` / `cost_output`（每百万 token 的 USD 费率）、`catalog_context_window`、`supports_vision`。**目录没有对应条目时这些字段整个缺席**（provider 未被映射，或模型不在目录里）——调用方应把它们当作「不知道」，而不是 `false` 或 `0`。
 
@@ -442,7 +483,7 @@ try {
 | `skills` | `list()` / `get(skillId)` | `skill/list` / `skill/get` |
 | `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `logout(id)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` |
 | `store` | `list()` / `search(query, filter?)` / `installed()` / `checkUpdates()` / `updateHint(item)` / `install(item, opts?)` / `setEnabled(item, enabled, opts?)` / `uninstall(item, opts?)` | 组合方法，无独立 wire 方法：`store/list` · `store/install-entry` · `install/run` · `install/status` · `install/disable` · `install/enable` · `install/uninstall` |
-| `conversations` | `create(input)` / `update(id, input)` / `modelOptions()` / `list(limit?)` / `get(id)` / `messages(query)` / `send(id, content, idempotencyKey)` / `cancel(id)` / `delete(id)` / `follow(id, options?)` | `conversation/*` 同名方法 |
+| `conversations` | `create(input)` / `update(id, input)` / `modelOptions()` / `list(limit?)` / `get(id)` / `messages(query)` / `send(id, content, idempotencyKey, options?)` / `cancel(id)` / `delete(id)` / `follow(id, options?)` | `conversation/*` 同名方法 |
 | `runs` | `agent(input)` / `team(input)` / `get(id)` / `result(id)` / `events(query)` / `cancel(input)` / `steer(input)` / `answerDecision(input)` / `follow(id, options?)` | `agent/run` · `team/run` · `run/get` · `run/result` · `run/events` · `run/cancel` · `run/steer` · `run/answer-decision` |
 | `workspaces` | `list()` / `create(path)` / `revoke(id)` | `workspace/list` / `workspace/create` / `workspace/revoke` |
 | `models` | `list()` | `models/list` |
@@ -586,7 +627,7 @@ Agent Store 的官方 MCP 接入路径是**连接器描述文件**，不引入�
 远程 HTTP/SSE 与本地 stdio 两种 server 都按清单原样描述；Agent Store 只做托管与工具命名空间代理，不执行连接器内容。凭据处理：
 
 - 敏感的配置项走 `userConfig` 的 schema 标记，值进操作系统凭据存储；
-- 不要把密钥写进 `env`：当前版本会把 `env` 明文写入快照（已登记为待修偏差），在修复前请用 `userConfig`。
+- 不要把密钥写成 `env` 的**明文值**：导入器会把 `env` / `headers` 里**键名**含 `api` / `token` / `secret` / `password` / `apikey` 的**值**改写成 `secret:<KEY>` 引用，真值只在宿主启动子进程时从 `[credentials]`（或进程环境变量）解析进内存，不落快照、不落库、不进日志。所以照抄来源插件的密钥行是安全的；但**其它键名**下的明文值不在保护范围内——涉及凭据请显式用 `secret:` 引用或 `userConfig`。
 
 更多清单字段与示例见 [插件与市场](/zh-CN/docs/plugins-market)。
 

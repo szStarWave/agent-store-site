@@ -54,6 +54,8 @@ source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/mark
 | `memory` | `table` | Post-session memory policy → `memory` (below) |
 | `marketplace` | `table` | Background auto-update cadence → `marketplace` (below) |
 | `tools` | `table` | Host-level tool policy (subtractive only) → `tools` (below) |
+| `connector_proxy` | `table` | Authorization for the connector call proxy: which MCP tools a third party may run over the host's connections. Off unless declared → `connector_proxy` (below) |
+| `credentials` | `table` | Values for `secret:NAME` references; hand-edited, never on the wire → see "`secret:NAME`: credentials stay out of the declaration file" |
 
 ## `providers`
 
@@ -98,7 +100,7 @@ The three sources below are the **built-in defaults a release ships with**: when
 source_kind = "url"
 source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
 
-[default_marketplaces.workbuddy-skills]
+[default_marketplaces.skills]
 source_kind = "url"
 source = "https://agent-store.flowyaipc.cn/source/skills/.codebuddy-skill/marketplace.json"
 
@@ -211,6 +213,41 @@ AGENT_STORE_TOOLS='{"computer":false,"domains":{"knowledge":false}}' agent-store
 ```
 
 Full usage examples are in the [TypeScript SDK cookbook](/en-US/docs/examples-sdk) §10.
+
+## `connector_proxy`
+
+The **connector call proxy** authorization table: it decides whether a **third party** (an external agent, an SDK client) may **run a tool of an installed MCP connector over the host's connection**. The connection and its credentials always stay on the host and the caller can only name a connector and a tool — this table is about *whether it is allowed*, not about *how to connect*.
+
+> **Only the Agent Store host adopts this table** (the `agent-store` executable), behind the same gate as `[tools]`. It is **not** in `config/get`'s projection and **not** on `config/set`'s whitelist: letting a third party execute tools on the host's connections is not a setting a remote caller should be able to widen. The host reads it **once at startup**.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `enabled` | `boolean` | Only `true` turns the proxy on. Absent, or no table at all = **off** (the default) |
+| `allow` | `array<string>` | **Optional narrowing**: when present, only matching entries are admitted; `allow = []` means "nothing"; **omitting** `allow` means every enabled connector is callable |
+| `deny` | `array<string>` | **Optional subtraction**, applied **after** `allow`, so it can only narrow further |
+
+Entries are written in the tool's own vocabulary: `mcp__<connector>__<tool>`. `<connector>` may be the registered **name** or the **id** (the id is the precise spelling: MCP servers are upserted by name, so a later install takes the name over and would otherwise inherit the grant). Matching follows the same rule as `[tools]` — only `mcp__` entries are globs, so `mcp__github__*` means the whole connector.
+
+```toml
+[connector_proxy]
+enabled = true                    # turn the proxy on; absent = off
+allow = ["mcp__github__*"]        # optional: admit just this connector (omit to admit every enabled one)
+deny = ["mcp__*__delete_*"]       # optional: subtract delete-style tools across all connectors
+```
+
+Decision order (the order below is the order they are evaluated in):
+
+| # | Gate | Code when it refuses |
+| --- | --- | --- |
+| 1 | Table missing, or `enabled` is not `true` | `policy_denied` |
+| 2 | No such connector | `not_found` |
+| 3 | `allow` was declared and nothing matched | `policy_denied` |
+| 4 | `deny` matched | `policy_denied` (worded differently from the line above, so the two are distinguishable) |
+| 5 | The connector is registered but disabled | `connector_unavailable` |
+
+> **The default is off, not wide open.** A slip of the pen must not be the difference between "nothing is callable" and "everything is callable", so a missing table or a missing `enabled` always refuses. Conversely, **writing `enabled = true` is itself the grant** — `allow` only narrows it. If you are upgrading from an older version, note that the old spelling `<connector>__<tool>` (no `mcp__` prefix) **no longer matches anything** under the new rule, which narrows to nothing; the host logs one warning about that and one about "the proxy is on with no list at all", so both are easy to fix.
+>
+> The `AGENT_STORE_CONNECTOR_PROXY` environment variable replaces this whole table (JSON, same shape), mirroring `AGENT_STORE_TOOLS`: it **replaces** rather than merges, and an unparseable value leaves the proxy off.
 
 ## `mcp.json`: declaring MCP servers
 
@@ -334,7 +371,7 @@ These methods travel over the host's own loopback WebSocket only, have no HTTP b
 | `default_model` | `"<provider>/<model>"` alias | Same |
 | Unknown keys | Tolerated, no error | Tolerated |
 | Env fallback | **None** — credentials come from the file only | Some tools support `env`-subtables / env fallbacks |
-| Agent Store only | `default_marketplaces`, `[memory]`, `[marketplace]`, `[tools].domains` (`enabled` / `disabled` have the same shape on both sides; the domain switches are ours) | No `domains` switches |
+| Agent Store only | `default_marketplaces`, `[memory]`, `[marketplace]`, `[tools].domains` (`enabled` / `disabled` have the same shape on both sides; the domain switches are ours), `[connector_proxy]` (third-party call authorization, off by default), `[credentials]` (the values behind `secret:NAME`) | No `domains` switches, and no call-proxy authorization table |
 | MCP declarations | `~/.agent-store/mcp.json` (sibling of `config.toml`, **user level only**) | `~/.kimi-code/mcp.json` plus a project-level `.kimi-code/mcp.json` (project overrides user) |
 
 If your config already has `[providers]` / `[models]` sections from Kimi Code or another tool, you can **copy them directly** into `~/.agent-store/config.toml` (as long as the provider speaks an OpenAI/Anthropic-compatible protocol); unrelated sections (`thinking`, `permission`, `hooks`, …) can stay or go — Agent Store ignores them.
