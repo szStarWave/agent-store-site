@@ -26,3 +26,9 @@ Thumbs.db
 
 
 .codebuddy/
+
+# Tencent Cloud EdgeOne
+.env
+.edgeone/*
+.tef_dist/*
+  
