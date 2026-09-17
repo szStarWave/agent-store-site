@@ -1286,6 +1286,56 @@
       "name": "omics-bioinfo-expert",
       "source": "./plugins/omics-bioinfo-expert",
       "description": "Expert in omics bioinformatics analysis, providing WDL/Nextflow workflow execution, task failure diagnosis, and 3D protein structure visualization services"
+    },
+    {
+      "name": "charity-doc-finance-expert",
+      "source": "./plugins/charity-doc-finance-expert",
+      "description": "An all-in-one expert for charity document writing and financial management, covering project applications, final reports, receipt management, audit preparation, and compliance consulting."
+    },
+    {
+      "name": "family-education-ma",
+      "source": "./plugins/family-education-ma",
+      "description": "8-year frontline family education expert from Tencent Minor Protection Camp, specializing in parent-child communication, screen addiction intervention, and family growth counseling"
+    },
+    {
+      "name": "fbsir-mom-dialogue-expert",
+      "source": "./plugins/fbsir-mom-dialogue-expert",
+      "description": "Organizes mother-centered family materials into source-linked stories, timelines, questions, and editable manuscripts."
+    },
+    {
+      "name": "ip-expert",
+      "source": "./plugins/ip-expert",
+      "description": "An end-to-end IP expert across copyright, patent, trademark, trade secret and domains: it routes scenarios, guides IP-database retrieval, runs infringement / FTO / validity analysis, and delivers grounded drafting and strategy with verification."
+    },
+    {
+      "name": "mentougou-business-guide",
+      "source": "./plugins/mentougou-business-guide",
+      "description": "Mentougou business policy expert providing registration address, tax analysis, subsidies and talent policies for entrepreneurs"
+    },
+    {
+      "name": "tiderider-sentiment",
+      "source": "./plugins/tiderider-sentiment",
+      "description": "Game sentiment analyst via BigQuery: anomaly detection, topic attribution, trend reports."
+    },
+    {
+      "name": "uae-public-affairs",
+      "source": "./plugins/uae-public-affairs",
+      "description": "Specializes in UAE government relations, policy analysis, regulatory engagement and public opinion intelligence. Delivers professional public affairs advisory and risk assessment for Chinese enterprises, investment institutions and cross-border traders."
+    },
+    {
+      "name": "vietnam-public-affairs",
+      "source": "./plugins/vietnam-public-affairs",
+      "description": "Expert in Vietnam government relations, policy analysis, regulatory compliance, and crisis management. Integrates official open data and real-time COS corpus to support enterprise public affairs decisions in Vietnam."
+    },
+    {
+      "name": "python-fullstack-engineer",
+      "source": "./plugins/python-fullstack-engineer",
+      "description": "A rigorous Python full-stack engineer mastering FastAPI/Django backends, Pandas/PyTorch data & AI, and automation. Delivers type-safe, tested, production-ready code with a full dev-to-deploy workflow."
+    },
+    {
+      "name": "fundus-disease-analysis",
+      "source": "./plugins/fundus-disease-analysis",
+      "description": "AI-powered multi-disease analysis of standard and ultra-wide fundus images, covering glaucoma, DR, AMD and dozens of conditions with inferred diagnosis, sign classification, detection, segmentation and structured reports."
     }
   ]
 }
