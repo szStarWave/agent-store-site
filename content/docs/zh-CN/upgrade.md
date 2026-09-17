@@ -27,7 +27,8 @@
 | `0.1.0` | 2026-09-09T09:09:04Z | 无 | 首次发布；三个包的**代码与类型声明与 beta.2 逐字节相同**，只有 `package.json` 不同：当时的 sdk 没有 `optionalDependencies`（未随附平台运行时包） |
 | `0.1.0-beta.2` | 2026-09-09T09:27:36Z | `latest` | 补齐 sdk 的 `optionalDependencies`（darwin / linux / win32 五个平台运行时包，同一版本号） |
 | `0.1.0-beta.3` | 2026-09-10T04:44:34Z | — | 为 client / sdk 新增公开声明（重连生命周期、退出观测，见 §6.1）；`package.json` 补 `engines.node >= 22`、`repository`、`sideEffects`；protocol 声明逐字节未变 |
-| `0.1.0-beta.4` | 2026-09-16T10:24:02Z | `beta` | **破坏性**：协议指纹改为严格相等的 `fp-1`（旧客户端连不上新运行时）、`event_type` 收窄为封闭联合 `ConversationEventType`；同时带上技能文件树读面、`connector/call` 调用代理与 `conversation/list-changed` 等加法项，客户端映射到 HTTP 的方法数现为 `48 / 71`（升级步骤见 §6.3） |
+| `0.1.0-beta.5` | 2026-09-17T11:41:10Z | `beta` | **破坏性**：协议指纹从 `fp-1` 跳到 `fp-7`（旧客户端连不上新运行时）；其余为加法项——连接器工具的 `input_schema` / `tools_truncated`、按轮挂载技能（`mentions` 只认 `kind: "skill"`）、`agent_id` / `team_id`、`model` / `reasoning_effort`，以及市场源新增 `zip` 类型。方法面无增删，仍是 `48 / 71`（升级步骤见 §6.4） |
+| `0.1.0-beta.4` | 2026-09-16T10:24:02Z | — | **破坏性**：协议指纹改为严格相等的 `fp-1`（旧客户端连不上新运行时）、`event_type` 收窄为封闭联合 `ConversationEventType`；同时带上技能文件树读面、`connector/call` 调用代理与 `conversation/list-changed` 等加法项，客户端映射到 HTTP 的方法数现为 `48 / 71`（升级步骤见 §6.3） |
 
 注意 `0.1.0` 是**时间最早**的一次发布（比 beta.2 早约 18 分钟），却没有任何 dist-tag 指向它；它既不是稳定版，也不比 beta 线新。
 
@@ -38,7 +39,7 @@
 | dist-tag | 当前指向 |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.4` |
+| `beta` | `0.1.0-beta.5` |
 
 `0.1.0` 不带任何 tag。三个包与 `@flowy-agent-store/runtime-*` 两个 tag 的指向一致（已实测）。
 
@@ -48,14 +49,14 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.4", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.5", "latest": "0.1.0-beta.2" }
 }
 ```
 
 两个陷阱：
 
-1. `latest` **不是**最新版——它指向 `0.1.0-beta.2`；最新的 beta 是 `beta` tag 指向的 `0.1.0-beta.4`。
+1. `latest` **不是**最新版——它指向 `0.1.0-beta.2`；最新的 beta 是 `beta` tag 指向的 `0.1.0-beta.5`。
 2. `0.1.0` 虽然没有 tag，但版本范围仍可能解析到它（见 §4）。
 
 另外，`versions` 数组的**排列顺序不是时间顺序**：`0.1.0` 排在最后，却是最早发布的。
@@ -68,7 +69,7 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```bash
 bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2（latest）
-bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.4
+bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.5
 bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → bun 解析到 0.1.0-beta.2
 npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → npm 解析到 0.1.0（那个无 tag 的早期发布）
 ```
@@ -79,14 +80,14 @@ npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → npm 解析到 0.
 
 ```bash
 # 明确写出确切版本；不要用 ^ 或 ~
-bun add @flowy-agent-store/sdk@0.1.0-beta.4
-bun add @flowy-agent-store/protocol@0.1.0-beta.4   # 需要协议类型时
+bun add @flowy-agent-store/sdk@0.1.0-beta.5
+bun add @flowy-agent-store/protocol@0.1.0-beta.5   # 需要协议类型时
 
 # npm / pnpm 同理
-npm install @flowy-agent-store/sdk@0.1.0-beta.4
+npm install @flowy-agent-store/sdk@0.1.0-beta.5
 ```
 
-`package.json` 里应当落到 `"@flowy-agent-store/sdk": "0.1.0-beta.4"`（**不带** `^`）。sdk 的平台运行时包由它的 `optionalDependencies` 按同一版本号钉住，不需要单独声明。
+`package.json` 里应当落到 `"@flowy-agent-store/sdk": "0.1.0-beta.5"`（**不带** `^`）。sdk 的平台运行时包由它的 `optionalDependencies` 按同一版本号钉住，不需要单独声明。
 
 锁文件也要提交进版本库：`bun.lock` / `package-lock.json` / `pnpm-lock.yaml` 是「这次到底装了什么」的唯一权威记录。
 
@@ -118,11 +119,11 @@ bun run typecheck && bun run test
 
 ```bash
 # 从无 tag 的 0.1.0 切到当前 beta 线（当前 beta 见 §3）
-bun add @flowy-agent-store/sdk@0.1.0-beta.4
+bun add @flowy-agent-store/sdk@0.1.0-beta.5
 bun pm ls | grep '@flowy-agent-store'   # 确认 0.1.0 已经不在了
 ```
 
-`0.1.0` 升到 `beta.3` 是纯加法：公开声明面只增不减（`beta.2` 补的运行时包、`beta.3` 补的重连与退出观测），没有删除或改名；**再往上的 `beta.4` 不是纯加法**——它带类型收窄与严格相等的协议指纹，见 §6.3。
+`0.1.0` 升到 `beta.3` 是纯加法：公开声明面只增不减（`beta.2` 补的运行时包、`beta.3` 补的重连与退出观测），没有删除或改名；**再往上的 `beta.4` 不是纯加法**——它带类型收窄与严格相等的协议指纹，见 §6.3；**`beta.5` 也不是纯加法**（指纹再次严格相等），但**不需要改代码**，见 §6.4。
 
 ### 6.3 从 0.1.0-beta.3 升到 0.1.0-beta.4
 
@@ -147,6 +148,31 @@ bun run typecheck && bun run test
 
 加法项不需要改代码：技能文件树读面（`skill/files` / `skill/file`）、连接器调用代理（`connector/call`，默认全关）、`conversation/list-changed` 通知等。
 
+### 6.4 从 0.1.0-beta.4 升到 0.1.0-beta.5
+
+指纹再次严格相等（`fp-1` → `fp-7`），所以**必须升级**；但本版**没有类型收窄、没有方法增删**，所以**不需要改代码**：
+
+```bash
+# 1) 先看当前实际装的是什么
+bun pm ls | grep '@flowy-agent-store'          # npm 项目：npm ls @flowy-agent-store/sdk
+# 2) 固定到 0.1.0-beta.5（需要几个包就升几个，版本号保持一致）
+bun add @flowy-agent-store/sdk@0.1.0-beta.5
+bun add @flowy-agent-store/protocol@0.1.0-beta.5
+# 3) 确认解析结果
+node -p "require('@flowy-agent-store/sdk/package.json').version"
+# 4) 重跑类型检查与测试——应当是零改动通过
+bun run typecheck && bun run test
+```
+
+唯一必须处理的是**指纹**：`0.1.0-beta.4` 报 `fp-1`，本版报 `fp-7`。若用 `AGENT_STORE_BIN` 指向自建二进制，请把 SDK 与二进制**同批**升级（或直接升到 `@flowy-agent-store/runtime-win32-x64@0.1.0-beta.5`）。
+
+新增的可选字段（都不改变现有行为）：`ConnectorTool.input_schema`、`ConnectorDetail.tools_truncated`、`ConnectorProbeResult.tools_truncated`、`ConversationCreateInput.agentId` / `teamId`、`AgentRunInput.model` / `reasoningEffort`、`ConversationView.reasoning_effort`、`MarketplaceSourceKind` 的 `"zip"`。
+
+两处**行为**变化（签名不变，类型检查抓不到）：
+
+1. **宿主配置 `[connector_proxy]` 的授权形状**（`fp-2`）：`allow` 由**必填的逐工具白名单**改为**可选收窄**，并新增 `deny`（在 `allow` 之后做减法）。现在的语义是——`enabled = true` 且**没有** `allow` ⇒ 该连接器的工具**全部可调**；写了 `allow` 就按它收窄，而 `allow` 存在但为空（`allow = []`）⇒ **什么都调不了**；整张表不存在 ⇒ 什么都不调。因此**此前只写了 `enabled = true`、没逐条列工具的宿主，升级后授权面会变大**，请重读该表；启动时会为此打一条告警（`enabled with neither "allow" nor "deny"`），按它核对即可。
+2. **`conversation/send` 的 `mentions` 只认 `kind: "skill"`**（`fp-3`）：`agent` / `connector` 两类以 `invalid_request` 显式拒绝。该字段的类型面在 `0.1.0-beta.4` 就已发布，所以这一条只在运行期可见。
+
 ## 7. 自查当前安装的版本
 
 ```bash
@@ -164,7 +190,7 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. 已发布产物的差异与自查方法
 
-截至 `0.1.0-beta.4`（2026-09-16），**工作区领先于已发布产物**：`0.1.0-beta.4` 之后工作区又积累了协议指纹 `fp-1` → **`fp-2`** 的增量——连接器工具的 `input_schema`（`ConnectorTool` 加字段）与 `ConnectorDetail` / `ConnectorProbeResult` 的 `tools_truncated`，**无方法增删**（映射数仍是 `48 / 71`）；同一批还改了宿主配置 `[connector_proxy]` 的授权形状（`allow` 变可选收窄、新增 `deny`，`enabled` 为真即默认可调）。工作区还继续往前走了 `fp-2` → `fp-3`（`conversation/send` 的 `mentions`）、`fp-3` → `fp-4`（`conversation/create` 的 `agent_id`）、`fp-4` → `fp-5`（`team_id`）与 `fp-5` → `fp-6`（`send` / `agent/run` 的 `model` 与 `reasoning_effort`），并在 `fp-6` → `fp-7` 把官方市场源改成 ModelScope 上的 zip 归档。这些**尚未随任何版本发布**；`0.1.0-beta.4` 相对 `0.1.0-beta.3` 的改动见[变更日志](/zh-CN/docs/changelog) §2.1。
+截至 `0.1.0-beta.5`（2026-09-17），**工作区与已发布产物之间没有未发布的协议差异**：`fp-1` → `fp-7` 的六次递增已全部随本版发布，逐条见[变更日志](/zh-CN/docs/changelog) §2.1；`0.1.0-beta.4` 相对 `0.1.0-beta.3` 的改动见同页 §2.2。下面的命令用来核对这件事——把任意两版已发布产物取回来对读。
 
 ### 8.1 迁移已有配置里的市场源
 
@@ -216,9 +242,19 @@ grep -n 'event_type:\|APP_SERVER_PROTOCOL_VERSION' package/dist/index.d.mts
 # export declare const APP_SERVER_PROTOCOL_VERSION = "fp-1";
 # event_type: ConversationEventType;   ← ConversationEvent（收窄）
 # event_type: string;                  ← RunEvent，另一处声明，有意保持开放
+
+# beta.5：指纹从 fp-1 跳到 fp-7，新增的只有可选字段
+mkdir -p b4 b5
+(cd b4 && npm pack @flowy-agent-store/protocol@0.1.0-beta.4 --silent && tar xzf *.tgz)
+(cd b5 && npm pack @flowy-agent-store/protocol@0.1.0-beta.5 --silent && tar xzf *.tgz)
+grep -n 'APP_SERVER_PROTOCOL_VERSION' b5/package/dist/index.d.mts
+# export declare const APP_SERVER_PROTOCOL_VERSION = "fp-7";
+diff <(grep -o '^export [a-z]* [A-Za-z]*' b4/package/dist/index.d.mts) \
+     <(grep -o '^export [a-z]* [A-Za-z]*' b5/package/dist/index.d.mts)
+# （无输出）141 个导出名一个不多一个不少 → 只是加字段，没有任何声明被收窄或删除
 ```
 
-客户端侧同理：把 `@flowy-agent-store/client` 装进临时目录后数 `httpRouteTable()` 的键数，就是 §5.3 引用的映射数（`0.1.0-beta.4` 为 48）。
+客户端侧同理：把 `@flowy-agent-store/client` 装进临时目录后数 `httpRouteTable()` 的键数，就是 §5.3 引用的映射数（`0.1.0-beta.5` 为 48）。协议侧的「没有增删类型」用上面那条 `diff` 数导出名即可核对——`0.1.0-beta.4` 与 `0.1.0-beta.5` 都是 **141 个**。
 
 ## 9. changelog 与 release notes 的边界
 
