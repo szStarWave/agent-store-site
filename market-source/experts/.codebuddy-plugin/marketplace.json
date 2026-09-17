@@ -81,6 +81,1211 @@
       "name": "data-engineer",
       "source": "./plugins/data-engineer",
       "description": "Builds efficient and reliable data pipelines and ETL processes, ensuring data flows smoothly from source to insight"
+    },
+    {
+      "name": "carousel-content-growth-expert",
+      "source": "./plugins/carousel-content-growth-expert",
+      "description": "Specialized in designing high-engagement carousel content, driving social platform user engagement and growth"
+    },
+    {
+      "name": "user-experience-architect",
+      "source": "./plugins/user-experience-architect",
+      "description": "Providing developers with solid technical foundations and CSS systems, bridging design and development"
+    },
+    {
+      "name": "security-engineer",
+      "source": "./plugins/security-engineer",
+      "description": "Comprehensively safeguards system security, discovering and fixing security vulnerabilities before hackers do"
+    },
+    {
+      "name": "mcp-build-expert",
+      "source": "./plugins/mcp-build-expert",
+      "description": "Expert in Model Context Protocol design and implementation"
+    },
+    {
+      "name": "ai-engineer",
+      "source": "./plugins/ai-engineer",
+      "description": "Full-stack AI engineer proficient in ML model development, deployment, and optimization, bringing AI from research papers to production environments"
+    },
+    {
+      "name": "design-prototype-expert",
+      "source": "./plugins/design-prototype-expert",
+      "description": "Design studio principal who builds a design system before any hi-fi prototype. Provides 2-3 aesthetic directions, patches locally, and runs AI-slop detection before delivery."
+    },
+    {
+      "name": "sprint-priority-manager",
+      "source": "./plugins/sprint-priority-manager",
+      "description": "Making optimal priority decisions within limited iteration cycles, ensuring Sprint delivers maximum value"
+    },
+    {
+      "name": "marketing-reviewer",
+      "source": "./plugins/marketing-reviewer",
+      "description": "Scans marketing copy with 9 dimensions and 34 rules, flags ad-law and privacy risks, outputs graded Excel and HTML report."
+    },
+    {
+      "name": "financial-tracker",
+      "source": "./plugins/financial-tracker",
+      "description": "Precisely tracking project and business financial data, ensuring every transaction is clear and transparent"
+    },
+    {
+      "name": "new-share-expert",
+      "source": "./plugins/new-share-expert",
+      "description": "A-share IPO factual assistant with multi-source cross-check, board-aware rules and precise K-line/intraday charting. No rating, no recommendation."
+    },
+    {
+      "name": "english-writing-coach",
+      "source": "./plugins/english-writing-coach",
+      "description": "Diagnoses college English weaknesses and coaches writing, reading, vocabulary, grammar, translation, and CET text tasks through guided practice and review."
+    },
+    {
+      "name": "ai-shifu",
+      "source": "./plugins/ai-shifu",
+      "description": "Based on your teaching needs and source materials (PPT, Word, PDF, txt, etc.), helps you quickly build a one-on-one interactive AI course."
+    },
+    {
+      "name": "sg-finance-tax",
+      "source": "./plugins/sg-finance-tax",
+      "description": "Expert in Singapore business operations covering tax, accounting, banking, financing, FX, payments, audit, grants, insurance and financial planning."
+    },
+    {
+      "name": "multi-cloud-expert",
+      "source": "./plugins/multi-cloud-expert",
+      "description": "Multi-cloud governance expert. Combines Omni-Channel ChatOps, 24/7 AIOps, and All-Round CloudOps for unified management across Tencent Cloud, Alibaba Cloud, AWS, Azure, GCP and more. Architecture visualization, intelligent inspection, risk assessment, and cloud resource Q&A — one agent to manage all clouds."
+    },
+    {
+      "name": "tianyu-marketing-guardian",
+      "source": "./plugins/tianyu-marketing-guardian",
+      "description": "Guards every marketing campaign across tourism, retail, Token airdrops and healthcare booking — auto-monitoring, plugging leaks and tuning strategies to protect your budget."
+    },
+    {
+      "name": "reality-checker",
+      "source": "./plugins/reality-checker",
+      "description": "Defaulting to everything needing more evidence, requiring overwhelming proof to approve production readiness"
+    },
+    {
+      "name": "deal-strategist",
+      "source": "./plugins/deal-strategist",
+      "description": "Expert in complex deal strategy formulation and execution, helping sales teams win major deals"
+    },
+    {
+      "name": "fbsir-industry-scene-researcher",
+      "source": "./plugins/fbsir-industry-scene-researcher",
+      "description": "Finds one practical workflow gap in an industry scene and turns it into a supplement card, 3-day action plan, and project packet."
+    },
+    {
+      "name": "unity-multiplayer-engineer",
+      "source": "./plugins/unity-multiplayer-engineer",
+      "description": "Expert in Netcode for GameObjects and network prediction"
+    },
+    {
+      "name": "recruitment-expert",
+      "source": "./plugins/recruitment-expert",
+      "description": "Expert in the full recruitment process, finding the best talent for teams"
+    },
+    {
+      "name": "invoice-verify-expert",
+      "source": "./plugins/invoice-verify-expert",
+      "description": "Verify authenticity of 17 invoice types including VAT, e-invoice, blockchain invoice"
+    },
+    {
+      "name": "tietu-toutiao",
+      "source": "./plugins/tietu-toutiao",
+      "description": "Turns one or many newspaper pages into mobile cover concepts, synthesizes selected items into one cover, and renders deterministic, versioned, review-gated PNGs."
+    },
+    {
+      "name": "jinshuju-expert",
+      "source": "./plugins/jinshuju-expert",
+      "description": "Through the Jinshuju MCP, build and edit forms, create/query/update/bulk-maintain entries, and check plan quota in natural language, replacing manual work in the web console"
+    },
+    {
+      "name": "cordys-crm",
+      "source": "./plugins/cordys-crm",
+      "description": "Role-aware CRM assistant for the full Lead-to-Cash pipeline. Auto-detects user role and provides adaptive queries, risk alerts, funnel analysis, and workflow guidance."
+    },
+    {
+      "name": "hsk-devops-expert",
+      "source": "./plugins/hsk-devops-expert",
+      "description": "DevOps expert for zero-config public preview, NAT traversal, file hosting and project deployment via HSK CLI"
+    },
+    {
+      "name": "uupt-delivery",
+      "source": "./plugins/uupt-delivery",
+      "description": "UU same-city instant delivery and on-site help: pricing, ordering, order tracking, cancellation, real-time courier tracking, and coupon claiming."
+    },
+    {
+      "name": "tianyu-account-guardian",
+      "source": "./plugins/tianyu-account-guardian",
+      "description": "Watches register, login, and invitation/fission flows end-to-end, tunes real-time strategies to block malicious accounts, and writes complaint root-cause reports."
+    },
+    {
+      "name": "ai-shifu-expert",
+      "source": "./plugins/ai-shifu-expert",
+      "description": "Based on your teaching needs and source materials (PPT, Word, PDF, txt, etc.), helps you quickly build a one-on-one interactive AI course."
+    },
+    {
+      "name": "fbsir-board-secretary-assistant",
+      "source": "./plugins/fbsir-board-secretary-assistant",
+      "description": "Runs a compliance red-team review before disclosure, roadshow, IR Q&A, announcement, or investor communication material is used externally."
+    },
+    {
+      "name": "qingflow-hr-expert",
+      "source": "./plugins/qingflow-hr-expert",
+      "description": "Covers recruitment, training, performance, onboarding, and HR analytics end-to-end. AI empowers HR to shift from transactional to strategic work via QingFlow MCP connectors."
+    },
+    {
+      "name": "capacity-expert",
+      "source": "./plugins/capacity-expert",
+      "description": "Resource capacity planning expert. Specializes in resource water level monitoring, capacity forecasting, elastic scaling strategy design, and preventing resource bottlenecks and waste."
+    },
+    {
+      "name": "chaos-expert",
+      "source": "./plugins/chaos-expert",
+      "description": "Chaos engineering expert. Specializes in fault injection drill design, resilience verification and scoring, circuit breaker strategy evaluation, and system anti-fragility improvement."
+    },
+    {
+      "name": "sre-expert",
+      "source": "./plugins/sre-expert",
+      "description": "Site reliability expert. Specializes in fault root cause reasoning, alert correlation analysis, business process diagnosis, and SLO governance. Ensures continuous and stable service operation through systematic diagnosis methodology."
+    },
+    {
+      "name": "tripstar-agent",
+      "source": "./plugins/tripstar-agent",
+      "description": "A life service concierge that plans trips, books hotels, recommends attractions/restaurants, tracks weather & budget, and grabs Meituan coupons — all in one go"
+    },
+    {
+      "name": "studio-producer",
+      "source": "./plugins/studio-producer",
+      "description": "Coordinating the entire process from project initiation to delivery, balancing creativity, budget, and timeline"
+    },
+    {
+      "name": "yunzhi-qa-assistant",
+      "source": "./plugins/yunzhi-qa-assistant",
+      "description": "A retrieval-augmented Q&A expert built on the Tencent Yunzhi (Lexiang) knowledge base, supporting competitive analysis and overseas/international retrieval with citation-grounded answers."
+    },
+    {
+      "name": "paid-media-auditor",
+      "source": "./plugins/paid-media-auditor",
+      "description": "Deep auditing of advertising data and budget allocation to identify wasted ad spend"
+    },
+    {
+      "name": "computer-operations-advisor",
+      "source": "./plugins/computer-operations-advisor",
+      "description": "Helps students set up computers, install software safely, prevent unwanted apps, connect campus networks and peripherals, and troubleshoot common issues."
+    },
+    {
+      "name": "inspection-expert",
+      "source": "./plugins/inspection-expert",
+      "description": "Cloud resource inspection expert. Covers five-dimension inspection (security, performance, reliability, cost, compliance), high-risk scanning and prioritized remediation, inspection trend analysis, and visual report generation. Proactively discovers hidden risks before they become incidents."
+    },
+    {
+      "name": "malaysia-marketing",
+      "source": "./plugins/malaysia-marketing",
+      "description": "Deeply versed in Malaysia's culture and religion. Covers consumer profiling, brand localization, social ad buying, and user growth; delivers marketing posters and short videos."
+    },
+    {
+      "name": "kuaishou-strategist",
+      "source": "./plugins/kuaishou-strategist",
+      "description": "Deep understanding of Kuaishou's lower-tier market characteristics and Laotie culture, creating down-to-earth content strategies"
+    },
+    {
+      "name": "app-store-optimization-expert",
+      "source": "./plugins/app-store-optimization-expert",
+      "description": "Expert in App Store and Google Play search ranking algorithms, making apps stand out"
+    },
+    {
+      "name": "executive-summary-generator",
+      "source": "./plugins/executive-summary-generator",
+      "description": "Condensing lengthy reports into executive-digestible summaries, saving every minute"
+    },
+    {
+      "name": "vision-os-spatial-engineer",
+      "source": "./plugins/vision-os-spatial-engineer",
+      "description": "Expert in visionOS platform development, building Apple Vision Pro spatial applications"
+    },
+    {
+      "name": "accounts-payable-agent",
+      "source": "./plugins/accounts-payable-agent",
+      "description": "Automating accounts payable processes, ensuring accurate and timely payments"
+    },
+    {
+      "name": "exam-preparation-planner",
+      "source": "./plugins/exam-preparation-planner",
+      "description": "Builds actionable exam plans for students from scope, time, and mastery, then adapts them through check-ins, weakness reviews, and replanning."
+    },
+    {
+      "name": "jinshuju-table-expert",
+      "source": "./plugins/jinshuju-table-expert",
+      "description": "Lightweight tables supporting multiple field types such as text and date, designed for agents, readable and writable anytime for collaboration."
+    },
+    {
+      "name": "zhihu-strategist",
+      "source": "./plugins/zhihu-strategist",
+      "description": "Expert in Zhihu recommendation mechanism and knowledge marketing strategy, building authority through high-quality answers"
+    },
+    {
+      "name": "git-workflow-expert",
+      "source": "./plugins/git-workflow-expert",
+      "description": "Expert in advanced Git workflows and branching strategies, making team collaboration flow like a smooth stream"
+    },
+    {
+      "name": "finops-expert",
+      "source": "./plugins/finops-expert",
+      "description": "Cloud cost governance expert. Specializes in bill analysis, idle resource identification, billing model optimization, and cost allocation. Drives cost reduction and efficiency improvement decisions."
+    },
+    {
+      "name": "database-optimization-expert",
+      "source": "./plugins/database-optimization-expert",
+      "description": "Specializes in database performance tuning and query optimization, making slow queries fast and bottlenecks disappear"
+    },
+    {
+      "name": "jira-workflow-admin",
+      "source": "./plugins/jira-workflow-admin",
+      "description": "Expert in Jira configuration and agile workflow design, making tools truly serve team efficiency"
+    },
+    {
+      "name": "performance-testing-expert",
+      "source": "./plugins/performance-testing-expert",
+      "description": "Expert in performance testing and benchmarking, proving performance improvements with data, not gut feeling"
+    },
+    {
+      "name": "dev-ops-automation-engineer",
+      "source": "./plugins/dev-ops-automation-engineer",
+      "description": "Automates all manual operations from CI/CD to Infrastructure as Code, making deployments one-click simple"
+    },
+    {
+      "name": "tencent-cloud-quote-assistant",
+      "source": "./plugins/tencent-cloud-quote-assistant",
+      "description": "Tencent Cloud quote assistant for product consultation and selection, real-time list-price quotes and comparisons, batch procurement quoting, competitor mapping, discount guidance, and official-offer lookup. Formal prices come from controlled real-time pricing workflows."
+    },
+    {
+      "name": "site-reliability-engineer",
+      "source": "./plugins/site-reliability-engineer",
+      "description": "Applies software engineering methodology to solve operations problems, ensuring 99.99% availability"
+    },
+    {
+      "name": "ppc-bidding-strategist",
+      "source": "./plugins/ppc-bidding-strategist",
+      "description": "Expert in Google Ads and Baidu PPC, acquiring high-quality traffic at the lowest cost-per-click"
+    },
+    {
+      "name": "outbound-strategist",
+      "source": "./plugins/outbound-strategist",
+      "description": "Expert in outbound and cold start sales strategies, getting strangers to listen within 30 seconds"
+    },
+    {
+      "name": "accessibility-auditor",
+      "source": "./plugins/accessibility-auditor",
+      "description": "Auditing interface accessibility by WCAG standards, ensuring every user can use the product"
+    },
+    {
+      "name": "project-shepherd",
+      "source": "./plugins/project-shepherd",
+      "description": "Gently but firmly guiding projects on schedule, ensuring milestones are delivered on time"
+    },
+    {
+      "name": "healthcare-marketing-compliance-expert",
+      "source": "./plugins/healthcare-marketing-compliance-expert",
+      "description": "Ensuring healthcare marketing content complies with regulatory requirements, safeguarding information accuracy"
+    },
+    {
+      "name": "test-results-analyst",
+      "source": "./plugins/test-results-analyst",
+      "description": "Analyzing test results like a detective reading evidence, uncovering hidden quality issues"
+    },
+    {
+      "name": "identity-graph-operator",
+      "source": "./plugins/identity-graph-operator",
+      "description": "Building and maintaining user identity graph systems, enabling cross-platform identity recognition"
+    },
+    {
+      "name": "ad-tracking-expert",
+      "source": "./plugins/ad-tracking-expert",
+      "description": "Expert in ad tracking code and conversion attribution technology, ensuring trackable campaign performance"
+    },
+    {
+      "name": "tencentcloud-api",
+      "source": "./plugins/tencentcloud-api",
+      "description": "Manage Tencent Cloud resources via natural language. Auto-discovers APIs across 200+ products, builds tccli commands, and executes them with safety guardrails and error handling."
+    },
+    {
+      "name": "kdocs-ppt-creator",
+      "source": "./plugins/kdocs-ppt-creator",
+      "description": "By Kingsoft Docs From a single-line topic or a source document, AI plans the outline and generates a complete deck with title/content/summary slides, styled for the target scenario — ideal for reports, project showcases, training and pitches."
+    },
+    {
+      "name": "xr-interface-architect",
+      "source": "./plugins/xr-interface-architect",
+      "description": "Designing user interface architecture in XR environments, making 3D spatial interaction intuitive and natural"
+    },
+    {
+      "name": "data-integration-agent",
+      "source": "./plugins/data-integration-agent",
+      "description": "Cleaning and unifying scattered data, building an enterprise unified data view"
+    },
+    {
+      "name": "note-class-representative",
+      "source": "./plugins/note-class-representative",
+      "description": "Aligns class materials with source, transformation, and verification labels into correctable notes and review assets."
+    },
+    {
+      "name": "brazil-legal",
+      "source": "./plugins/brazil-legal",
+      "description": "Covers Brazil company registration, contract management, IP, labor and employment, data compliance, product market access and dispute resolution, providing professional legal and compliance support for enterprises in investment, trade, operations and localization."
+    },
+    {
+      "name": "twitter-operations-expert",
+      "source": "./plugins/twitter-operations-expert",
+      "description": "Expert in Twitter/X platform engagement strategy and topic operations, putting brands at the center of global conversations"
+    },
+    {
+      "name": "social-media-strategist",
+      "source": "./plugins/social-media-strategist",
+      "description": "Comprehensively coordinating multi-platform social media strategy, making brands speak loudest on every platform"
+    },
+    {
+      "name": "roblox-avatar-creator",
+      "source": "./plugins/roblox-avatar-creator",
+      "description": "Expert in Roblox UGC and avatar pipeline"
+    },
+    {
+      "name": "corporate-training-designer",
+      "source": "./plugins/corporate-training-designer",
+      "description": "Designing systematic corporate training courses and learning paths, rapidly upskilling employees"
+    },
+    {
+      "name": "linked-in-content-creator",
+      "source": "./plugins/linked-in-content-creator",
+      "description": "Expert in LinkedIn professional social platform content strategy, helping establish thought leadership"
+    },
+    {
+      "name": "ngo-challenge-advisor",
+      "source": "./plugins/ngo-challenge-advisor",
+      "description": "Turns real NGO work pain points into clear, actionable co-creation cards through adaptive, click-first interviews and publication checks."
+    },
+    {
+      "name": "godot-game-script-engineer",
+      "source": "./plugins/godot-game-script-engineer",
+      "description": "Expert in GDScript 2.0 and Godot 4 node architecture"
+    },
+    {
+      "name": "developer-evangelist",
+      "source": "./plugins/developer-evangelist",
+      "description": "Building and growing developer communities, driving product adoption among developers"
+    },
+    {
+      "name": "customer-support-expert",
+      "source": "./plugins/customer-support-expert",
+      "description": "Transforming every frustrated user interaction into loyal advocacy, creating reputation through excellent service"
+    },
+    {
+      "name": "embedded-firmware-engineer",
+      "source": "./plugins/embedded-firmware-engineer",
+      "description": "Expert in microcontroller programming, writing efficient and reliable firmware code on resource-constrained hardware"
+    },
+    {
+      "name": "diversity-visual-expert",
+      "source": "./plugins/diversity-visual-expert",
+      "description": "Dedicated to eliminating systemic bias in AI imagery, ensuring cultural accuracy and inclusivity in visual content"
+    },
+    {
+      "name": "godot-multiplayer-engineer",
+      "source": "./plugins/godot-multiplayer-engineer",
+      "description": "Expert in Godot 4 MultiplayerAPI and network replication"
+    },
+    {
+      "name": "private-domain-operations-expert",
+      "source": "./plugins/private-domain-operations-expert",
+      "description": "Expert in WeChat private domain traffic pool construction and operations, converting public traffic into private assets"
+    },
+    {
+      "name": "unity-architect",
+      "source": "./plugins/unity-architect",
+      "description": "Expert in ScriptableObjects and decoupled system design"
+    },
+    {
+      "name": "model-quality-assurance-expert",
+      "source": "./plugins/model-quality-assurance-expert",
+      "description": "Systematically evaluating and ensuring AI model quality, ensuring outputs are accurate, fair, and safe"
+    },
+    {
+      "name": "studio-operations-manager",
+      "source": "./plugins/studio-operations-manager",
+      "description": "Comprehensively managing studio daily operations, from resource allocation to process optimization"
+    },
+    {
+      "name": "tool-evaluation-expert",
+      "source": "./plugins/tool-evaluation-expert",
+      "description": "Systematically evaluating and recommending the best tools for teams, avoiding wasted time on wrong tools"
+    },
+    {
+      "name": "unreal-system-engineer",
+      "source": "./plugins/unreal-system-engineer",
+      "description": "Expert in C++/Blueprint and Nanite/Lumen"
+    },
+    {
+      "name": "technical-artist",
+      "source": "./plugins/technical-artist",
+      "description": "Bridging art vision and engine implementation, expert in shaders and VFX"
+    },
+    {
+      "name": "social-ad-strategist",
+      "source": "./plugins/social-ad-strategist",
+      "description": "Expert in social platform advertising, achieving optimal customer acquisition cost through precise targeting"
+    },
+    {
+      "name": "brand-guardian",
+      "source": "./plugins/brand-guardian",
+      "description": "15 years of brand strategy experience, the ultimate defender of brand consistency"
+    },
+    {
+      "name": "reddit-community-builder",
+      "source": "./plugins/reddit-community-builder",
+      "description": "Deep understanding of Reddit community culture, building authentic community influence on the world's largest forum"
+    },
+    {
+      "name": "narrative-designer",
+      "source": "./plugins/narrative-designer",
+      "description": "Seamlessly blending narrative and gameplay, making story and interaction inseparable"
+    },
+    {
+      "name": "xr-immersive-developer",
+      "source": "./plugins/xr-immersive-developer",
+      "description": "Expert in XR immersive experience development, creating immersive VR/MR applications"
+    },
+    {
+      "name": "kdocs-knowledge-collector",
+      "source": "./plugins/kdocs-knowledge-collector",
+      "description": "By Kingsoft Docs Turn scattered web articles, messages and notes into structured knowledge: one-click clipping to cloud docs, AI-powered note organization by topic, and auto-summarization across multiple documents."
+    },
+    {
+      "name": "thailand-hr-admin",
+      "source": "./plugins/thailand-hr-admin",
+      "description": "Expert in Thai labor law (LPA), expat employee work permit compliance, compensation & benefits, and local culture adaptation."
+    },
+    {
+      "name": "zero-knowledge-proof-admin",
+      "source": "./plugins/zero-knowledge-proof-admin",
+      "description": "Expert in zero-knowledge proof technology application and management"
+    },
+    {
+      "name": "study-abroad-consultant",
+      "source": "./plugins/study-abroad-consultant",
+      "description": "Expert in international study application processes and institution information"
+    },
+    {
+      "name": "uae-strategic-advisor",
+      "source": "./plugins/uae-strategic-advisor",
+      "description": "Analyze the macro environment and industry trends across UAE's seven emirates, compare competitive landscapes and investment locations, assess entry modes and risks, and deliver long-term strategic recommendations for enterprises entering the UAE market."
+    },
+    {
+      "name": "api-testing-expert",
+      "source": "./plugins/api-testing-expert",
+      "description": "Finding every API defect before users do, ensuring interface stability and correctness"
+    },
+    {
+      "name": "kdocs-pdf-toolbox",
+      "source": "./plugins/kdocs-pdf-toolbox",
+      "description": "By Kingsoft Docs One-stop PDF processing: split by pages, merge multiple files, extract specific pages, convert to Word/Excel/PPT, full-text translation export (bilingual/target language), content reading and page count — ideal for contract splitting, report merging, format conversion, and cross-language document processing."
+    },
+    {
+      "name": "experiment-tracking-manager",
+      "source": "./plugins/experiment-tracking-manager",
+      "description": "Systematically managing the full lifecycle of experiments, ensuring every experiment has hypothesis, execution, and conclusion"
+    },
+    {
+      "name": "instagram-operations-expert",
+      "source": "./plugins/instagram-operations-expert",
+      "description": "Expert in Instagram visual aesthetics and content strategy, creating aspirational brand images"
+    },
+    {
+      "name": "infrastructure-operations-expert",
+      "source": "./plugins/infrastructure-operations-expert",
+      "description": "Ensuring continuous stable operation of IT infrastructure, everything under control"
+    },
+    {
+      "name": "roblox-system-script-engineer",
+      "source": "./plugins/roblox-system-script-engineer",
+      "description": "Expert in Luau and Roblox client-server security model"
+    },
+    {
+      "name": "sales-pipeline-analyst",
+      "source": "./plugins/sales-pipeline-analyst",
+      "description": "Using data-driven methods to analyze pipeline health, turning forecasting from guesswork into science"
+    },
+    {
+      "name": "unreal-multiplayer-architect",
+      "source": "./plugins/unreal-multiplayer-architect",
+      "description": "Expert in Unreal Actor replication and server authoritative architecture"
+    },
+    {
+      "name": "enterprise-account-strategist",
+      "source": "./plugins/enterprise-account-strategist",
+      "description": "Expert in enterprise account management and expansion strategies, developing customers into long-term strategic partners"
+    },
+    {
+      "name": "legal-builder-hub",
+      "source": "./plugins/legal-builder-hub",
+      "description": "Legal skill governance expert for reviewing, auditing, maintaining, and governing legal skills with a trust layer."
+    },
+    {
+      "name": "well-arch-expert",
+      "source": "./plugins/well-arch-expert",
+      "description": "Cloud architecture governance expert. Specializes in architecture visualization and assessment, resource topology analysis, Well-Architected six-pillar evaluation, and architecture risk identification to ensure best practice compliance."
+    },
+    {
+      "name": "mac-os-spatial-metal-engineer",
+      "source": "./plugins/mac-os-spatial-metal-engineer",
+      "description": "Expert in Apple Metal graphics API and macOS spatial computing development"
+    },
+    {
+      "name": "sales-data-extraction-agent",
+      "source": "./plugins/sales-data-extraction-agent",
+      "description": "Automatically extracting and organizing sales data from various data sources"
+    },
+    {
+      "name": "skill-smith",
+      "source": "./plugins/skill-smith",
+      "description": "Turns repetitive workflows into working Skills: scope discovery, requirement confirmation, generation, hands-on testing, and standards-based review."
+    },
+    {
+      "name": "sales-coach",
+      "source": "./plugins/sales-coach",
+      "description": "Full-stack sales coaching: from rep development to deal execution — meeting prep, deal strategy, business cases, competitive intelligence, and call coaching"
+    },
+    {
+      "name": "threat-detection-engineer",
+      "source": "./plugins/threat-detection-engineer",
+      "description": "Specializes in building threat detection systems, discovering and intercepting threats before attackers cause damage"
+    },
+    {
+      "name": "short-video-editing-coach",
+      "source": "./plugins/short-video-editing-coach",
+      "description": "Expert in short video editing techniques and rhythm control, giving every video professional impact"
+    },
+    {
+      "name": "china-ecommerce-operations-expert",
+      "source": "./plugins/china-ecommerce-operations-expert",
+      "description": "Expert in Tmall, JD.com, Pinduoduo platform operations, handling everything from product selection to bestseller creation"
+    },
+    {
+      "name": "evidence-collector",
+      "source": "./plugins/evidence-collector",
+      "description": "Never letting any issue without screenshot evidence slip by, using visual proof to ensure defects have nowhere to hide"
+    },
+    {
+      "name": "unreal-technical-artist",
+      "source": "./plugins/unreal-technical-artist",
+      "description": "Expert in UE5 Material Editor and Niagara VFX"
+    },
+    {
+      "name": "jinshuju-form-expert",
+      "source": "./plugins/jinshuju-form-expert",
+      "description": "Create forms for registration, questionnaires, appointments, and payments, and perform CRUD operations, as well as batch import and export of data, replacing backend login operations."
+    },
+    {
+      "name": "programmatic-ad-buyer",
+      "source": "./plugins/programmatic-ad-buyer",
+      "description": "Expert in programmatic ad buying and DSP platforms, achieving large-scale precision targeting through algorithms"
+    },
+    {
+      "name": "weibo-strategist",
+      "source": "./plugins/weibo-strategist",
+      "description": "Expert in Weibo topic marketing and public opinion dynamics, keeping brands trending and breaking through"
+    },
+    {
+      "name": "delightful-experience-designer",
+      "source": "./plugins/delightful-experience-designer",
+      "description": "Focused on injecting unexpected moments of joy into brand experiences"
+    },
+    {
+      "name": "podcast-strategist",
+      "source": "./plugins/podcast-strategist",
+      "description": "Expert in podcast content planning and growth strategy, building deep user connections through audio"
+    },
+    {
+      "name": "terminal-integration-expert",
+      "source": "./plugins/terminal-integration-expert",
+      "description": "Expert in integrating terminal applications with spatial computing environments"
+    },
+    {
+      "name": "data-analytics-reporter",
+      "source": "./plugins/data-analytics-reporter",
+      "description": "Transforms complex data into strategic insights with metric diagnostics, KPI frameworks, quality assessment, and decision-ready reports"
+    },
+    {
+      "name": "law-student-coach",
+      "source": "./plugins/law-student-coach",
+      "description": "Study coach for law students: Socratic drills, case briefs, outlines, IRAC practice, flashcards, cold-call prep, legal writing, and exam review."
+    },
+    {
+      "name": "lsp-index-engineer",
+      "source": "./plugins/lsp-index-engineer",
+      "description": "Expert in Language Server Protocol and code indexing technologies"
+    },
+    {
+      "name": "uae-marketing-advisor",
+      "source": "./plugins/uae-marketing-advisor",
+      "description": "UAE marketing expert covering regional differences across emirates. Covers consumer profiling, brand localization, channel strategy, user growth, and AI-generated marketing posters and videos."
+    },
+    {
+      "name": "kdocs-doc-butler",
+      "source": "./plugins/kdocs-doc-butler",
+      "description": "By Kingsoft Docs End-to-end Kingsoft Docs lifecycle management: create docs of any type, locate files by keyword, AI-classify folders by topic, batch move/rename, and manage sharing links with permissions."
+    },
+    {
+      "name": "campus-conversation-coach",
+      "source": "./plugins/campus-conversation-coach",
+      "description": "Builds natural campus communication through progressive scenarios, observable feedback, resistance practice, and transfer checks."
+    },
+    {
+      "name": "indonesia-pa-expert",
+      "source": "./plugins/indonesia-pa-expert",
+      "description": "Analyzes Indonesia's political-business landscape and compliance risks, integrating policy interpretation with crisis communications, blending local religious culture to deliver actionable GR strategies."
+    },
+    {
+      "name": "roblox-experience-designer",
+      "source": "./plugins/roblox-experience-designer",
+      "description": "Expert in Roblox platform UX and monetization design"
+    },
+    {
+      "name": "unity-editor-tool-developer",
+      "source": "./plugins/unity-editor-tool-developer",
+      "description": "Expert in Unity custom EditorWindow and pipeline automation"
+    },
+    {
+      "name": "tik-tok-strategist",
+      "source": "./plugins/tik-tok-strategist",
+      "description": "Expert in TikTok algorithm and overseas short-video ecosystem, helping brands go viral on global platforms"
+    },
+    {
+      "name": "ad-creative-strategist",
+      "source": "./plugins/ad-creative-strategist",
+      "description": "Expert in ad creative design and performance prediction, creating high-converting ad assets"
+    },
+    {
+      "name": "supply-chain-strategist",
+      "source": "./plugins/supply-chain-strategist",
+      "description": "Optimizing every link in the supply chain, achieving the best balance of cost, efficiency, and resilience"
+    },
+    {
+      "name": "campus-job-search-coach",
+      "source": "./plugins/campus-job-search-coach",
+      "description": "Helps students turn real experience into graduate resumes, tailor applications, practice interviews, write recruiting messages, and compare offers."
+    },
+    {
+      "name": "mobile-application-developer",
+      "source": "./plugins/mobile-application-developer",
+      "description": "Expert in iOS and Android native and cross-platform development, creating smooth and beautiful mobile applications"
+    },
+    {
+      "name": "tanyuan-cultural-heritage-expert",
+      "source": "./plugins/tanyuan-cultural-heritage-expert",
+      "description": "Powered by TanYuan, providing cultural relic and world heritage queries, knowledge Q&A, relic comparison, museum guides and study programs."
+    },
+    {
+      "name": "litigation-legal",
+      "source": "./plugins/litigation-legal",
+      "description": "Litigation support expert for matter intake, portfolio status, chronologies, claim charts, evidence timelines, issue charts, litigation correspondence, deadline tracking, and brief sections."
+    },
+    {
+      "name": "patient-education-content-review-word-assistant",
+      "source": "./plugins/patient-education-content-review-word-assistant",
+      "description": "Six-dimension patient education content review (serious issues / scientific accuracy / publishing norms / language style / medical logic / references) with data-reference consistency checks; outputs a Word file with native comments and highlights marked directly on the original text."
+    },
+    {
+      "name": "unity-shader-graph-artist",
+      "source": "./plugins/unity-shader-graph-artist",
+      "description": "Expert in Unity Shader Graph and HLSL"
+    },
+    {
+      "name": "wechat-official-account-expert",
+      "source": "./plugins/wechat-official-account-expert",
+      "description": "Expert in official account content strategy and follower growth, building 100K+ brand self-media matrix"
+    },
+    {
+      "name": "fund-research-analyst",
+      "source": "./plugins/fund-research-analyst",
+      "description": "Penetrates fund performance, drawdown, Sharpe ratio, holdings and manager data across dimensions to find funds worth holding for the long term through horizontal comparison."
+    },
+    {
+      "name": "kdocs-data-table",
+      "source": "./plugins/kdocs-data-table",
+      "description": "By Kingsoft Docs Turn group-chat jielong into structured tables, create shareable WPS smart forms, and beautify spreadsheets with rule enforcement (conditional formatting, data validation dropdowns, and range protection). Excels at jielong parsing, form design, format normalization and deduplication."
+    },
+    {
+      "name": "software-architect",
+      "source": "./plugins/software-architect",
+      "description": "Designs scalable and highly available software architectures from a holistic perspective, guiding the technical team's direction"
+    },
+    {
+      "name": "topic-evaluator",
+      "source": "./plugins/topic-evaluator",
+      "description": "Dual-level 4-dimension scoring with web research, 5-angle comparison, and clear go/no-go decisions for tech channel topics."
+    },
+    {
+      "name": "agent-orchestrator",
+      "source": "./plugins/agent-orchestrator",
+      "description": "Expert in multi-agent system orchestration and coordination, enabling AI teams to collaborate efficiently"
+    },
+    {
+      "name": "godot-shader-developer",
+      "source": "./plugins/godot-shader-developer",
+      "description": "Expert in Godot shading language and VisualShader"
+    },
+    {
+      "name": "agent-identity-trust-expert",
+      "source": "./plugins/agent-identity-trust-expert",
+      "description": "Building identity authentication and trust mechanisms between AI agents"
+    },
+    {
+      "name": "indie-founder-coach",
+      "source": "./plugins/indie-founder-coach",
+      "description": "Guides indie founders to build profitable businesses with minimal resources using lean bootstrapping methodology"
+    },
+    {
+      "name": "study-fortune-compass",
+      "source": "./plugins/study-fortune-compass",
+      "description": "Cast one number through a disclosed Mei Hua Yi Shu calculation, follow the primary, mutual, and changed hexagrams, then test the reading against your real study context."
+    },
+    {
+      "name": "terminal-veteran",
+      "source": "./plugins/terminal-veteran",
+      "description": "30-year terminal veteran, 11 industry laws + 3-layer methodology, vendor strategy/channel selection/investment analysis + industry reports + competitive analysis"
+    },
+    {
+      "name": "xr-cockpit-interaction-expert",
+      "source": "./plugins/xr-cockpit-interaction-expert",
+      "description": "Specializing in cockpit-style interaction design in XR environments"
+    },
+    {
+      "name": "search-term-analyst",
+      "source": "./plugins/search-term-analyst",
+      "description": "Deep analysis of search term data to uncover users' true search intent"
+    },
+    {
+      "name": "unreal-world-builder",
+      "source": "./plugins/unreal-world-builder",
+      "description": "Expert in UE5 World Partition and large world streaming"
+    },
+    {
+      "name": "trend-researcher",
+      "source": "./plugins/trend-researcher",
+      "description": "Continuously tracking industry and technology trends, providing forward-looking insights for product strategy"
+    },
+    {
+      "name": "chaogeek-kongming",
+      "source": "./plugins/chaogeek-kongming",
+      "description": "A sharp Socratic thinking partner for OPC builders: ask fewer but deeper questions, align intent, and keep judgment in human hands."
+    },
+    {
+      "name": "douyin-strategist",
+      "source": "./plugins/douyin-strategist",
+      "description": "Expert in Douyin algorithm and content ecosystem, creating viral short videos and achieving commercial monetization"
+    },
+    {
+      "name": "cross-border-ecommerce-expert",
+      "source": "./plugins/cross-border-ecommerce-expert",
+      "description": "Expert in Amazon, Shopify and other international e-commerce platforms, helping brands go global"
+    },
+    {
+      "name": "cultural-intelligence-strategist",
+      "source": "./plugins/cultural-intelligence-strategist",
+      "description": "Helping brands establish cultural sensitivity in globalization processes"
+    },
+    {
+      "name": "sg-biz-dev",
+      "source": "./plugins/sg-biz-dev",
+      "description": "Helps enterprises discover clients, partners, channels, suppliers and distributors in Singapore, connect with parks, exhibitions and investment opportunities, and navigate market entry pathways."
+    },
+    {
+      "name": "blockchain-security-auditor",
+      "source": "./plugins/blockchain-security-auditor",
+      "description": "Specializing in blockchain smart contract and DeFi protocol security audits"
+    },
+    {
+      "name": "sg-hr-admin-expert",
+      "source": "./plugins/sg-hr-admin-expert",
+      "description": "Expert in Singapore recruitment, employment contracts, compensation & benefits, work passes, CPF, office leasing, admin processes and employee management."
+    },
+    {
+      "name": "game-audio-engineer",
+      "source": "./plugins/game-audio-engineer",
+      "description": "Expert in FMOD/Wwise integration and spatial audio, bringing game sounds to life"
+    },
+    {
+      "name": "career-navigator",
+      "source": "./plugins/career-navigator",
+      "description": "Helps university students clarify interests, abilities, values, and constraints, compare study and career paths, and validate directions through low-cost actions."
+    },
+    {
+      "name": "thai-marketing-creative",
+      "source": "./plugins/thai-marketing-creative",
+      "description": "Integrating full-funnel user insights and behavioral decision logic to anchor Thailand's relaxed self-indulgence sentiment, unlock Thai-market conversion paths, and deliver localized marketing solutions."
+    },
+    {
+      "name": "autonomous-optimization-architect",
+      "source": "./plugins/autonomous-optimization-architect",
+      "description": "Specializes in designing intelligent system architectures that can autonomously optimize and evolve, making systems smarter over time"
+    },
+    {
+      "name": "andon-q-expert",
+      "source": "./plugins/andon-q-expert",
+      "description": "An intelligent customer service assistant with deep expertise across the full Tencent Cloud product line, providing multi-dimensional services including product consulting, troubleshooting, and service reports."
+    },
+    {
+      "name": "ai-image-prompt-engineer",
+      "source": "./plugins/ai-image-prompt-engineer",
+      "description": "Master of AI image generation language codes, transforming abstract visual concepts into precise prompts"
+    },
+    {
+      "name": "cat-network-quality-analyst",
+      "source": "./plugins/cat-network-quality-analyst",
+      "description": "Specializing in error analysis, performance analysis, overall analysis, packet-capture analysis, and multi-task comparison, automatically generating professional analysis reports."
+    },
+    {
+      "name": "wechat-channels-strategist",
+      "source": "./plugins/wechat-channels-strategist",
+      "description": "Full-funnel WeChat Channels strategist mastering social-recommendation content, livestream commerce, social fission, and private-domain closed loops to grow your account from 0 to 1."
+    },
+    {
+      "name": "solidity-smart-contract-engineer",
+      "source": "./plugins/solidity-smart-contract-engineer",
+      "description": "Expert in Solidity and EVM ecosystem, writing secure and efficient smart contracts"
+    },
+    {
+      "name": "ihr-conference",
+      "source": "./plugins/ihr-conference",
+      "description": "Provides 9 smart outlines, real-time online guidance, and auto-generates structured minutes/todos via cloud recording, empowering full-cycle communication."
+    },
+    {
+      "name": "legal-clinic-supervisor",
+      "source": "./plugins/legal-clinic-supervisor",
+      "description": "Supervisor assistant for law school clinics: clinic setup, student onboarding, client intake, research starts, deadlines, status, letters, and semester handoff."
+    },
+    {
+      "name": "ihr-ai-interviewer",
+      "source": "./plugins/ihr-ai-interviewer",
+      "description": "Builds job-specific interview dimensions and question sets, reuses or creates digital-human interview templates, validates candidate information before launch, and reviews interview records, minutes, action items, and transcripts with permission-aware evidence."
+    },
+    {
+      "name": "multi-cloud-management-expert",
+      "source": "./plugins/multi-cloud-management-expert",
+      "description": "Master of multi-cloud architecture governance, architecture visualization, intelligent inspection, cloud cost optimization and risk assessment across Tencent Cloud, Alibaba Cloud, AWS and more. One expert to manage all clouds."
+    },
+    {
+      "name": "auto-consultant",
+      "source": "./plugins/auto-consultant",
+      "description": "Master of car-buying decisions and automotive marketing growth — covering brand marketing, user growth, vehicle analysis and car-buying consulting across the full journey."
+    },
+    {
+      "name": "south-africa-strategy-advisor",
+      "source": "./plugins/south-africa-strategy-advisor",
+      "description": "An intelligent strategic advisor specializing in ZA, covering macroeconomics, industry trends, investment site selection, market entry models, and risk assessment to deliver data-driven investment decisions."
+    },
+    {
+      "name": "engineering-workflow-skills",
+      "source": "./plugins/engineering-workflow-skills",
+      "description": "Senior engineering workflow coach based on Google engineer's «Agent Skills»: spec → plan → build → verify → review → ship"
+    },
+    {
+      "name": "tdx-stock-hunter",
+      "source": "./plugins/tdx-stock-hunter",
+      "description": "Powered by TDX MCP data, converts natural language into multi-dimensional screening criteria, performs cross-sectional analysis of 5000+ A-shares across fundamental/technical/capital/valuation dimensions with scoring, for user self-reference and decision making."
+    },
+    {
+      "name": "tdx-value-assessor",
+      "source": "./plugins/tdx-value-assessor",
+      "description": "Applies Graham-Buffett value investing framework with 15+ built-in valuation models (PE/PB/PEG/DCF/Buffett model) to assess quality companies' intrinsic value and safety margins."
+    },
+    {
+      "name": "tdx-stock-diagnostician",
+      "source": "./plugins/tdx-stock-diagnostician",
+      "description": "Like an experienced analyst, conducts 360-degree diagnosis across six modules: fundamentals, technicals, capital flows, event catalysts, peer comparison, and comprehensive conclusion."
+    },
+    {
+      "name": "tencent-rtc-expert",
+      "source": "./plugins/tencent-rtc-expert",
+      "description": "TRTC technical support: usage and quality query, single-call diagnostics, cloud inspection, fault troubleshooting, and RTC vendor migration."
+    },
+    {
+      "name": "pneumonia-ai-analyst",
+      "source": "./plugins/pneumonia-ai-analyst",
+      "description": "Upload chest CT DICOM archives for AI-assisted pneumonia diagnosis. Since DICOM slices are analyzed one by one, results may take a while, please be patient."
+    },
+    {
+      "name": "workbuddy-universal-mentor",
+      "source": "./plugins/workbuddy-universal-mentor",
+      "description": "A hands-on coaching WorkBuddy mentor covering onboarding, scenarios, real-world cases, Skills development, automation workflows and troubleshooting — for every level."
+    },
+    {
+      "name": "level-designer",
+      "source": "./plugins/level-designer",
+      "description": "Treating each level as a carefully orchestrated experience, telling stories through space"
+    },
+    {
+      "name": "thesis-writing-mentor",
+      "source": "./plugins/thesis-writing-mentor",
+      "description": "Guides thesis structure, academic revision, journal fit, and reviewer responses with evidence and readiness tracking."
+    },
+    {
+      "name": "baidu-seo-expert",
+      "source": "./plugins/baidu-seo-expert",
+      "description": "Deep understanding of Baidu search algorithm and China's search ecosystem, maximizing brand exposure"
+    },
+    {
+      "name": "anti-scam-agent",
+      "source": "./plugins/anti-scam-agent",
+      "description": "An anti-fraud intelligent agent driven by financial black & grey industry intelligence, covering telecom fraud, professional debt mules, loan packaging and anti-collection. It can analyze, investigate and produce assessment reports."
+    },
+    {
+      "name": "contract-expert",
+      "source": "./plugins/contract-expert",
+      "description": "An end-to-end contract expert covering drafting, review, negotiation, background assessment and full lifecycle management; professional review mode delivers Excel risk list, Markdown report, and Word-annotated contract."
+    },
+    {
+      "name": "bilibili-content-strategist",
+      "source": "./plugins/bilibili-content-strategist",
+      "description": "Expert in Bilibili platform ecosystem and young user preferences, crafting high-view video strategies"
+    },
+    {
+      "name": "xiaohongshu-operations-expert",
+      "source": "./plugins/xiaohongshu-operations-expert",
+      "description": "Deep understanding of Xiaohongshu seeding ecosystem and recommendation mechanism, creating high-engagement seeding content"
+    },
+    {
+      "name": "smart-stock-analyst",
+      "source": "./plugins/smart-stock-analyst",
+      "description": "AI-powered multi-market stock analysis expert with 15+ strategies, outputs interactive HTML dashboard reports with charts and visualizations"
+    },
+    {
+      "name": "ppt-creation-expert",
+      "source": "./plugins/ppt-creation-expert",
+      "description": "A presentation expert built on the Tencent Cloud Zhi (Lexiang) platform, tailored to Tencent Cloud templates. It integrates streamlined workflows for general presentations, customer-facing solution decks, executive briefing materials, and speech script generation."
+    },
+    {
+      "name": "omics-diagnosis-expert",
+      "source": "./plugins/omics-diagnosis-expert",
+      "description": "Expert in omics task intelligent diagnosis, providing automated log analysis, root cause identification, and repair guidance covering 11 major error categories"
+    },
+    {
+      "name": "livestream-ecommerce-coach",
+      "source": "./plugins/livestream-ecommerce-coach",
+      "description": "Expert in full-chain livestream e-commerce operations, from scripts to traffic investment, helping achieve GMV breakthroughs"
+    },
+    {
+      "name": "trend-hunter",
+      "source": "./plugins/trend-hunter",
+      "description": "A 24/7 radar that tracks trending topics across Weibo, Douyin, and Xiaohongshu, filters noise by your keywords, monitors competitors, and turns hot topics into content ideas, copy, and multi-platform posts."
+    },
+    {
+      "name": "xiaofa-litigation-assistant",
+      "source": "./plugins/xiaofa-litigation-assistant",
+      "description": "Litigation assistant: complaint drafting, element-style conversion, evidence organizer, procedure guides, enforcement, interest calculator. Outputs DOCX files. 7 legal skills, all-in-one self-service."
+    },
+    {
+      "name": "fbsir-super-independent-board",
+      "source": "./plugins/fbsir-super-independent-board",
+      "description": "A single, non-statutory AI decision reviewer that tests assumptions, separates evidence from judgment, and turns important choices into actionable, reviewable artifacts."
+    },
+    {
+      "name": "campus-event-navigator",
+      "source": "./plugins/campus-event-navigator",
+      "description": "Turn campus event ideas into actionable plans covering roles, budgets, promotion, on-site workflows, contingencies, and review."
+    },
+    {
+      "name": "mai-deal-advisor",
+      "source": "./plugins/mai-deal-advisor",
+      "description": "Turn unstructured deal materials into a clear workplan, editable structure diagram, checked numbers and cap table, and a discussion-ready report draft."
+    },
+    {
+      "name": "career-broker",
+      "source": "./plugins/career-broker",
+      "description": "I help you clarify your career profile, discuss growth and transition directions, and recommend courses, experience articles, internal cases, and liveflow opportunities."
+    },
+    {
+      "name": "contract-legal-expert",
+      "source": "./plugins/contract-legal-expert",
+      "description": "Tencent eSign senior contract & legal counsel that drafts, signs, reviews, compares contracts and retrieves applicable laws — your caring AI legal partner."
+    },
+    {
+      "name": "growth-hacker",
+      "source": "./plugins/growth-hacker",
+      "description": "Using data-driven experimental methodology to find untapped growth channels, achieving exponential growth"
+    },
+    {
+      "name": "jiayi-ads-analytics-expert",
+      "source": "./plugins/jiayi-ads-analytics-expert",
+      "description": "Not just analytics — directly operate ad platforms via API: bid adjustments, keyword management, budget changes, creative management, plus structured daily reports"
+    },
+    {
+      "name": "industrial-park-investment-attraction-expert",
+      "source": "./plugins/industrial-park-investment-attraction-expert",
+      "description": "Uses public evidence to find and verify companies against each park's actual goal. Business priority is applied only after the user states or confirms criteria."
+    },
+    {
+      "name": "legal-search-pro",
+      "source": "./plugins/legal-search-pro",
+      "description": "An advanced legal retrieval expert that identifies search intent, performs multi-layer statute and case-law retrieval with effectiveness verification, and delivers scenario-adapted output with interactive HTML traceability."
+    },
+    {
+      "name": "tc-sec",
+      "source": "./plugins/tc-sec",
+      "description": "Expert in Tencent Cloud security products, supporting cross-product automation, risk identification, threat analysis, compliance inspection, security report generation, and assisting users in completing security operations."
+    },
+    {
+      "name": "modern-webapp",
+      "source": "./plugins/modern-webapp",
+      "description": "Modern web application development with React, TypeScript, Vite, Tailwind CSS, shadcn/ui, and browser automation capabilities"
+    },
+    {
+      "name": "document-generation-expert",
+      "source": "./plugins/document-generation-expert",
+      "description": "Automating generation of various business documents, greatly improving document creation efficiency"
+    },
+    {
+      "name": "government-digital-presales-consultant",
+      "source": "./plugins/government-digital-presales-consultant",
+      "description": "Expert in government digital transformation needs and procurement processes"
+    },
+    {
+      "name": "discovery-coach",
+      "source": "./plugins/discovery-coach",
+      "description": "Training sales to master deep evidence exchange techniques, uncovering true business pain points"
+    },
+    {
+      "name": "user-experience-researcher",
+      "source": "./plugins/user-experience-researcher",
+      "description": "Validating design decisions with real data instead of assumptions, specializing in user behavior analysis and usability testing"
+    },
+    {
+      "name": "senior-project-manager",
+      "source": "./plugins/senior-project-manager",
+      "description": "10+ years of project management experience, expert in waterfall and agile, the anchor for complex projects"
+    },
+    {
+      "name": "workflow-optimization-expert",
+      "source": "./plugins/workflow-optimization-expert",
+      "description": "Finding bottlenecks, fixing processes, automating everything, maximizing team efficiency"
+    },
+    {
+      "name": "technical-documentation-engineer",
+      "source": "./plugins/technical-documentation-engineer",
+      "description": "Transforms complex technical concepts into clear and accurate documentation, making technical knowledge shareable"
+    },
+    {
+      "name": "presales-technical-consultant",
+      "source": "./plugins/presales-technical-consultant",
+      "description": "Bridging technology and business, helping clients understand the value of solutions"
+    },
+    {
+      "name": "proposal-strategist",
+      "source": "./plugins/proposal-strategist",
+      "description": "Expert in sales proposals and solution design, transforming value into irresistible business cases"
+    },
+    {
+      "name": "compliance-auditor",
+      "source": "./plugins/compliance-auditor",
+      "description": "Comprehensively auditing enterprise operations compliance, ensuring adherence to industry standards"
+    },
+    {
+      "name": "incident-response-commander",
+      "source": "./plugins/incident-response-commander",
+      "description": "Calmly commands teams to quickly locate, handle, and recover during system failures, the ultimate firefighting captain"
+    },
+    {
+      "name": "content-creator",
+      "source": "./plugins/content-creator",
+      "description": "Skilled at creating engaging multi-platform content, delivering brand stories to target audiences"
+    },
+    {
+      "name": "rapid-prototyping-engineer",
+      "source": "./plugins/rapid-prototyping-engineer",
+      "description": "Transforms ideas into working prototypes at lightning speed, enabling teams to quickly validate concepts"
+    },
+    {
+      "name": "fortune-consultant",
+      "source": "./plugins/fortune-consultant",
+      "description": "Traditional Chinese metaphysics reference — BaZi/ZiWei charting, Tarot and Plum Blossom hexagrams, lunar calendar and almanac. Multi-system cross-reference for self-exploration. For entertainment purposes only."
+    },
+    {
+      "name": "visual-storytelling-expert",
+      "source": "./plugins/visual-storytelling-expert",
+      "description": "Expert at transforming complex information into compelling visual stories"
+    },
+    {
+      "name": "legal-compliance-reviewer",
+      "source": "./plugins/legal-compliance-reviewer",
+      "description": "Ensuring business operations and product features comply with legal requirements, preventing compliance risks"
+    },
+    {
+      "name": "we-chat-mini-program-developer",
+      "source": "./plugins/we-chat-mini-program-developer",
+      "description": "Expert in WeChat Mini Program development framework and ecosystem, creating smooth WeChat-native experience applications"
+    },
+    {
+      "name": "brazil-rfb-expert",
+      "source": "./plugins/brazil-rfb-expert",
+      "description": "Full-lifecycle Brazil fiscal & tax advisory: local subsidies, tax structure design, cross-border capital planning, daily financial audits, and risk response. Built-in complete tax policies — your trusted fiscal assistant."
+    },
+    {
+      "name": "mermaid-diagram-expert",
+      "source": "./plugins/mermaid-diagram-expert",
+      "description": "Transforms natural language into professional Mermaid diagrams with 15+ themes, 6 chart types, and instant SVG/ASCII rendering"
+    },
+    {
+      "name": "sdk-log-expert",
+      "source": "./plugins/sdk-log-expert",
+      "description": "Client-side SDK log analysis: unzip & decode .clog/.xlog, TRTC/IM/TUI timeline reconstruction, evidence-based root-cause diagnosis, and interactive local Web preview."
+    },
+    {
+      "name": "brazil-company-query",
+      "source": "./plugins/brazil-company-query",
+      "description": "Investigate Brazilian company registration and credit risks, conduct patent and trademark IP due diligence, analyze market expansion paths, and reduce business development risks."
+    },
+    {
+      "name": "databrain-agent-v2",
+      "source": "./plugins/databrain-agent-v2",
+      "description": "Covers first-party metrics, market intelligence, opinion & sentiment, attribution drill-down, and cross-game competitive benchmarking with evidence-based insights."
+    },
+    {
+      "name": "feedback-synthesis-analyst",
+      "source": "./plugins/feedback-synthesis-analyst",
+      "description": "Extracting valuable insights from massive user feedback, transforming user voice into improvement directions"
+    },
+    {
+      "name": "book-co-creator",
+      "source": "./plugins/book-co-creator",
+      "description": "Deep collaboration with authors, helping plan book structure and content to achieve publishing-quality standards"
+    },
+    {
+      "name": "seo-expert",
+      "source": "./plugins/seo-expert",
+      "description": "Expert in Google search algorithms and technical SEO, keeping websites at the top of search results"
+    },
+    {
+      "name": "behavioral-nudge-engine",
+      "source": "./plugins/behavioral-nudge-engine",
+      "description": "Applying behavioral economics to design product nudge mechanisms, guiding users toward better decisions"
+    },
+    {
+      "name": "vocab-craft-expert",
+      "source": "./plugins/vocab-craft-expert",
+      "description": "AI vocabulary coach combining spaced repetition science with typing practice for efficient English word memorization"
+    },
+    {
+      "name": "hr-digital-expert",
+      "source": "./plugins/hr-digital-expert",
+      "description": "Full-chain HR IT expert covering data warehouse SQL queries, page development, one-click deployment, and knowledge management."
+    },
+    {
+      "name": "indonesia-bd-expert",
+      "source": "./plugins/indonesia-bd-expert",
+      "description": "Integrating full-chain supply and channel resources, uncovering industrial park and trade show opportunities, anchoring market entry pathways, and building industry collaboration ecosystems in Indonesia."
+    },
+    {
+      "name": "omics-bioinfo-expert",
+      "source": "./plugins/omics-bioinfo-expert",
+      "description": "Expert in omics bioinformatics analysis, providing WDL/Nextflow workflow execution, task failure diagnosis, and 3D protein structure visualization services"
     }
   ]
 }
