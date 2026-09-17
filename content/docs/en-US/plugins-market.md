@@ -29,11 +29,11 @@ Marketplace sources are declared in [`~/.agent-store/config.toml`](/en-US/docs/c
 ```toml
 # This site (agent-store.flowyaipc.cn) hosts all three market sources itself, under /source/<market>/…;
 # with no [default_marketplaces] declared, these are exactly what the runtime registers
-[default_marketplaces.workbuddy-experts]
+[default_marketplaces.experts]
 source_kind = "url"
 source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
 
-[default_marketplaces.workbuddy-skills]
+[default_marketplaces.skills]
 source_kind = "url"
 source = "https://agent-store.flowyaipc.cn/source/skills/.codebuddy-skill/marketplace.json"
 
@@ -96,7 +96,7 @@ All three can coexist. On a name collision **the declaration file > the `mcp_ser
 
 The two paths below cover the **latter two** (both land in `mcp_servers`):
 
-**Path A: direct registration (recommended for self-developed / private deployments)**
+### Path A: direct registration (recommended for self-developed / private deployments)
 
 Register by name through the MCP configuration API (these are the runtime's own HTTP endpoints and the host serves them; the Agent Store Web UI does **not** use them — that panel reads and writes the `mcp.json` declaration, see [Configuration](/en-US/docs/configuration)):
 
@@ -118,25 +118,36 @@ Three transports are supported; pick the one matching your server (the snippet b
 
 API keys / custom auth go directly in the transport `headers`; standard OAuth is handled by the runtime (login, storage, request injection). After registration, bind the server in a session/run (`selected_mcp_server_ids`) — the runtime `McpManager` connects and injects the tools into the model.
 
-**Integrating via the TypeScript SDK**
+### Integrating via the TypeScript SDK
 
-The SDK's connector client (`connector.list / get / status / test / authStart / authStatus`) is **read-only + OAuth pass-through** — the App Server protocol has no WebSocket method for "register an MCP server". Inside the SDK, a self-developed MCP server is wired in through the protocol-native **import → install** chain: package the server as a connector market directory, `import/run` it into an immutable PluginSnapshot, and `install/run` registers the connector into the runtime `mcp_servers` automatically.
+The SDK's connector client is **catalog reads + OAuth pass-through + the call proxy**: `list` / `get` / `status` / `test` (`get` and `test` carry each tool's parameter schema, so you can see how to call it before calling it), `authStart` / `authStatus` / `logout`, and `call`, which actually runs a tool over the host's own connection and needs the host to admit it in `[connector_proxy]` (see the [Configuration file](/en-US/docs/configuration)). **But** the App Server protocol has **no** WebSocket method for "register an MCP server", so inside the SDK a self-developed MCP server is wired in through the protocol-native **import → install** chain: package the server as a connector market directory, `import/run` it into an immutable PluginSnapshot, and `install/run` registers the connector into the runtime `mcp_servers` automatically.
 
-1. Create a minimal connector market directory:
+1. Create a minimal connector market directory — **two levels**: the market manifest lists entries, each entry's `source` points at its own directory, and the server declaration lives in there:
 
    ```text
-   my-mcp/
-   └── .codebuddy-connector/
-       └── connectors.json
+   my-market/
+   ├── .codebuddy-connector/
+   │   └── connectors.json        # market manifest: id/name + source (relative)
+   └── my-mcp/
+       └── mcp.json               # server declaration: mcpServers
    ```
 
    ```json
    {
      "name": "my-connectors",
-     "version": "0.1.0",
      "connectors": [
-       { "id": "my-mcp", "name": "My MCP", "type": "remote-mcp", "url": "https://mcp.example.com/mcp", "auth": "oauth" }
+       { "id": "my-mcp", "name": "My MCP", "version": "0.1.0", "source": "my-mcp" }
      ]
+   }
+   ```
+
+   An entry is keyed by `id` or `name`, and `source` **must be relative**; the fields inside `mcp.json`'s `mcpServers` are the **same set** as `~/.agent-store/mcp.json` (`command` / `url` / `headers` / `env`), and the importer turns each of them into a connector component — fields and validation are in the [Configuration file](/en-US/docs/configuration).
+
+   ```json
+   {
+     "mcpServers": {
+       "my-mcp": { "url": "https://mcp.example.com/mcp" }
+     }
    }
    ```
 
@@ -149,7 +160,7 @@ The SDK's connector client (`connector.list / get / status / test / authStart / 
 
    // 1. Import: produces an immutable PluginSnapshot (idempotent per digest, reused=true)
    const snap = await session.client.transport.request("import/run", {
-     source_path: "/abs/path/to/my-mcp", // absolute path to the local directory
+     source_path: "/abs/path/to/my-market", // the market root (holds .codebuddy-connector/)
      source_kind: "workbuddy-connector-market",
    });
 
@@ -170,7 +181,7 @@ The SDK's connector client (`connector.list / get / status / test / authStart / 
 3. For standard OAuth, start with the SDK's `connector.authStart(connectorId)` and poll `connector.authStatus` until `authenticated`;
 4. At run time, inject via `mentions`: `{ kind: "connector", id }` appends to the run's MCP list (must be an enabled server); skills mount with `{ kind: "skill", id }`. Query install state with `install/status` and manage it with `install/enable` / `install/disable`.
 
-**Path B: marketplace / plugin distribution (for public distribution)**
+### Path B: marketplace / plugin distribution (for public distribution)
 
 To let others install your server from a marketplace in one click, package it as:
 
@@ -179,7 +190,7 @@ To let others install your server from a marketplace in one click, package it as
 
 After installation both paths land in `mcp_servers` — the two paths converge. Note that V1 OAuth only supports standard PKCE Loopback; custom URI schemes, public relays and other complex auth flows are not yet supported.
 
-**Custom skills**
+### Custom skills
 
 - SDK / protocol: `import/run` (`source_kind: "workbuddy-skill-market"`; a single directory containing `SKILL.md` also works) → `install/run`, then mount via a run mention;
 - Local: `POST /api/skills/import` (directory or zip) imports as user skills;

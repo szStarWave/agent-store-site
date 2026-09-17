@@ -54,6 +54,8 @@ source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/mark
 | `memory` | `table` | 会话结束后的记忆策略 → `memory`（见下） |
 | `marketplace` | `table` | 后台自动更新节奏 → `marketplace`（见下） |
 | `tools` | `table` | 宿主级工具策略（只做减法） → `tools`（见下） |
+| `connector_proxy` | `table` | 连接器调用代理的授权：第三方能经宿主的连接执行哪些 MCP 工具。缺省关 → `connector_proxy`（见下） |
+| `credentials` | `table` | `secret:NAME` 引用的取值；手工编辑、不上 wire → 见「`secret:NAME`：凭据不写进声明文件」 |
 
 ## `providers`
 
@@ -98,7 +100,7 @@ source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/mark
 source_kind = "url"
 source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
 
-[default_marketplaces.workbuddy-skills]
+[default_marketplaces.skills]
 source_kind = "url"
 source = "https://agent-store.flowyaipc.cn/source/skills/.codebuddy-skill/marketplace.json"
 
@@ -209,6 +211,41 @@ AGENT_STORE_TOOLS='{"computer":false,"domains":{"knowledge":false}}' agent-store
 ```
 
 完整用法示例见 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §10。
+
+## `connector_proxy`
+
+**连接器调用代理**的授权表：它决定**第三方**（外部 agent、SDK 客户端）能不能**经宿主的连接**去执行一个已装 MCP 连接器的工具。连接与凭据始终留在宿主，调用方只能点名连接器与工具——这张表管的是「准不准许」，不是「怎么连」。
+
+> **只有 Agent Store 宿主采纳这张表**（`agent-store` 可执行文件），与 `[tools]` 同一道闸。它 **不在** `config/get` 的投影里、也**不在** `config/set` 的白名单里：让第三方在宿主连接上执行工具，不是远程调用方该能自己放宽的设置。宿主**启动时读一次**。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `enabled` | `boolean` | `true` 才开启代理。缺省、或整张表不写 = **关**（默认状态） |
+| `allow` | `array<string>` | **可选收窄**：写了就只放命中的条目；`allow = []` 表示「什么都不放」；**不写** `allow` = 已启用的连接器全部可调 |
+| `deny` | `array<string>` | **可选减法**，在 `allow` **之后**应用，因此只会更严 |
+
+条目用工具本身的名字写：`mcp__<连接器>__<工具>`。`<连接器>` 可写**注册名**或 **id**（id 是精确写法：MCP server 按名字 upsert，后来安装的同名者会接管名字并因此继承授权）。与 `[tools]` 同一套匹配规则——只有 `mcp__` 条目按通配处理，因此 `mcp__github__*` 表示整个连接器。
+
+```toml
+[connector_proxy]
+enabled = true                    # 开启代理；缺省 = 关
+allow = ["mcp__github__*"]        # 可选：只放这一个连接器（不写则全部已启用连接器可调）
+deny = ["mcp__*__delete_*"]       # 可选：跨所有连接器排除删除类工具
+```
+
+判定顺序（顺序即求值顺序）：
+
+| # | 门 | 不过时返回 |
+| --- | --- | --- |
+| 1 | 表缺失，或 `enabled` 不是 `true` | `policy_denied` |
+| 2 | 连接器不存在 | `not_found` |
+| 3 | 写了 `allow` 且没有条目命中 | `policy_denied` |
+| 4 | `deny` 命中 | `policy_denied`（措辞与上一条不同，便于区分） |
+| 5 | 连接器已注册但被停用 | `connector_unavailable` |
+
+> **默认是关，不是全放。** 一个手滑不该是「什么都不能调」与「什么都能调」的差别，所以缺表、缺 `enabled` 一律拒绝。反过来，**一旦你写了 `enabled = true`，那就是授权本身**——`allow` 只是收窄用的；如果你是从旧版本升级过来，注意旧写法 `<连接器>__<工具>`（没有 `mcp__` 前缀）在新规则下**不再命中任何条目**，等于收窄到零；宿主启动时会就这一条、以及「开了代理但没写任何名单」各打一条告警，照着改即可。
+>
+> 环境变量 `AGENT_STORE_CONNECTOR_PROXY` 可整份替换这张表（JSON，形状相同），与 `AGENT_STORE_TOOLS` 同构：**替换**而不是合并；值不可解析时按「代理关」处理。
 
 ## `mcp.json`：声明 MCP server
 
@@ -332,7 +369,7 @@ UPSTREAM_TOKEN = "…"    # 填给 mcp.json 里的 secret:UPSTREAM_TOKEN
 | `default_model` | `"<provider>/<model>"` 别名 | 同构 |
 | 未知键 | 容忍，不报错 | 容忍 |
 | 环境变量后备 | **无**——凭证只从文件读取 | 部分工具有 `env` 子表/环境变量后备 |
-| Agent Store 专属 | `default_marketplaces`、`[memory]`、`[marketplace]`、`[tools].domains`（`[tools]` 的 `enabled` / `disabled` 两边同构，域开关是本产品特有） | 无 `domains` 域开关 |
+| Agent Store 专属 | `default_marketplaces`、`[memory]`、`[marketplace]`、`[tools].domains`（`[tools]` 的 `enabled` / `disabled` 两边同构，域开关是本产品特有）、`[connector_proxy]`（第三方调用授权，默认关）、`[credentials]`（`secret:NAME` 的取值） | 无 `domains` 域开关，也没有调用代理授权表 |
 | MCP 声明 | `~/.agent-store/mcp.json`（与 `config.toml` 同级，**只做用户级**） | `~/.kimi-code/mcp.json` 加项目级 `.kimi-code/mcp.json`（项目级覆盖用户级） |
 
 如果你的配置里已经有 Kimi Code 或其他工具的 `[providers]`、`[models]` 段落，可以**直接复制**它们到 `~/.agent-store/config.toml` 使用（前提是该供应商走 OpenAI/Anthropic 兼容协议）；不相关的段落（`thinking`、`permission`、`hooks` 等）保留与否都不影响 Agent Store 解析。

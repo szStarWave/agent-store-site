@@ -29,11 +29,11 @@ Agent Store 原生支持**插件**与**插件市场**：插件是打包好的能
 ```toml
 # 本站（agent-store.flowyaipc.cn）即托管这三个市场源，路径形如 /source/<market>/…；
 # 未声明 [default_marketplaces] 时，运行时的内置默认源就是它们
-[default_marketplaces.workbuddy-experts]
+[default_marketplaces.experts]
 source_kind = "url"
 source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
 
-[default_marketplaces.workbuddy-skills]
+[default_marketplaces.skills]
 source_kind = "url"
 source = "https://agent-store.flowyaipc.cn/source/skills/.codebuddy-skill/marketplace.json"
 
@@ -96,7 +96,7 @@ source = "https://agent-store.flowyaipc.cn/source/connectors/.codebuddy-connecto
 
 下面两条路径说的是**后两条**（都落 `mcp_servers`）：
 
-**路径 A：直接注册（自研 / 私有部署推荐）**
+### 路径 A：直接注册（自研 / 私有部署推荐）
 
 通过 MCP 配置接口按名注册（这是运行时自己的 HTTP 接口，宿主就提供它；Agent Store 的 Web UI **不用**这套接口——那个界面读写的是 `mcp.json` 声明文件，见[配置文件](/zh-CN/docs/configuration)）：
 
@@ -118,25 +118,36 @@ source = "https://agent-store.flowyaipc.cn/source/connectors/.codebuddy-connecto
 
 API Key / 自定义鉴权直接写在传输层的 `headers`；标准 OAuth 由运行时负责登录、存储与请求注入。注册后在会话/Run 中绑定该 Server（`selected_mcp_server_ids`），运行时 `McpManager` 建连并把工具注入模型。
 
-**通过 TypeScript SDK 接入**
+### 通过 TypeScript SDK 接入
 
-SDK 的连接器客户端（`connector.list / get / status / test / authStart / authStatus`）是**只读 + OAuth 直通**的——App Server 协议没有「注册 MCP Server」的 WebSocket 方法。SDK 内的自研 MCP Server 接入走协议原生的**导入 → 安装**链路：把 Server 打包为连接器市场目录，`import/run` 导入为不可变 PluginSnapshot，`install/run` 安装时由运行时自动注册进 `mcp_servers`。
+SDK 的连接器客户端是**目录读面 + OAuth 直通 + 调用代理**：`list` / `get` / `status` / `test`（`get` 与 `test` 会带上每个工具的参数 schema，先看清怎么调再调）、`authStart` / `authStatus` / `logout`，以及真正执行工具的 `call`（走宿主自己的连接，需宿主在 `[connector_proxy]` 里放行，见[配置文件](/zh-CN/docs/configuration)）。**但** App Server 协议**没有**「注册 MCP Server」的 WebSocket 方法，所以 SDK 内的自研 MCP Server 接入走协议原生的**导入 → 安装**链路：把 Server 打包为连接器市场目录，`import/run` 导入为不可变 PluginSnapshot，`install/run` 安装时由运行时自动注册进 `mcp_servers`。
 
-1. 写一个最小连接器市场目录：
+1. 写一个最小连接器市场目录——**两级**：市场清单列条目，`source` 指向条目自己的目录，server 声明装在那个目录里：
 
    ```text
-   my-mcp/
-   └── .codebuddy-connector/
-       └── connectors.json
+   my-market/
+   ├── .codebuddy-connector/
+   │   └── connectors.json        # 市场清单：id/name + source（相对路径）
+   └── my-mcp/
+       └── mcp.json               # server 声明：mcpServers
    ```
 
    ```json
    {
      "name": "my-connectors",
-     "version": "0.1.0",
      "connectors": [
-       { "id": "my-mcp", "name": "My MCP", "type": "remote-mcp", "url": "https://mcp.example.com/mcp", "auth": "oauth" }
+       { "id": "my-mcp", "name": "My MCP", "version": "0.1.0", "source": "my-mcp" }
      ]
+   }
+   ```
+
+   条目按 `id` 或 `name` 唯一，`source` **必须是相对路径**；`mcp.json` 里 `mcpServers` 的字段与 `~/.agent-store/mcp.json` 是**同一套**（`command` / `url` / `headers` / `env`），导入器按它逐条产出连接器组件——字段与校验见[配置文件](/zh-CN/docs/configuration)。
+
+   ```json
+   {
+     "mcpServers": {
+       "my-mcp": { "url": "https://mcp.example.com/mcp" }
+     }
    }
    ```
 
@@ -149,7 +160,7 @@ SDK 的连接器客户端（`connector.list / get / status / test / authStart / 
 
    // 1. 导入：生成不可变 PluginSnapshot（同 digest 重复导入幂等，返回 reused=true）
    const snap = await session.client.transport.request("import/run", {
-     source_path: "C:/abs/path/to/my-mcp", // 本地目录绝对路径
+     source_path: "C:/abs/path/to/my-market", // 市场根目录（含 .codebuddy-connector/）
      source_kind: "workbuddy-connector-market",
    });
 
@@ -170,7 +181,7 @@ SDK 的连接器客户端（`connector.list / get / status / test / authStart / 
 3. 标准 OAuth 直接用 SDK 的 `connector.authStart(connectorId)` 发起、轮询 `connector.authStatus` 至 `authenticated`；
 4. Run 时通过 `mentions` 注入：`{ kind: "connector", id }` 追加到 run 的 MCP 列表（须为已启用 Server）；技能则用 `{ kind: "skill", id }` 挂载。安装状态可用 `install/status` 查询、`install/enable` / `install/disable` 管理。
 
-**路径 B：市场 / 插件分发（面向公开分发）**
+### 路径 B：市场 / 插件分发（面向公开分发）
 
 希望别人能从市场一键安装时，把自研 MCP Server 打包为：
 
@@ -179,7 +190,7 @@ SDK 的连接器客户端（`connector.list / get / status / test / authStart / 
 
 用户安装后同样落到 `mcp_servers`——两条路径最终殊途同归。注意 V1 的 OAuth 仅支持标准 PKCE Loopback，自定义 URI scheme、公网 relay 等复杂授权暂不支持。
 
-**自定义 Skill**
+### 自定义 Skill
 
 - SDK / 协议接入：`import/run`（`source_kind: "workbuddy-skill-market"`，单个含 `SKILL.md` 的目录同样支持）→ `install/run`，随后 Run 中 mention 挂载；
 - 本机接入：`POST /api/skills/import`（目录或 zip）导入为用户技能；

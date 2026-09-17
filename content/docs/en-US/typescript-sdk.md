@@ -29,7 +29,7 @@ bun add @flowy-agent-store/protocol
 All packages ship ESM + CJS (`exports` maps `import` / `require` / `types`); they work out of the box in Node and bundlers.
 
 > **Version status**: all three packages are `0.1.0-beta.*` pre-releases (the API is not frozen, and **no backward compatibility is promised during beta**). Pin an **exact** version in production — this page and the repo currently correspond to `0.1.0-beta.4` (the `beta` tag). Do not rely on a bare `bun add`: the registry's `latest` currently points at `0.1.0-beta.2`, **not** the newest `0.1.0-beta.4`. For dist-tag semantics, per-version upgrade steps and self-check commands see the [Upgrade and migration guide](/en-US/docs/upgrade).
-> **Protocol surface scope**: as of `0.1.0-beta.4`, the `APP_SERVER_PROTOCOL_VERSION` example in §2 and the method counts in §5.3 (`48 / 71`) **match the published artifacts** (before that, the working tree was ahead of every published version). This is what decides whether a client can connect at all: the fingerprint is compared for **strict equality**, and `0.1.0-beta.4` changed its shape from a date stamp to an `fp-<n>` counter (currently `fp-1`) — a client built against the old value cannot connect to the new runtime; the upgrade steps are in §6.3 of the [Upgrade and migration guide](/en-US/docs/upgrade).
+> **Protocol surface scope**: the `APP_SERVER_PROTOCOL_VERSION` example in §2 and the method counts in §5.3 (`48 / 71`) are taken from the **working tree**, which currently **leads every published artifact** — the differences are listed one by one in §8 of the [Upgrade and migration guide](/en-US/docs/upgrade), together with the self-check commands. The fingerprint is compared for **strict equality** (a client built against an old value cannot connect to a new runtime), so when you build your own binary or touch the protocol, read the constant in §2 rather than copying a value out of this page's prose.
 > **Runtime**: Node.js **≥ 22** (relies on the global `WebSocket`) or Bun; the lower bound is declared by each package's `engines.node`.
 
 ---
@@ -44,7 +44,7 @@ The single TypeScript source of truth for the wire contract: every request/respo
 
 | Export | Meaning |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | A contract **fingerprint** (**currently** `"fp-1"` in the working tree; the shape is an `fp-<n>` counter, incremented on each wire change and never reusing a past value. It was once a date stamp, but that is a *label, not the day of the change* — consecutive changes advanced it a day each, so it ran ahead of the calendar); the handshake and SDK checks compare it for strict equality |
+| `APP_SERVER_PROTOCOL_VERSION` | A contract **fingerprint** (**currently** `"fp-5"` in the working tree; the shape is an `fp-<n>` counter, incremented on each wire change and never reusing a past value. It was once a date stamp, but that is a *label, not the day of the change* — consecutive changes advanced it a day each, so it ran ahead of the calendar); the handshake and SDK checks compare it for strict equality |
 | `InitializeRequest` / `InitializeResult` | Handshake request/response (incl. `protocol_version`, server info) |
 | `ClientInfo` / `ClientCapabilities` | Caller self-description |
 | `StoreList` / `StoreInstallResult` | Winget-style unified catalog |
@@ -199,14 +199,16 @@ client.skills.readFileWithType(skillId: string, path: string): Promise<SkillFile
 client.connectors.list(): Promise<ConnectorSummary[]>;
 client.connectors.get(connectorId: string): Promise<ConnectorDetail>;        // namespaced tools + auth state
 client.connectors.status(connectorId: string): Promise<ConnectorStatusView>; // connected only when auth ready AND last probe OK
-client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;  // run probe (result persisted)
+client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;  // run probe (really connects; result persisted); tool schemas come from here
 client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>;
 client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // start host browser OAuth flow; poll authStatus until authenticated
 client.connectors.logout(connectorId: string): Promise<void>;                // revoke token
 client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // call proxy
 ```
 
-> `call()` runs one MCP tool through the **host's own connection**: the transport, its headers and its OAuth token stay on the host — you send a tool name and an argument object, and you **cannot** name a URL, a command or a header. Whether the pair is callable is the host's `[connector_proxy]` allowlist, so **`policy_denied` is the default state** (the host operator has not listed this tool), not a misconfiguration.
+> `call()` runs one MCP tool through the **host's own connection**: the transport, its headers and its OAuth token stay on the host — you send a tool name and an argument object, and you **cannot** name a URL, a command or a header. Whether the pair is callable is the host's `[connector_proxy]` policy: once its operator turns the proxy on, the **enabled connectors are callable**, and `allow` / `deny` are that operator's optional narrowing and subtraction. So `policy_denied` means "the host never turned the proxy on" or "this pair was narrowed out or explicitly denied" — **not** "you forgot to maintain a list".
+>
+> **How to know the arguments**: every tool returned by `get()` / `test()` carries `input_schema` (the upstream `tools/list` `inputSchema`, verbatim). Arguments are arbitrary JSON Schema and the client does **not** validate them — a wrong argument comes back as `is_error: true` with the server's own complaint, not as a rejected promise. If the host omitted some schemas to stay inside its size budget it sets `tools_truncated: true` (names and descriptions are never omitted).
 >
 > **A tool-level failure is not a rejection**: when the server answers `isError: true` the promise still **resolves**, with `is_error` set. It rejects only when the call never reached the tool: `connector_call_timeout`, `connector_call_failed`, `response_too_large`, `connector_unavailable`, `policy_denied`, `not_found`. Check `capabilities.connector_calls` first (the method existing does **not** mean any tool is callable). The result object is passed through verbatim (`content`, `structuredContent`, … nothing dropped), capped at 1 MiB, default timeout 30s. All three connector transports are supported: stdio, Streamable HTTP and SSE.
 
@@ -236,11 +238,51 @@ client.conversations.modelOptions(): Promise<ConversationModelOptions>;
 client.conversations.list(limit = 100): Promise<ConversationView[]>;
 client.conversations.get(id): Promise<ConversationView>;
 client.conversations.messages(query): Promise<ConversationMessagesPage>; // page/page_size/cursor
-client.conversations.send(id, content, idempotencyKey): Promise<ConversationSendReceipt>; // explicit idempotency key required
+client.conversations.send(id, content, idempotencyKey, options?): Promise<ConversationSendReceipt>; // explicit idempotency key required
 client.conversations.cancel(id): Promise<ConversationView>;
 client.conversations.delete(id): Promise<{ conversation_id: string; deleted: boolean }>;
 await client.conversations.follow(id): Promise<ConversationSubscription>;
 ```
+
+The fourth argument of `send()` describes **this one turn** (the legacy `string[]` attachment array is still accepted):
+
+```ts
+client.conversations.send(id, content, key, {
+  attachments: ["/abs/path/inside/workspace.png"],   // absolute path inside the conversation workspace
+  mentions: [{ kind: "skill", id: "release-notes" }], // a Skill mounted for this turn
+});
+```
+
+> **`mentions` honours `kind: "skill"` only** (added in `fp-3`). A Skill is a **per-turn** payload: its instructions and immutable snapshot travel with that one turn, while the conversation's create-time snapshot is neither changed nor rewritable. `agent` and `connector` have **no carrier** on `send` (an expert is the conversation's identity, a connector is a host-level switch), so they are **refused with `invalid_request`** — explicitly, never silently not-mounted. `id` is the id `skill/list` publishes (the skill's name), not an `install/status` component id. Both fields stay off the wire when omitted.
+
+`create()` can also build a conversation **as a named expert** with `agentId` (added in `fp-4`):
+
+```ts
+const experts = await client.agents.list();
+const architect = experts.find((agent) => agent.name === "software-architect");
+
+const conv = await client.conversations.create({
+  name: "refactor discussion",
+  agentId: architect!.id,     // an `agent/list` id; not installed answers agent_not_installed
+});
+```
+
+> An expert is the conversation's **identity**, decided once at creation: its preset snapshot, its own Skills and its Connectors are frozen into that conversation and cannot be rewritten afterwards (`conversation/update` refuses preset / Skill / connector keys). **Changing the expert means creating another conversation.** With `agentId` omitted this is the plain conversation it always was, byte for byte.
+
+`create()` can also **open a team's Leader conversation** with `teamId` (added in `fp-5`):
+
+```ts
+const teams = await client.teams.list();
+const company = teams.find((team) => team.name === "Software Company");
+
+const leader = await client.conversations.create({ teamId: company!.id });
+// Same orchestration as `team/run` (member checks, template materialization or reuse,
+// conversation fences) but **without the goal turn**: you speak first, and
+// `delegation_policy` is already `automatic`.
+await client.conversations.send(leader.conversation_id, "break this release into a plan", crypto.randomUUID());
+```
+
+> `teamId` and `agentId` are **mutually exclusive** (sending both answers `invalid_request`): a conversation opens either as one expert or as one team's Leader. A member that is not installed, a member that is disabled, and a Connector the team binds but the host disabled are all refused **at creation** with their own stable codes (`agent_not_installed` / `agent_disabled` / `connector_unavailable`) — never a half-built Leader.
 
 Every entry in `modelOptions()` carries `name` / `display_name` / `context_limit` and may additionally carry **models.dev catalog facts**: `cost_input` / `cost_output` (USD per million tokens), `catalog_context_window`, and `supports_vision`. When the registry has no entry for that provider+model the fields are **absent entirely** — read them as "unknown", never as `false` or `0`.
 
@@ -442,7 +484,7 @@ How the three packages' real exports line up with the protocol methods. Method n
 | `skills` | `list()` / `get(skillId)` | `skill/list` / `skill/get` |
 | `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `logout(id)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` |
 | `store` | `list()` / `search(query, filter?)` / `installed()` / `checkUpdates()` / `updateHint(item)` / `install(item, opts?)` / `setEnabled(item, enabled, opts?)` / `uninstall(item, opts?)` | composed methods, no wire method of their own: `store/list` · `store/install-entry` · `install/run` · `install/status` · `install/disable` · `install/enable` · `install/uninstall` |
-| `conversations` | `create(input)` / `update(id, input)` / `modelOptions()` / `list(limit?)` / `get(id)` / `messages(query)` / `send(id, content, idempotencyKey)` / `cancel(id)` / `delete(id)` / `follow(id, options?)` | the same-named `conversation/*` methods |
+| `conversations` | `create(input)` / `update(id, input)` / `modelOptions()` / `list(limit?)` / `get(id)` / `messages(query)` / `send(id, content, idempotencyKey, options?)` / `cancel(id)` / `delete(id)` / `follow(id, options?)` | the same-named `conversation/*` methods |
 | `runs` | `agent(input)` / `team(input)` / `get(id)` / `result(id)` / `events(query)` / `cancel(input)` / `steer(input)` / `answerDecision(input)` / `follow(id, options?)` | `agent/run` · `team/run` · `run/get` · `run/result` · `run/events` · `run/cancel` · `run/steer` · `run/answer-decision` |
 | `workspaces` | `list()` / `create(path)` / `revoke(id)` | `workspace/list` / `workspace/create` / `workspace/revoke` |
 | `models` | `list()` | `models/list` |
@@ -586,7 +628,7 @@ The official MCP path for Agent Store is the **connector descriptor**, with no s
 Remote HTTP/SSE and local stdio servers are both described verbatim in the manifest; Agent Store only hosts them and proxies tools under a namespace — it never executes connector content. Credentials:
 
 - Mark sensitive config entries in the `userConfig` schema; values go to the OS credential store.
-- Do not put secrets in `env`: the current version writes `env` into the snapshot in plaintext (a registered known deviation). Use `userConfig` until that is fixed.
+- Do not put secrets in `env` as **plain values**: the importer rewrites the **values** of `env` / `headers` entries whose **key names** contain `api` / `token` / `secret` / `password` / `apikey` into `secret:<KEY>` references, and the real value is resolved from `[credentials]` (or the process environment) into memory only when the host starts the child process — never into a snapshot, the database or a log. Copying a source plugin's secret lines is therefore safe; a plaintext value under **any other key name** is not covered — use an explicit `secret:` reference or `userConfig` for credentials.
 
 More manifest fields and examples: [Plugins and market](/en-US/docs/plugins-market).
 

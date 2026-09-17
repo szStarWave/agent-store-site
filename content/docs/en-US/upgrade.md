@@ -164,7 +164,7 @@ When the three disagree, trust the **lockfile and the installed `package.json`**
 
 ## 8. Published-artifact differences and how to check them
 
-As of `0.1.0-beta.4` (2026-09-16), **the working tree and the published artifacts agree — nothing is unpublished**; for what `0.1.0-beta.4` changed relative to `0.1.0-beta.3`, see §2.1 of the [Changelog](/en-US/docs/changelog).
+As of `0.1.0-beta.4` (2026-09-16), **the working tree leads the published artifacts**: after `0.1.0-beta.4` it accumulated the protocol fingerprint move `fp-1` → **`fp-2`** — each connector tool's `input_schema` (a `ConnectorTool` field) plus `tools_truncated` on `ConnectorDetail` / `ConnectorProbeResult`, with **no methods added or removed** (still `48 / 71` mapped); the same batch also changed the host's `[connector_proxy]` grant shape (`allow` became optional narrowing, `deny` was added, and an enabled proxy now means callable). None of this has shipped in any version yet; for what `0.1.0-beta.4` changed relative to `0.1.0-beta.3`, see §2.1 of the [Changelog](/en-US/docs/changelog).
 
 To check for yourself what a published artifact actually contains, reading two adjacent versions side by side is the clearest way:
 

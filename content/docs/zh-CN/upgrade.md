@@ -164,7 +164,7 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. 已发布产物的差异与自查方法
 
-截至 `0.1.0-beta.4`（2026-09-16），**工作区与已发布产物一致，没有未发布的差异**；`0.1.0-beta.4` 相对 `0.1.0-beta.3` 的改动见[变更日志](/zh-CN/docs/changelog) §2.1。
+截至 `0.1.0-beta.4`（2026-09-16），**工作区领先于已发布产物**：`0.1.0-beta.4` 之后工作区又积累了协议指纹 `fp-1` → **`fp-2`** 的增量——连接器工具的 `input_schema`（`ConnectorTool` 加字段）与 `ConnectorDetail` / `ConnectorProbeResult` 的 `tools_truncated`，**无方法增删**（映射数仍是 `48 / 71`）；同一批还改了宿主配置 `[connector_proxy]` 的授权形状（`allow` 变可选收窄、新增 `deny`，`enabled` 为真即默认可调）。这些**尚未随任何版本发布**；`0.1.0-beta.4` 相对 `0.1.0-beta.3` 的改动见[变更日志](/zh-CN/docs/changelog) §2.1。
 
 想自己核对「已发布产物里到底是什么」，按相邻两版对读最直观：
 

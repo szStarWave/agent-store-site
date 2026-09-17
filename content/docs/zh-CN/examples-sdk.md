@@ -344,6 +344,49 @@ const receipt = await client.conversations.send(
 );
 ```
 
+**给单独一轮挂技能**（`fp-3`）：技能只在这一轮生效，会话创建时的快照不受影响。
+
+```ts
+const skills = await client.skills.list();
+const releaseNotes = skills.find((skill) => skill.name === "release-notes");
+
+await client.conversations.send(conv.conversation_id, "按这个技能的步骤发版", crypto.randomUUID(), {
+  mentions: [{ kind: "skill", id: releaseNotes!.id }],
+});
+// 同一轮也可以带图片附件（会话工作区内的绝对路径）：
+// { attachments: ["/abs/path/inside/workspace.png"] }
+```
+
+> `mentions` 只认 `skill`：专家与连接器在 `conversation/send` 上没有载体（专家是会话身份、连接器是宿主级开关），传进去会得到 `invalid_request`，**不会**被静默忽略。
+
+**以专家开场**（`fp-4`）：专家的身份写在**创建**那一刻，之后不可改写。
+
+```ts
+const experts = await client.agents.list();
+const architect = experts.find((agent) => agent.name === "software-architect");
+
+const expertChat = await client.conversations.create({
+  name: "重构讨论",
+  agentId: architect!.id, // 未安装会得到 agent_not_installed
+});
+// 之后照常 send：每一轮都在这个专家的身份、技能与连接器栅栏下运行。
+await client.conversations.send(expertChat.conversation_id, "先看模块边界", crypto.randomUUID());
+```
+
+> 想换专家只能**新建会话**——`conversation/update` 拒绝 preset / 技能 / 连接器三类键。这是刻意的：会话的 preset 快照是冻结的，否则「同一个会话里前后两轮是两个不同的人」。
+
+**以专家团开场**（`fp-5`）：走 `team/run` 的同一段编排，但不代你说第一句话。
+
+```ts
+const teams = await client.teams.list();
+const leader = await client.conversations.create({ teamId: teams[0].id });
+
+// 你的第一条消息就是 Leader 的首轮：它在这里调用 nomi_delegate 把活分下去。
+await client.conversations.send(leader.conversation_id, "把这版需求拆成计划", crypto.randomUUID());
+```
+
+> 想直接「给目标、拿 run_id」，还是用 `client.runs.team({ teamId, goal })`；`create({ teamId })` 给的是**可继续对话的 Leader 会话**。`teamId` 与 `agentId` 互斥。
+
 **Run：发起 → 等待结果 → 处理审批**
 
 ```ts
@@ -414,6 +457,37 @@ await client.connectors.logout(github.id);
 ```
 
 > `authStart` 只返回 `started`，**不返回授权 URL 或 token**——浏览器流程由可信宿主持有，客户端只触发与轮询（见[接口参考](/zh-CN/docs/typescript-sdk) §3.4）。stdio 类型连接器不支持 OAuth，服务端会报 `OAuth is not supported for stdio connectors`。
+
+### 8.1 调用工具：先读签名，再调用
+
+`connector/get` 与 `connector/test` 返回的每个工具都带 `input_schema`（上游 `tools/list` 的 `inputSchema` **逐字**），所以**不需要猜参数**：
+
+```ts
+// 1) 现场探针：真连接一次（stdio 会 spawn 子进程），结果落库——get() 随后读的就是它
+const probe = await client.connectors.test(github.id);
+if (!probe.success) throw new Error(probe.error ?? "probe failed");
+if (probe.tools_truncated) {
+  // 名字与描述永不省略；只有 schema 会为控制体积被整份略去
+  console.warn("host omitted some schemas to stay inside its size budget");
+}
+
+// 2) 挑一个工具，读它收什么参数
+const tool = probe.tools?.find((t) => t.name === "create_issue");
+console.log(tool?.description, tool?.input_schema);
+
+// 3) 按签名传参调用
+const call = await client.connectors.call(github.id, "create_issue", {
+  owner: "acme",
+  repo: "site",
+  title: "flush the docs",
+});
+if (call.is_error) {
+  // 参数不对 / 服务器自己拒绝：promise 仍然 resolve，错误在结果对象里
+  console.error(call.result);
+}
+```
+
+> **参数不做客户端校验**：`input_schema` 是任意 JSON Schema，客户端只负责把它交给你。传错参数得到的是 `is_error: true` 与服务器自己的报错，**而不是 promise 拒绝**——只有「根本没够着工具」才 reject。`policy_denied` 表示宿主**没开代理**，或这一对被 `allow` 收窄出局 / 被 `deny` 明确排除，不再是「你漏写了白名单」。
 
 ## 9. 目录类短例：agents / teams / skills / models / workspaces
 

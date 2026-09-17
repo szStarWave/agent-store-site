@@ -344,6 +344,49 @@ const receipt = await client.conversations.send(
 );
 ```
 
+**Mount a Skill for one turn** (`fp-3`): the Skill applies to that turn only; the conversation's create-time snapshot is untouched.
+
+```ts
+const skills = await client.skills.list();
+const releaseNotes = skills.find((skill) => skill.name === "release-notes");
+
+await client.conversations.send(conv.conversation_id, "ship it following this Skill", crypto.randomUUID(), {
+  mentions: [{ kind: "skill", id: releaseNotes!.id }],
+});
+// The same turn may also carry image attachments (absolute paths inside the workspace):
+// { attachments: ["/abs/path/inside/workspace.png"] }
+```
+
+> `mentions` honours `skill` only: experts and connectors have no carrier on `conversation/send` (an expert is the conversation's identity, a connector is a host-level switch), so sending them answers `invalid_request` — they are **not** silently ignored.
+
+**Open a conversation as an expert** (`fp-4`): an expert's identity is decided at **creation** and cannot be rewritten afterwards.
+
+```ts
+const experts = await client.agents.list();
+const architect = experts.find((agent) => agent.name === "software-architect");
+
+const expertChat = await client.conversations.create({
+  name: "refactor discussion",
+  agentId: architect!.id, // not installed answers agent_not_installed
+});
+// `send` works as usual: every turn runs under that expert's identity, Skills and Connector fence.
+await client.conversations.send(expertChat.conversation_id, "start with the module boundaries", crypto.randomUUID());
+```
+
+> Switching experts means **creating another conversation** — `conversation/update` refuses preset / Skill / connector keys. That is deliberate: the conversation's preset snapshot is frozen, otherwise two consecutive turns of one conversation would be two different people.
+
+**Open a team's Leader conversation** (`fp-5`): the same orchestration `team/run` runs, minus the first turn it would otherwise send for you.
+
+```ts
+const teams = await client.teams.list();
+const leader = await client.conversations.create({ teamId: teams[0].id });
+
+// Your first message is the Leader's first turn: that is where it calls nomi_delegate.
+await client.conversations.send(leader.conversation_id, "break this release into a plan", crypto.randomUUID());
+```
+
+> To hand over a goal and get a `run_id` back, keep using `client.runs.team({ teamId, goal })`; `create({ teamId })` is the **continuable** Leader conversation. `teamId` and `agentId` are mutually exclusive.
+
 **Run: start → await result → handle approval**
 
 ```ts
@@ -414,6 +457,39 @@ await client.connectors.logout(github.id);
 ```
 
 > `authStart` only returns `started` and **never returns an auth URL or token** — the browser flow is owned by the trusted host, and the client only triggers and polls (see the [reference](/en-US/docs/typescript-sdk) §3.4). stdio connectors do not support OAuth; the server returns `OAuth is not supported for stdio connectors`.
+
+### 8.1 Calling a tool: read the signature first
+
+Every tool returned by `connector/get` and `connector/test` carries `input_schema` — the upstream `tools/list` `inputSchema`, **verbatim** — so there is nothing to guess:
+
+```ts
+// 1) Probe: really connects (spawns a child for stdio) and persists the result,
+//    which is what get() reads back afterwards
+const probe = await client.connectors.test(github.id);
+if (!probe.success) throw new Error(probe.error ?? "probe failed");
+if (probe.tools_truncated) {
+  // Names and descriptions are never omitted; only schemas are, and whole.
+  console.warn("host omitted some schemas to stay inside its size budget");
+}
+
+// 2) Pick a tool and read what it takes
+const tool = probe.tools?.find((t) => t.name === "create_issue");
+console.log(tool?.description, tool?.input_schema);
+
+// 3) Call it with arguments that match
+const call = await client.connectors.call(github.id, "create_issue", {
+  owner: "acme",
+  repo: "site",
+  title: "flush the docs",
+});
+if (call.is_error) {
+  // Wrong arguments / the server itself refused: the promise still resolves and
+  // the complaint is in the result object.
+  console.error(call.result);
+}
+```
+
+> **Arguments are not validated client-side**: `input_schema` is arbitrary JSON Schema and the client only hands it to you. A wrong argument comes back as `is_error: true` with the server's own complaint — **not** as a rejected promise; only "we never reached the tool" rejects. `policy_denied` means the host never turned the proxy on, or this pair was narrowed out by `allow` / explicitly denied — no longer "you forgot to maintain an allowlist".
 
 ## 9. Catalogue one-liners: agents / teams / skills / models / workspaces
 
