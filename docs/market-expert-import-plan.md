@@ -397,3 +397,223 @@ content/market.json
 - **工具化（可选）**：把「拉目录 → bundle 存在性/字段核验 → 解包 → 登记」做成
   `scripts/import-expert-bundles.mjs`（`--slugs`、`--dry-run`），下一批只给 slug 列表即可；
   先在站外副本灰度，再接标准流程。
+
+## 10. 批量收录执行记录（2026-09-16）
+
+### 10.1 结果
+
+专家 **16 → 381**（新增 365 个：A 档 264 + B 档 101），另 3 个 team 为历史存量。站点现有
+agent 378 个；目录 agent 375 个，**未收 1 个**（见 §10.4）。
+
+### 10.2 工具与修复
+
+- 新增 `scripts/import-expert-bundles.mjs`（bundle 拉取 → A/B/X 档判定 → 解包 → 登记副本 → 报告）
+  与 `scripts/lib/tar-lite.mjs`（Node 原生 tar 解析）。
+- 修复 1：Windows `tar.exe` 在中文文件名上解包失败（`Invalid empty pathname`）并残留半成品目录；
+  改为 Node 实现，中文名全部通过。
+- 修复 2：`plugin.json` 的 `agents` / `skills` 允许「目录形态」（如 `"./agents/"`）。
+- 修复 3：解包失败时清理目标目录，避免「未登记目录」泄漏进树（批次 5–6 曾泄漏 8 个，已剪除）。
+
+### 10.3 批次与体积指标
+
+| 批次 | 数量 | 备注 |
+| --- | --- | --- |
+| 灰度 A | 20 | 全部 A 档 |
+| 主体 1–5 | 221 | 5 × 65，A 档判定后入库 |
+| 补录 | 10 | 原 8 个中文名失败 + 2 个误判复核 |
+| 2–5 MB 档 | 9 | 15 个中 6 个 B 档挂起，后并入 B 批 |
+| B 档批 | 101 | 缺头像 69 / 仅缺 README 32（回落按 §8.2） |
+| 重包档 | 4 | 马来西亚×3 + 印尼×1，解包合计约 +234 MB（见 §10.6） |
+
+- 下载合计约 307 MB（压缩态），入库后 `market-source/` 从 112 MB 增至 **695.3 MB**（解包膨胀 ≈1.9×）。
+- `build/client` **699.1 MB**、构建 **2.0 分钟**、`.git` **189.6 MB**。
+- 最大单文件 47.7 MB（`malaysia-legal/CSV_Datasets/.../legal_advisory_services.json`），
+  未触 GitHub 100 MB 硬限。
+- `check:market` 每批 0 findings；`sync:tree` 每批 `-removed=0`；幂等复检通过。
+
+### 10.4 剩余与挂账
+
+| slug | bundle | 解包 | 状态 |
+| --- | --- | --- | --- |
+| `vietnam-finance-tax-expert` | 495.5 MB | 未实测 | **唯一未收**：需先解包验证单文件是否 >100 MB，再决定收录策略 |
+
+其余 4 个重包已按用户决策收录（见 §10.6）。
+
+### 10.5 提交状态
+
+全部改动为**本地提交、未推送**（市场产物与工具/文档分开成笔），共 18 笔，待审阅后推送/合并。
+
+### 10.6 阈值调整记录（2026-09-16）
+
+按用户决策，**收录 4 个 5–50 MB 重包**，主动越过 §9.4 的 `build/client > 500 MB` 熔断线。
+现状：`build/client` 699.1 MB、`market-source` 695.3 MB、`.git` 277.1 MB、构建 2.0 分钟。
+**风险提示**：EdgeOne Makers 的构建/部署体积上限未经验证；若线上构建失败，需回退本批
+（市场产物单笔提交，可 `git revert`）或按体积再次分档。
+
+### 10.7 收录统计（2026-09-16 收口）
+
+| 指标 | 数值 |
+| --- | --- |
+| 专家总数 | **381**（agent 378 / team 3） |
+| 目录覆盖 | 目录 375 个 agent 中已收 **374**，唯一未收 `vietnam-finance-tax-expert` **已明确放弃** |
+| 卡片质量 | 有头像 312 / 381；缺中文字段 20；无标签 22（回落表现按 §8.2，均为可接受的已知回落） |
+| 分类分布 | 内容创作 40、技术工程 39、数据智能 38、金融投资 31、营销增长 31、行业顾问 27、游戏空间 24、腾讯专区 23、法务安全 23、项目质量 22、全球发展 21、产品设计 17、销售商务 16、运营人力 14、开学季 11、目录外历史存量 4 |
+| 体积 | `market-source` 22,696 文件 / 695.3 MB；`build/client` 699.1 MB；`.git` 277.1 MB |
+| 构建与门禁 | 单次构建 2.0 分钟；每批 `check:market` 0 findings、`-removed=0`、幂等通过 |
+| 存档 | 365 个 `tar.gz`（`archive/`，站外，不入仓库） |
+| 提交 | 19 笔本地提交，分支 `feat/market-add-experts-batch-2`，**未推送** |
+
+**明确放弃**：`vietnam-finance-tax-expert`（越南财税金融专家，bundle 495.5 MB）——
+解包体积与单文件限制未验证，且会使仓库/构建产物再增约 1 GB；用户决策不收录。
+
+## 8. 第二批执行计划（2026-09-16 规划，分支 `feat/market-add-experts-batch-2`）
+
+目标（2026-09-16 修订）：**本批 20 个，专家 16 → 36**；最终目标是把目录中 375 个 agent
+全部收录（见 §9）。
+
+### 8.1 规模与容量画像（2026-09-16 全量探测）
+
+- 目录 428 条 = 375 agent + 53 team；站点现有 16（13 agent + 3 team）→ 待收录 agent **366 个**。
+- 366 个 bundle 合计 **759 MB**，体积分布：
+
+  | 单包上限 | 覆盖条目 | 合计体积 |
+  | --- | --- | --- |
+  | ≤1 MB | 325 | 103 MB |
+  | ≤2 MB | 346 | 133 MB |
+  | ≤5 MB | 361 | 177 MB |
+  | ≤20 MB | 364 | 224 MB |
+  | 全部 | 366 | 759 MB |
+
+- 5 个超大包占 583 MB（整体的 77%）：`vietnam-finance-tax-expert`（495 MB）、
+  `malaysia-hr-admin`（39.8）、`malaysia-legal`（18.0）、`malaysia-finance-tax`（15.4）、
+  `indonesia-digital-law-expert`（14.1）。
+- **上表是 bundle（压缩）体积，解包入库会膨胀**。2026-09-16 实测 4 个重包：
+
+  | 包 | bundle | 解包后 | 膨胀 | 最大单文件 |
+  | --- | --- | --- | --- | --- |
+  | `malaysia-legal` | 18.0 MB | 111.3 MB | 6.2× | 47.7 MB（json 数据集） |
+  | `malaysia-hr-admin` | 39.8 MB | 67.8 MB | 1.7× | 23.3 MB（duckdb） |
+  | `malaysia-finance-tax` | 15.4 MB | 40.0 MB | 2.6× | 11.8 MB（duckdb） |
+  | `indonesia-digital-law-expert` | 14.1 MB | 15.2 MB | 1.1× | 6.2 MB（xlsx） |
+
+  按此比例外推，**全量 366 个入库后约在 1.5–2 GB 量级**（压缩态 759 MB），
+  远超「264 MB / 177 MB」这种下载体积直觉。当前仓库基数：`market-source/` 9,013 文件 /
+  112 MB，`.git` 43 MB。
+- **GitHub 硬限制**：单文件 >100 MB 会被拒收。已检查的 4 个重包最大单文件 47.7 MB（安全），
+  但 `vietnam-finance-tax-expert`（495 MB 压缩）**尚未解包检查**，收录前必须先验证。
+- 结论：批量收录按体积分档推进；超大包单独决策，不阻塞主体；每批必须记录入库体积与实际
+  增重（见 §9.3）。
+
+### 8.2 入口门槛（分档）
+
+- **A 档（理想卡片）**：中英文 `profession` / `displayDescription` + `tags` +
+  `avatars/expert.png` + README 齐全。
+- **B 档（可按回落收录）**：payload 与 `plugin.json` 合法，但缺头像或本地化字段 →
+  卡片回落为字母徽标 / 插件 id / 英文简介。站点本就容忍这种回落（现存 2 例），
+  为达成「全量收录」目标应接受，并在批次记录里标注。
+- **排除**：无 payload、manifest 非法、结构损坏。
+
+### 8.3 本批名单（20 个，全部 A 档）
+
+| # | slug | 类别 | 体积 |
+| --- | --- | --- | --- |
+| 1 | `carousel-content-growth-expert` | 营销增长 | 本机包 |
+| 2 | `user-experience-architect` | 产品设计 | 本机包 |
+| 3 | `security-engineer` | 技术工程 | 285 KB |
+| 4 | `mcp-build-expert` | 技术工程 | 293 KB |
+| 5 | `ai-engineer` | 数据智能 | 417 KB |
+| 6 | `design-prototype-expert` | 产品设计 | 192 KB |
+| 7 | `sprint-priority-manager` | 产品设计 | 293 KB |
+| 8 | `marketing-reviewer` | 法务安全 | 299 KB |
+| 9 | `financial-tracker` | 金融投资 | 324 KB |
+| 10 | `new-share-expert` | 金融投资 | 321 KB |
+| 11 | `english-writing-coach` | 开学季 | 280 KB |
+| 12 | `ai-shifu` | 内容创作 | 157 KB |
+| 13 | `sg-finance-tax` | 全球发展 | 187 KB |
+| 14 | `multi-cloud-expert` | 腾讯专区 | 241 KB |
+| 15 | `tianyu-marketing-guardian` | 腾讯专区 | 138 KB |
+| 16 | `reality-checker` | 项目质量 | 273 KB |
+| 17 | `deal-strategist` | 销售商务 | 319 KB |
+| 18 | `fbsir-industry-scene-researcher` | 行业顾问 | 187 KB |
+| 19 | `unity-multiplayer-engineer` | 游戏空间 | 302 KB |
+| 20 | `recruitment-expert` | 运营人力 | 294 KB |
+
+后 15 个来自 60 个候选的 bundle 实检（41 个合格项），其余合格项留给后续批次。
+
+### 8.4 执行清单
+
+1. 站外造副本：以仓库 `market-source/experts`（16）为底，并入上表 20 个包，
+   在副本 `.codebuddy-plugin/marketplace.json` 登记（`name` / `source` / 英文兜底 `description`）。
+2. 逐个核验：`plugin.json` 可解析、`expertType=agent`、声明 agents/skills 路径存在、
+   头像/README 状态符合分档记录、无 `.DS_Store`/`.git`/`node_modules`。
+3. 预检：`MARKET_SRC_EXPERTS=<副本>`，`MARKET_SRC_SKILLS/CONNECTORS` 指回仓库自镜像；
+   期望 `experts` 的 `-removed=0`，另两个市场 `+0 -0 ~0`。
+4. `bun run sync` → `bun run check:market`（退出码 0）→ 幂等复检 `+0 -0 ~0`。
+5. `bun run build`；确认 `build/client/source/experts/` 含 20 个新包，且 `/zh-CN/market`、
+   `/en-US/market` 预渲染 HTML 出现 20 张新卡片的中英文名。
+6. 提交：市场产物一笔（`chore(market): …`）+ 文档/工具一笔；推送后按 §5.4 合并 `main`。
+
+### 8.5 验收与不变量
+
+- 基线应为 `experts=36 skills=268 connectors=228 avatars=372`（头像 = 352 + 20）。
+- `-removed` 非 0、门禁 `✗`、构建失败、预渲染页面缺卡片——任一出现即停下排查。
+- `senior-developer` 版本差异仍挂账、`ai-content-creator-team` 仍按 team 排除，
+  本批不改变这两项结论。
+
+## 9. 全量收录路线图（375 个 agent）
+
+目标：把目录中 **375 个 agent** 全部收录（53 个 team 不在目标内）。站点现有 13 个 agent，
+待收录 366 个。
+
+### 9.1 总原则（2026-09-16 修订）
+
+- **上架 = 解包后的文件树**：url 市场契约是客户端按 `_files.txt` 逐文件镜像并还原目录结构，
+  **压缩包不会被客户端解压**；清单 `source` 与卡片头像也都指向树内文件。因此不允许
+  「只存 tar.gz 上架」。
+- **获取 = bundle**：`bundles/<slug>.tar.gz` 是唯一的批量获取通道（无需 UI、可脚本化）。
+- **站外副本保留存档**：副本内建 `archive/<slug>.tar.gz`，用于重放、校验与换机重建；
+  **存档不进仓库**（避免双份体积）。
+- **每批独立可回滚**：市场产物单笔提交；脚本工具单独一笔。
+
+### 9.2 阶段与批次（366 个 agent）
+
+| 阶段 | 范围 | 条数 | bundle 体积 | 批次 |
+| --- | --- | --- | --- | --- |
+| 0 灰度 | §8.3 的 20 个（A 档，单包 ≤0.5 MB） | 20 | ~5 MB | 1 |
+| 1 主体 | 其余 ≤2 MB（A/B 档） | 326 | ~128 MB | 5 × ~65 |
+| 2 | 2–5 MB | 15 | 44 MB | 1 |
+| 3 | 5–20 MB | 3 | 47.5 MB | 1（视阶段 0–2 实测再定） |
+| 4 | 20–50 MB + B 档余量 | 1 + N | 39.8 MB | 1（单批决策） |
+| 5 另案 | >50 MB（`vietnam-finance-tax-expert`） | 1 | 495 MB | 单独立项 |
+
+阶段 1 完成后已覆盖 **346/366（94%）**；即便阶段 2–5 全部挂账，也已达到「主体全收」。
+
+### 9.3 每批固定动作
+
+与 §8.4 相同六步（造副本 → 核验 → 预检 `-removed=0` → `sync` → `check:market` + 幂等 →
+`build` + 页面断言 → 单笔提交 → 合并 `main`），另加两项：
+
+- 站外副本同时保留本批 `archive/*.tar.gz` 存档；
+- 记录本批观测指标（见 §9.4）。
+
+### 9.4 观测指标与熔断阈值
+
+- 每批记录：入库字节与文件数、bundle 解包膨胀系数、构建耗时、`build/client` 体积、
+  `git count-objects -vH` 的 `size-pack`。
+- **熔断（任一触发即暂停并评估：降批 / 分档 / 评估 LFS 或外置托管）**：
+  - `build/client` 体积 > 500 MB；
+  - 单次构建耗时 > 10 分钟；
+  - 仓库 `.git` > 800 MB；
+  - 出现单文件 > 100 MB（GitHub 硬限，必须放弃该文件或另案）；
+  - 预渲染页面缺卡片或门禁出现 `✗`。
+- 阶段 0 完成后，用实测膨胀系数重排阶段 1 的批次规模。
+
+### 9.5 工具化（建议随阶段 0 一起做）
+
+`scripts/import-expert-bundles.mjs`：
+
+- 入参：`--slugs a,b,c` 或 `--from-file list.txt`（或 `--auto --category <id> --limit N`）；
+- 动作：拉目录 → 拉 bundle（`--keep-archive` 落存档）→ A/B 档判定 → 解包到站外副本 →
+  登记副本 `marketplace.json` → 输出报告（slug/档位/体积/文件数/缺失项/膨胀系数）；
+- 选项：`--dry-run`、`--copy <副本目录>`；
+- 边界：只写站外副本与存档，不碰 `market-source/` 与 `content/market.json`。

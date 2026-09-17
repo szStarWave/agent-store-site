@@ -9,6 +9,7 @@
     "sync": "node scripts/sync-market-tree.mjs && node scripts/sync-market-data.mjs",
     "sync:tree": "node scripts/sync-market-tree.mjs",
     "sync:market": "node scripts/sync-market-data.mjs",
+    "import:experts": "node scripts/import-expert-bundles.mjs",
     "preview": "react-router preview",
     "typecheck": "tsc --noEmit",
     "check:docs-sync": "node scripts/check-docs-sync.mjs",
