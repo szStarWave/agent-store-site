@@ -16,7 +16,10 @@
     "test:docs-sync": "bun test scripts/check-docs-sync.test.mjs",
     "check:market": "node scripts/check-market.mjs",
     "test:market": "bun test scripts/check-market.test.mjs",
-    "check:release": "bun run check:docs-sync && bun run test:docs-sync && bun run check:market && bun run test:market && bun run typecheck",
+    "test:market-zips": "bun test scripts/pack-market-zips.test.mjs",
+    "pack:market": "node scripts/pack-market-zips.mjs",
+    "publish:market": "node scripts/publish-market-zips.mjs",
+    "check:release": "bun run check:docs-sync && bun run test:docs-sync && bun run check:market && bun run test:market && bun run test:market-zips && bun run typecheck",
     "release:pack": "node scripts/release.mjs pack",
     "release:publish": "node scripts/release.mjs publish",
     "release:status": "node scripts/release.mjs status"

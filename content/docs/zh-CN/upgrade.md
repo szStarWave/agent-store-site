@@ -164,7 +164,40 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. 已发布产物的差异与自查方法
 
-截至 `0.1.0-beta.4`（2026-09-16），**工作区领先于已发布产物**：`0.1.0-beta.4` 之后工作区又积累了协议指纹 `fp-1` → **`fp-2`** 的增量——连接器工具的 `input_schema`（`ConnectorTool` 加字段）与 `ConnectorDetail` / `ConnectorProbeResult` 的 `tools_truncated`，**无方法增删**（映射数仍是 `48 / 71`）；同一批还改了宿主配置 `[connector_proxy]` 的授权形状（`allow` 变可选收窄、新增 `deny`，`enabled` 为真即默认可调）。这些**尚未随任何版本发布**；`0.1.0-beta.4` 相对 `0.1.0-beta.3` 的改动见[变更日志](/zh-CN/docs/changelog) §2.1。
+截至 `0.1.0-beta.4`（2026-09-16），**工作区领先于已发布产物**：`0.1.0-beta.4` 之后工作区又积累了协议指纹 `fp-1` → **`fp-2`** 的增量——连接器工具的 `input_schema`（`ConnectorTool` 加字段）与 `ConnectorDetail` / `ConnectorProbeResult` 的 `tools_truncated`，**无方法增删**（映射数仍是 `48 / 71`）；同一批还改了宿主配置 `[connector_proxy]` 的授权形状（`allow` 变可选收窄、新增 `deny`，`enabled` 为真即默认可调）。工作区还继续往前走了 `fp-2` → `fp-3`（`conversation/send` 的 `mentions`）、`fp-3` → `fp-4`（`conversation/create` 的 `agent_id`）、`fp-4` → `fp-5`（`team_id`）与 `fp-5` → `fp-6`（`send` / `agent/run` 的 `model` 与 `reasoning_effort`），并在 `fp-6` → `fp-7` 把官方市场源改成 ModelScope 上的 zip 归档。这些**尚未随任何版本发布**；`0.1.0-beta.4` 相对 `0.1.0-beta.3` 的改动见[变更日志](/zh-CN/docs/changelog) §2.1。
+
+### 8.1 迁移已有配置里的市场源
+
+官方三个市场源（`experts` / `skills` / `connectors`）已从本站的 `/source/<market>/…` 逐文件树迁到 ModelScope 上的 zip 归档，站点不再托管市场树。**没有自动改写地址**，所以升级后要人工处理一次——只影响配置里已经声明 `[default_marketplaces]` 的机器（`agent-store init` 或照旧文档手抄 URL 都会写进去）。
+
+先看 `~/.agent-store/config.toml` 里有没有这三段：
+
+```toml
+[default_marketplaces.experts]
+source_kind = "url"
+source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
+```
+
+有的话二选一：
+
+- **删掉这三段 `[default_marketplaces.*]` 整块** —— 不下声明表时，运行时的内置默认源（即下面的 zip 地址）自动生效；
+- **改成新的 zip 地址** —— 三个市场各一个归档，`source_kind = "zip"`：
+
+```toml
+[default_marketplaces.experts]
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
+
+[default_marketplaces.skills]
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/skills.zip"
+
+[default_marketplaces.connectors]
+source_kind = "zip"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
+```
+
+若配置里没有这三段，就什么都不用做。**失败方式是温和的**：拉取失败不碰上一次成功留下的本地副本，条目不会消失，只是停在旧数据上。改完第一次拉取会下整个归档（三个市场里最大的是 experts 的 289.0 MiB）。
 
 想自己核对「已发布产物里到底是什么」，按相邻两版对读最直观：
 
