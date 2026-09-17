@@ -42,7 +42,7 @@ content/market.json                            提交进仓库，目录页数据
 | 上游市场工作目录 | 原始资源树 | 运行时/市场侧；**不是本仓库** |
 | `market-source/` | 上游的 1:1 镜像，含每市场的 `_files.txt` | `sync:tree` 生成，**禁止手工编辑** |
 | `content/market.json` | 目录页用的精简快照 | `sync:market` 生成，**禁止手工编辑** |
-| `build/client/source/` | 构建产物里的同一棵树 | `copy-market-tree.mjs` 生成，构建产物不入库 |
+| `build/client/source/` | 构建产物里**本站托管的那部分**树（默认三个市场整树，可只留一部分，见下） | `copy-market-tree.mjs` 生成，构建产物不入库 |
 
 对外，本站同时是三个市场源（`url` 型 `source_kind`）：
 
@@ -61,6 +61,40 @@ content/market.json                            提交进仓库，目录页数据
 上确实有这些文件。2026-09-17 修掉的正是这样一处：不带根锚点的 `.codebuddy/` 让专家市场
 多出 84 条幽灵条目（见 4.3、7）。所以改 `.gitignore` 时不要写会命中市场树的宽松规则——那条
 契约写在 `.gitignore` 文件头，`check:market` 的 `ignore.market-tree` 会用一组代表名替你把关。
+
+### 托管边界：哪些市场由本站整树托管
+
+EdgeOne Makers 对**构建产物**有两条硬上限（官方排障指南给出，且没有提额入口）：**≤ 20,000 个文件**、
+**单文件 ≤ 25 MiB**。现状：
+
+| 部分 | 文件数 |
+| --- | --- |
+| 站点自身（页面、文档） | 94 |
+| `experts` | 14,714（含 45.8 MiB 的 `malaysia-legal` 数据集） |
+| `skills` | 4,634 |
+| `connectors` | 3,264 |
+| 合计 | **22,706** ← 超限：日志停在 `Checking output`，随后 `File count exceeds project limit.` |
+
+所以 `scripts/copy-market-tree.mjs` 支持只整树托管其中一部分。开关是脚本里的
+**`HOSTED_DEFAULT` 常量**（随提交进仓库、推送即生效，EdgeOne 不需要额外配置）；环境变量
+`SITE_HOSTED_MARKETS` 只是本地的临时覆盖，用来试算：
+
+```powershell
+$env:SITE_HOSTED_MARKETS="skills,connectors"   # 例如把专家交给别的宿主
+bun run build                                   # 产物变成 94 + 4,634 + 3,264 + 306 ≈ 8,298 文件
+```
+
+- **默认值仍是三个全托管**，也就是行为不变；
+- 不在列表里的市场**只保留目录页引用的图片**（从 `content/market.json` 的 `avatar` 路径取），
+  目录页的图标因此始终正常——目录页头像是按同源解析的；
+- 它只是产物侧的开关：不改 `market-source/`、不改 `content/market.json`、不影响 `check:market`。
+
+> **顺序铁律：先把新宿主和「老 URL 怎么办」安排妥当，再把这个市场从 `SITE_HOSTED_MARKETS` 里去掉。**
+> 客户端 `~/.agent-store/config.toml` 里写的是 `<站点>/source/<market>/…`；市场从站点消失而没有替代，
+> 那些客户端下次刷新就拉不到市场，而镜像语义是「上游没有即删除」，可能连带删掉用户已装的条目。
+
+开发态与此**不一致**：`vite.config.ts` 的 `marketSourcePlugin()` 直接从 `market-source/` 托管
+`/source/**`、不看这个开关，所以本地永远能看到完整树。
 
 ## 2. 四类资源的文件与字段规范
 

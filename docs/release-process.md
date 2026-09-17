@@ -9,7 +9,7 @@
 |---|---|---|
 | 官网（落地页 / 兼容性页） | `app/pages/`、`app/lib/platform.ts` | 下载直链的**版本号与资产名** |
 | 双语文档站 | `content/docs/{zh-CN,en-US}/` | 与源仓库的 wire 面一致（协议指纹、方法计数、未发布台账） |
-| 三个市场源的自托管宿主 | `market-source/` → 线上 `/source/**` | `bun run check:market` |
+| 三个市场源的宿主 | `market-source/` → 线上 `/source/**`（**只整树托管 `SITE_HOSTED_MARKETS` 里的市场**，见 `market-maintenance.md` §1「托管边界」） | `bun run check:market` |
 | **二进制分发** | 本仓的 GitHub Releases（`content/release.json` 的 `repo`） | 与 npm 里那份**同一份 exe** |
 
 **版本单一真源 = `content/release.json`**：`app/lib/platform.ts` 的下载链接与 `scripts/release.mjs` 的标签/资产名都读它。它必须与 npm 的 `@flowy-agent-store/*` 同版本——这条跨仓不变量由源仓库的 `bun run check:release-sync` 守着（它会读本仓的 `content/release.json` 与两语言 `typescript-sdk.md`）。
@@ -28,7 +28,7 @@
    ```
    `--exe` 用源仓库构建的那一个（**必须带 `--features static-webui`**，否则二进制没有内嵌 WebUI）；`--expect-sha256` 填**源仓库 `web/packages/runtime/vendor/flowy-agent-store.exe` 的哈希**，即 npm 里真正发布出去的那份字节。
 5. **部署**：commit → `git push origin main` → EdgeOne Makers 构建上线（也可在其控制台手动触发）。
-6. **部署后自检**：`/<lang>/docs/typescript-sdk` 中英两页有正文（不是 SPA 空壳）；三个 `/source/*/_files.txt` 可访问且带 `cache-control: no-cache`；首页下载直链真能下到 `v<版本>` 的 zip。
+6. **部署后自检**：`/<lang>/docs/typescript-sdk` 中英两页有正文（不是 SPA 空壳）；**本站托管的市场**（`SITE_HOSTED_MARKETS`，默认三个）的 `/source/<market>/_files.txt` 可访问且带 `cache-control: no-cache`；首页下载直链真能下到 `v<版本>` 的 zip。
 7. **台账**：`changelog` §2 追加「已发布事实」（版本号 + 发布时间 + 改了什么），本次的「未发布」条目从 §4 转正；`upgrade.md` §8 同步。
 
 > **顺序约束：先有 Release 资产，再推站点。** `content/release.json` 一上线，首页就在宣告那个版本；资产还不存在就是 404。所以在拿到 `release:status` 的正式 Release 之前不要 `push main`。
@@ -38,6 +38,7 @@
 1. **用 `bun run build`，不要直接 `react-router build`**——后者漏掉 `copy-market-tree.mjs`，线上 `/source/**` 全部 404。
 2. **新页必须进 `react-router.config.ts` 的 `prerender()`**，否则线上只拿到 SPA 空壳，SEO 与社交预览都是空的。
 3. **市场树与 `content/market.json` 是生成物，必须成对提交**，且只由 `bun run sync` 写；不要在仓里手工改市场条目。发布流程**不含**市场刷新（源仓库 `16` R6② 已延后），只有本次发布确实改了市场树才做。
+4. **产物规模有硬上限**：EdgeOne Makers 只接受 **≤ 20,000 个文件**、**单文件 ≤ 25 MiB** 的产物（官方排障指南给的三个限制之一，无提额入口）。专家市场单独就是 14,714 个文件且含一个 45.8 MiB 的数据集，与站点一起部署必然被拒（现象：日志停在 `Checking output`，随后 `File count exceeds project limit.` / `Build error`）。所以站点只**整树**托管 `copy-market-tree.mjs` 里 `HOSTED_DEFAULT` 指定的市场（`SITE_HOSTED_MARKETS` 只是本地覆盖）；`bun run build` 末尾那行 `[copy-market-tree] → build/client/source (N files…)` 就是部署前该看的数字。
 
 ## 已知缺口
 

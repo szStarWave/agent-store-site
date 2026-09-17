@@ -31,7 +31,7 @@ bun run dev      # 启动开发服务器 → http://127.0.0.1:5173
 | `bun run sync` | 同步市场树（`sync:tree` + `sync:market`），见下一节 |
 | `bun run sync:tree` | 把本地三个市场工作目录镜像进 `market-source/`，并生成 `_files.txt` |
 | `bun run sync:market` | 由 `market-source/` 生成 `content/market.json`（纯本地读取，无网络） |
-| `bun run build` | 预渲染静态 HTML → `build/client/`，随后把 `market-source/` 拷为 `build/client/source/` |
+| `bun run build` | 预渲染静态 HTML → `build/client/`，随后把 `market-source/` 拷为 `build/client/source/`（可用 `SITE_HOSTED_MARKETS` 只托管部分市场，见「市场源」） |
 | `bun run preview` | 本地托管生产构建产物 |
 | `bun run typecheck` | 类型检查（`tsc --noEmit`） |
 | `bun run check:market` | 市场门禁：查清单内重复，并核对 `market-source/` 与 `content/market.json` 是否一致 |
@@ -41,7 +41,7 @@ bun run dev      # 启动开发服务器 → http://127.0.0.1:5173
 
 ### 关于 `market-source/`
 
-市场树（experts / skills / connectors，约 8.9k 个文件）**刻意不放在 `public/`**：
+市场树（experts / skills / connectors，约 22.6k 个文件）**刻意不放在 `public/`**：
 Vite 会在构建期拷贝 `publicDir`，而位于项目根目录的这棵树会让 React Router 的
 prerender 请求失败（构建卡在准备输出目录阶段）。因此由
 `scripts/copy-market-tree.mjs` 在 `react-router build` 之后拷贝进产物，公开 URL
@@ -61,6 +61,19 @@ prerender 请求失败（构建卡在准备输出目录阶段）。因此由
 `_files.txt` 是预生成的目录清单（一行一个相对路径，不含自身），静态托管没有
 动态枚举端点，客户端以此镜像整棵条目树。目录页 `/market` 的头像直接引用同一批
 文件（`source/<market>/…`），不再有单独的图标下载缓存。
+
+**托管边界。** EdgeOne Makers 对构建产物有两条硬上限：**≤ 20,000 个文件**、**单文件 ≤ 25 MiB**
+（无提额入口）。三个市场合计 22,612 个文件、且专家市场里有一个 45.8 MiB 的数据集，因此
+`scripts/copy-market-tree.mjs` 支持只**整树**托管其中一部分，开关是脚本里的 `HOSTED_DEFAULT`
+常量（随提交进仓库、推送即生效）；环境变量 `SITE_HOSTED_MARKETS` 只是本地试算用的覆盖：
+
+```powershell
+$env:SITE_HOSTED_MARKETS="skills,connectors"   # 未列出的市场只留目录页引用的图片
+```
+
+默认仍是三个全托管。切换前必须先给搬出去的市场安排新宿主——客户端 `config.toml` 里写的是
+`<本站>/source/<market>/…`，市场消失而没有替代会让它们拉不到市场。细节见
+[`docs/market-maintenance.md`](docs/market-maintenance.md) §1「托管边界」。
 
 ## 内容来源
 

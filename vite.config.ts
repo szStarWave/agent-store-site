@@ -12,7 +12,7 @@ const siteRoot = path.dirname(fileURLToPath(import.meta.url));
 // `/flowy-agent-store/`) without touching source; local dev/build default to
 // `/` so `react-router dev` / `preview` work at the domain root.
 //
-// `market-source/` holds the committed market tree (~8.9k files, copied into
+// `market-source/` holds the committed market tree (~22.6k files, copied into
 // the build output by scripts/copy-market-tree.mjs). It is data, not app code:
 // watching it keeps the dev server busy enough that React Router's prerender
 // requests fail, so the watcher skips it and HMR stays fast too.
@@ -27,7 +27,7 @@ const MARKET_TREE = "**/market-source/**";
 const ATOMIC_WRITE_TEMP = "**/*.tmpdir/**";
 
 // React Router's SSG output (React Router's `buildDirectory`, not Vite's
-// `build.outDir`) holds a copy of the ~8.9k-file market tree under
+// `build.outDir`) holds a copy of the ~22.6k-file market tree under
 // `build/client/source`, so an unignored `build/` makes the watcher fire a
 // reload per copied file and starves the dev server. Vite only auto-ignores its
 // own `outDir`, hence the explicit pattern.
@@ -57,7 +57,7 @@ const MIME: Record<string, string> = {
  * then tripped `onError` and the page showed only letter badges.
  *
  * Mounted here instead of via `publicDir`, for the reason spelled out in
- * `scripts/copy-market-tree.mjs`: a ~8.9k-file `publicDir` stalls prerender.
+ * `scripts/copy-market-tree.mjs`: a ~22.6k-file `publicDir` stalls prerender.
  * Deliberately dev-only — `preview` must keep serving `build/client` verbatim
  * so that a broken copy step fails locally rather than only after deploy.
  */

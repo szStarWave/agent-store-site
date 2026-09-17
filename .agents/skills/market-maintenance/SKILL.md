@@ -64,12 +64,18 @@ git push origin main
 并跑门禁。清单本来就是由镜像生成的，所以它不需要上游副本——这正是它的用处：本机没有上游源
 的机器也能把清单与树重新拉齐。
 
-两个环境坑：
+三个环境坑：
 
 - 启动开发服务器前先 `$env:NODE_OPTIONS=""`。`NODE_OPTIONS` 里的 `node-language-shim`
   会让 `react-router dev` 清理 `.react-router/types` 时失败并直接退出。
 - 开发态 `/source/**` 由 `vite.config.ts` 的 dev 中间件托管 `market-source/`；`preview`
   刻意不兜底 `/source`，好让「构建期拷贝坏了」在本地就暴露，而不是等线上 404。
+- **站点只「整树」托管 `scripts/copy-market-tree.mjs` 里 `HOSTED_DEFAULT` 列出的市场**（默认三个）。
+  EdgeOne Makers 只接受 ≤ 20,000 文件、单文件 ≤ 25 MiB 的产物，而三个市场合计 22,612 文件、
+  专家里还有一个 45.8 MiB 的数据集；未列出的市场在产物里只保留目录页引用的图片。改这个常量
+  **必须**同时给该市场安排新宿主：客户端 `config.toml` 指向 `<站点>/source/<market>/…`，
+  市场消失而没有替代，它们下次刷新就拉不到市场（镜像语义是「上游没有即删除」）。
+  细节见 `docs/market-maintenance.md` §1。
 
 ## 按任务走
 

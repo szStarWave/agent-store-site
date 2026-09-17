@@ -8,10 +8,18 @@
  * 预渲染的速度，对外 URL 也仍然是 `/source/…`。
  *
  * 由 `package.json` → `build` 串起来，所以 EdgeOne Makers 也会跑到它。
+ *
+ * 从 2026-09-17 起还支持**按市场选择性产物**（`SITE_HOSTED_MARKETS`）：不整树托管的市场
+ * 只保留目录页引用的图片。背景是 EdgeOne Makers 的两条产物上限——20,000 个文件与单文件
+ * 25 MiB——而专家市场单独就有 14,714 个文件、含一个 45.8 MiB 的数据集，于是它必须迁到
+ * 别的宿主，技能与连接器可以留在站点。默认仍是三个全托管（行为不变），切换时机见 `HOSTED`。
+ *
+ * 注意开发态与它不一致：`vite.config.ts` 的 `marketSourcePlugin()` 直接从 `market-source/`
+ * 托管 `/source/**`、不看这个开关，所以本地永远能看到完整树。
  */
 
-import { existsSync } from "node:fs";
-import { cp, mkdir, readdir, rm } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
+import { copyFile, cp, mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,7 +28,43 @@ const siteRoot = path.resolve(here, "..");
 const sourceRoot = path.join(siteRoot, "market-source");
 const clientRoot = path.join(siteRoot, "build", "client");
 const outRoot = path.join(clientRoot, "source");
+const SNAPSHOT = path.join(siteRoot, "content", "market.json");
 const MARKETS = ["experts", "skills", "connectors"];
+
+/**
+ * 本站**整树托管**的市场 —— 这才是真源，随提交进仓库、推送即生效，EdgeOne 不需要任何配置。
+ *
+ * 为什么需要它：EdgeOne Makers 的产物上限是 **20,000 个文件**与**单文件 25 MiB**（官方排障
+ * 指南，无提额入口）。三个市场合计 22,612 个文件，专家单独就 14,714 个、且含一个 45.8 MiB
+ * 的数据集，所以它必须托管在别处；技能（4,634）与连接器（3,264）可以和站点自身的 94 个
+ * 文件留在站点。默认仍是三个全托管，也就是历史行为不变。
+ *
+ * 切换某个市场时必须**同时**安排好它的新宿主，不能提前：客户端的 `config.toml` 指向
+ * `<站点>/source/<market>/…`，一个市场在没有替代宿主的情况下从站点消失，等于让那些客户端
+ * 拉不到市场（而镜像语义是「上游没有即删除」）。
+ *
+ * 不在列表里的市场仍会保留**目录页引用的图片**：目录页头像按同源解析（`avatarUrl()`，见
+ * `app/lib/market.ts`），少一张就退化成字母徽标，与市场树托管在哪无关。
+ */
+const HOSTED_DEFAULT = MARKETS;
+
+/** `SITE_HOSTED_MARKETS` 只是本地/一次性构建的覆盖，不写进部署。 */
+const HOSTED = (process.env.SITE_HOSTED_MARKETS?.trim() || HOSTED_DEFAULT.join(","))
+  .split(",")
+  .map((name) => name.trim())
+  .filter(Boolean);
+
+/** 目录页快照里某个市场引用到的图片，转成相对市场根的路径。 */
+function snapshotAssets(market) {
+  const snapshot = JSON.parse(readFileSync(SNAPSHOT, "utf8"));
+  const prefix = `${snapshot.base ?? "source"}/${market}/`;
+  const rels = new Set();
+  for (const entry of snapshot[market] ?? []) {
+    const avatar = entry?.avatar;
+    if (typeof avatar === "string" && avatar.startsWith(prefix)) rels.add(avatar.slice(prefix.length));
+  }
+  return [...rels].sort();
+}
 
 async function countFiles(dir) {
   let n = 0;
@@ -40,6 +84,14 @@ if (!existsSync(clientRoot)) {
   process.exit(1);
 }
 
+const unknown = HOSTED.filter((market) => !MARKETS.includes(market));
+if (unknown.length) {
+  console.error(
+    `[copy-market-tree] SITE_HOSTED_MARKETS 里有未知市场：${unknown.join(", ")}（可选 ${MARKETS.join(" / ")}）`,
+  );
+  process.exit(2);
+}
+
 await rm(outRoot, { recursive: true, force: true });
 await mkdir(outRoot, { recursive: true });
 
@@ -51,6 +103,29 @@ for (const market of MARKETS) {
     console.error(`[copy-market-tree] missing market: ${market}`);
     process.exit(1);
   }
+
+  if (!HOSTED.includes(market)) {
+    // 只拷目录页引用到的图片：整棵市场树由另一个宿主提供。
+    await mkdir(to, { recursive: true });
+    const assets = snapshotAssets(market);
+    for (const rel of assets) {
+      const src = path.join(from, rel);
+      if (!existsSync(src)) {
+        console.error(
+          `[copy-market-tree] ${market}: content/market.json 指向 ${rel}，树里却没有 —— 先跑 \`bun run check:market\``,
+        );
+        process.exit(1);
+      }
+      const target = path.join(to, rel);
+      await mkdir(path.dirname(target), { recursive: true });
+      await copyFile(src, target);
+    }
+    const n = await countFiles(to);
+    total += n;
+    console.log(`[copy-market-tree] ${market.padEnd(11)} catalog-assets=${n}（整树托管在别处）`);
+    continue;
+  }
+
   await cp(from, to, { recursive: true });
   const n = await countFiles(to);
   total += n;
@@ -61,4 +136,4 @@ for (const market of MARKETS) {
   }
   console.log(`[copy-market-tree] ${market.padEnd(11)} files=${n}`);
 }
-console.log(`[copy-market-tree] → build/client/source (${total} files)`);
+console.log(`[copy-market-tree] → build/client/source (${total} files；整树托管：${HOSTED.join(" / ")}）`);
