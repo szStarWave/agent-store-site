@@ -35,7 +35,8 @@ description: 维护本站三个市场资源（专家 / 技能 / 连接器）的�
 - **清单必须等于 git 真正交付的集合。** 清单由扫磁盘生成，而 `git add` 会静默跳过
   `.gitignore` 命中的路径：被忽略且未跟踪的文件留在同步机的磁盘上与清单里，却进不了提交，
   客户端按清单拉取只会拿到 404，而同步机自己看不出任何异常。所以不要写会命中市场树的宽松
-  规则（`/.codebuddy/` 要锚根，别写 `.codebuddy/`；也别写 `*.log` 这类宽通配）。
+  规则（`/build/`、`/*.log`、`/.codebuddy/` 都要锚根）。`check:market` 的第 7 条规则
+  `ignore.market-tree` 会用代表名探这类规则，`.gitignore` 文件头写着同一条契约。
 
 ## 标准流程
 
@@ -96,6 +97,7 @@ git push origin main
 | `✗ listing misses …` / `listing references … missing file(s)` | `_files.txt` 与树不一致，通常是「合并过 `market-source/` 但没重跑同步」→ 重跑 |
 | `✗ listing must exclude itself` / `illegal path in listing` | 清单被手工破坏 → 重跑 `sync:tree` |
 | `check:market` 的 `listing.undeliverable` | 清单收录了被 `.gitignore` 忽略且未跟踪的路径，git 不会交付 → `git check-ignore -v <路径>` 找规则、锚到根，再 `bun run sync:tree -- --listing-only` |
+| `check:market` 的 `ignore.market-tree` | `.gitignore` 里有规则会命中市场树内部的载荷（还没发生，但真写了就是静默 404）→ `git check-ignore --no-index -v -- <探针路径>` 找规则并锚到根；不必重出清单 |
 
 完整对照表见 `docs/market-maintenance.md` 第 6 节。
 

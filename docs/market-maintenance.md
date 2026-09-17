@@ -59,7 +59,8 @@ content/market.json                            提交进仓库，目录页数据
 会静默跳过 `.gitignore` 命中的路径：被忽略且未跟踪的文件留在同步机的磁盘上、留在清单里，
 却进不了提交。客户端按清单逐个拉取，拿到的是 404；而同步机自己看不出任何异常——它的磁盘
 上确实有这些文件。2026-09-17 修掉的正是这样一处：不带根锚点的 `.codebuddy/` 让专家市场
-多出 84 条幽灵条目（见 4.3、7）。所以改 `.gitignore` 时不要写会命中市场树的宽松规则。
+多出 84 条幽灵条目（见 4.3、7）。所以改 `.gitignore` 时不要写会命中市场树的宽松规则——那条
+契约写在 `.gitignore` 文件头，`check:market` 的 `ignore.market-tree` 会用一组代表名替你把关。
 
 ## 2. 四类资源的文件与字段规范
 
@@ -355,10 +356,11 @@ bun run sync:tree -- --dry-run
 bun run check:market          # 退出码非 0 即有问题；--json 供脚本消费
 ```
 
-它逐市场检查六件事：清单内重复登记（`manifest.duplicate`）、快照条目数与清单是否一致
+它逐市场检查七件事：清单内重复登记（`manifest.duplicate`）、快照条目数与清单是否一致
 （`snapshot.count`）、快照条目集合是否与清单一一对应（`snapshot.entry`）、快照里的头像路径
 是否真有文件（`snapshot.avatar-missing`）、`_files.txt` 与树是否互相覆盖（`listing.*`）、
-清单里有没有 git 不会交付的路径（`listing.undeliverable`）。
+清单里有没有 git 不会交付的路径（`listing.undeliverable`）、`.gitignore` 会不会命中市场树里的
+载荷（`ignore.market-tree`）。
 
 ```text
 ✓ experts — 0 finding(s)
@@ -369,9 +371,15 @@ bun run check:market          # 退出码非 0 即有问题；--json 供脚本�
 [check-market] content/market.json: experts=381 skills=268 connectors=228 avatars=648
 ```
 
-前五条都以**磁盘**为准，第六条补的正是「磁盘有、提交没有」那一类：被 `.gitignore` 忽略且
-未跟踪的路径，`git add` 会静默丢掉它。它需要 git（`git check-ignore`）来判定，所以只在
-CLI 里跑；git 不可用时打一行提示而不是当作通过。
+前五条都以**磁盘**为准，第六、七条补的正是「磁盘有、提交没有」那一类。两者都要问 git
+（`git check-ignore`），所以只在 CLI 里跑；git 不可用时打一行提示而不是当作通过：
+
+- **`listing.undeliverable`** 拿清单去问：里面有没有「被忽略且未跟踪」的路径——到这一步
+  说明清单已经在说谎了。已跟踪但被忽略的路径不算（git 会交付它）。
+- **`ignore.market-tree`** 更早一步：用一组代表名（`build/x`、`dev.log`、`.codebuddy/x`…）
+  探 `.gitignore`，只要有规则能命中市场树**内部**的路径就报出来。它是**烟雾测试**而非证明
+  ——`git check-ignore` 没有「列出你的规则」这种模式，覆盖面取决于代表名是否覆盖了那类写法；
+  它按市场逐个报，因为同一条规则同时压在三个市场上。
 
 出现重复时**去上游删掉多余条目**，不要改镜像。`_files.txt` 里的重复行不必担心：
 每次 `sync:tree` 都整份重写它。
@@ -594,7 +602,10 @@ git check-ignore -v market-source/experts/plugins/<专家>/skills/<技能>/.code
    冲突时重跑脚本（见 4.6）。
 10. **不要在 `.gitignore` 里写会命中市场树的宽松规则**，尤其是不带根锚点的目录名与宽通配
     （`.codebuddy/`、`*.log` 这类）。命中就等于让清单指向客户端拉不到的 404，而且是静默的：
-    同步机、门禁、构建全都正常（见 1、7）。要忽略仓库自己的东西就锚到根（`/.codebuddy/`）。
+    同步机、门禁、构建全都正常（见 1、7）。要忽略仓库自己的东西就**锚到根**（`/.codebuddy/`、
+    `/build/`、`/*.log`）；带中间斜杠的写法（`.edgeone/*`）git 也按根锚定，同样安全。
+    `check:market` 的第 7 条规则 `ignore.market-tree` 会用代表名探这类规则，写错会被它拦下。
+    `.gitignore` 文件头写了这条契约，改之前先看一眼。
 
 ## 9. 当前基线（供交接时对照）
 
@@ -639,8 +650,8 @@ git check-ignore -v market-source/experts/plugins/<专家>/skills/<技能>/.code
 | [`connector-coverage.md`](./connector-coverage.md) | 连接器覆盖现状、近似项甄别方法 |
 | [`modelscope-mcp-api.md`](./modelscope-mcp-api.md) | ModelScope MCP 开放接口（当前**未接入**本站） |
 | `scripts/sync-market-tree.mjs` | 门禁与警告判定的权威定义；排除项（`logs`/`dist`/`market-icons`/`.git`/`node_modules`/`FILE_EXCLUDES`）、`--listing-only` 也在这里 |
-| `scripts/check-market.mjs` | 查重、两产物一致性、清单与 git 交付集的权威定义（`bun run check:market`） |
-| `.gitignore` | 哪条规则会命中市场树——`listing.undeliverable` 的判据来源（规则要锚到根） |
+| `scripts/check-market.mjs` | 查重、两产物一致性、清单与 git 交付集、`.gitignore` 体检的权威定义（`bun run check:market`） |
+| `.gitignore` | 哪条规则会命中市场树；文件头写着契约（规则要锚到根），第 7 条规则按它判定 |
 | `scripts/sync-market-data.mjs` | 快照字段映射与回落规则的权威定义 |
 | `scripts/copy-market-tree.mjs` | 构建期拷贝逻辑（纯拷贝，不做过滤：被排除的东西根本没进 `market-source/`） |
 | `app/lib/market.ts` | 目录页读取快照的规则 |

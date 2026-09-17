@@ -8,6 +8,7 @@ import {
   checkMarkets,
   checkSnapshot,
   compareDeliverable,
+  compareIgnoreRules,
   compareListing,
   readSnapshot,
 } from "./check-market.mjs";
@@ -167,6 +168,34 @@ describe("compareDeliverable", () => {
   test("ignores a refusal in another market", () => {
     const ignored = new Set(["market-source/skills/skills/s/.codebuddy/agents/p.md"]);
     expect(compareDeliverable("experts", ["plugins/a/x.md"], ignored)).toEqual([]);
+  });
+});
+
+describe("compareIgnoreRules", () => {
+  const probe = "market-source/experts/plugins/_probe/build/out.js";
+
+  test("accepts probes no ignore rule matches", () => {
+    expect(compareIgnoreRules("experts", [probe], new Map())).toEqual([]);
+  });
+
+  test("reports a rule that catches payload inside the tree", () => {
+    const findings = compareIgnoreRules("experts", [probe], new Map([[probe, ".gitignore:5:build/"]]));
+    expect(rules(findings)).toEqual(["ignore.market-tree"]);
+    expect(findings[0].message).toContain("plugins/_probe/build/out.js");
+    expect(findings[0].message).toContain(".gitignore:5:build/");
+  });
+
+  test("mentions how many further probes the same rule caught", () => {
+    const tmp = "market-source/experts/plugins/_probe/tmp/a.txt";
+    const findings = compareIgnoreRules(
+      "experts",
+      [probe, tmp],
+      new Map([
+        [probe, ".gitignore:5:build/"],
+        [tmp, ".gitignore:9:tmp/"],
+      ]),
+    );
+    expect(findings[0].message).toContain("(+1 more)");
   });
 });
 
