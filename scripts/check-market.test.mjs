@@ -74,7 +74,7 @@ describe("checkSnapshot", () => {
       manifestEntries: [{ id: "a" }, { id: "b" }],
       snapshotEntries: [{ id: "a" }],
     });
-    // Two facts, both worth reporting: the totals disagree, and "b" is the one lost.
+    // 两件事都值得报：总数对不上，而且丢掉的那个是 "b"。
     expect(rules(findings)).toEqual(["snapshot.count", "snapshot.entry"]);
     expect(findings[0].message).toContain("manifest has 2 entr(ies), content/market.json has 1");
     expect(findings[1].message).toContain('missing "b"');
@@ -211,10 +211,9 @@ describe("this repository's markets", () => {
     ]);
   });
 
-  // Rule 6 (`listing.undeliverable`) is the one rule that shells out to git, so
-  // it runs from the CLI, not from `checkMarkets` above. Its comparison is
-  // covered by `compareDeliverable`; what is left to pin here is the exclusion
-  // rule that keeps junk out of the listing in the first place.
+  // 规则 6（`listing.undeliverable`）是唯一要 fork git 的规则，所以它从 CLI 跑，
+  // 而不是上面那个 `checkMarkets`。它的比较逻辑由 `compareDeliverable` 覆盖；
+  // 这里剩下要钉住的，是一开始就把垃圾挡在清单外的那条排除规则。
 });
 
 describe("listFiles", () => {
@@ -242,8 +241,8 @@ describe("listFiles", () => {
   });
 
   test("keeps a `.codebuddy/` directory inside a market tree", async () => {
-    // The name is only special at the repository root (`.gitignore` anchors it
-    // there): the skills market ships `…/skills/<skill>/.codebuddy/` payload.
+    // 这个文件名只在仓库根目录特殊（`.gitignore` 在那里锚定它）：
+    // 技能市场带着 `…/skills/<skill>/.codebuddy/` 载荷。
     const dir = await fixture(["plugins/a/skills/s/.codebuddy/agents/one.md"]);
     try {
       expect(await listFiles(dir)).toEqual(["plugins/a/skills/s/.codebuddy/agents/one.md"]);

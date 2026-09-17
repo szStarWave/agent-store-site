@@ -1,27 +1,22 @@
 #!/usr/bin/env node
 /**
- * Build the slim market snapshot the catalog page renders, from the market
- * tree that ships with the site (`market-source/<market>/`).
+ * 从随站点一起发布的市场树（`market-source/<market>/`）生成目录页渲染用的精简快照。
  *
- * Run after `sync-market-tree.mjs` (which mirrors the working trees and emits
- * `_files.txt`). Everything here is local file access — no network — so the
- * snapshot matches the published tree exactly and builds work offline.
+ * 须在 `sync-market-tree.mjs` 之后运行（后者镜像工作树并产出 `_files.txt`）。这里全部是
+ * 本地文件访问——不联网——所以快照与已发布的树完全一致，构建也能离线跑。
  *
- * Output: `content/market.json` (committed) with site-relative avatar paths
- * (`source/<market>/…`), so the same files serve both the catalog page and the
- * market source clients mirror.
+ * 产物：`content/market.json`（提交入库），头像路径是站内相对路径
+ * （`source/<market>/…`），因此同一份文件既服务目录页，也服务客户端镜像的市场源。
  *
- * Avatar rules mirror the store backend (`market_icon_for` in
- * `crates/backend/nomifun-app/src/app_server_store.rs`):
- * skills/connectors use `icons/<source-basename>.<ext>` in the market root;
- * experts use the plugin's `avatars/expert.png`. Entries without an icon get
- * `avatar: null` and the UI renders a letter badge.
+ * 头像规则对齐商店后端（`crates/backend/nomifun-app/src/app_server_store.rs` 里的
+ * `market_icon_for`）：技能/连接器用市场根目录下的 `icons/<源文件基名>.<ext>`；
+ * 专家用插件自己的 `avatars/expert.png`。没有图标的条目得到 `avatar: null`，
+ * UI 渲染字母徽标。
  *
- * Text rules: skills/connectors spell both languages out inline in their own
- * manifest, experts only in the plugin's `.codebuddy-plugin/plugin.json`
- * (`profession` / `displayDescription` / `tags`, each keyed by locale — note
- * the marketplace manifest carries a single English blurb). Reading that file
- * is what stops expert cards from showing English copy on the zh-CN catalog.
+ * 文案规则：技能/连接器在各自的清单里内联写出双语；专家只写在插件的
+ * `.codebuddy-plugin/plugin.json` 里（`profession` / `displayDescription` / `tags`，
+ * 每个键都按 locale 分键——注意市场清单只带一句英文简介）。读那个文件正是让专家卡片
+ * 在 zh-CN 目录页上不再显示英文文案的原因。
  */
 
 import { existsSync } from "node:fs";
@@ -36,7 +31,7 @@ const sourceRoot = path.join(siteRoot, "market-source");
 const text = (v, fallback = "") => (typeof v === "string" && v.trim() ? v : fallback);
 const strArray = (v, max = 5) => (Array.isArray(v) ? v.filter((x) => typeof x === "string").slice(0, max) : []);
 
-/** Icon extensions probed in order (same order as the store backend). */
+/** 按序探测的图标扩展名（与商店后端同序）。 */
 const ICON_EXTS = ["png", "svg", "jpg", "jpeg", "webp", "gif"];
 
 const cleanSource = (s) => text(s).replace(/^\.\//, "");
@@ -49,8 +44,8 @@ async function readManifest(market, rel) {
 }
 
 /**
- * Return the first existing candidate as a site-relative path
- * (`source/<market>/<candidate>`), or null when the entry ships no icon.
+ * 返回第一个存在的候选者对应的站内相对路径
+ * （`source/<market>/<candidate>`），条目未带图标时返回 null。
  */
 function pickAvatar(market, candidates) {
   for (const suffix of candidates) {
@@ -59,7 +54,7 @@ function pickAvatar(market, candidates) {
   return null;
 }
 
-/** Experts only carry localized copy in their own plugin manifest. */
+/** 只有专家把自己的本地化文案放在插件清单里。 */
 async function readExpertPlugin(src) {
   const file = path.join(sourceRoot, "experts", src, ".codebuddy-plugin", "plugin.json");
   if (!existsSync(file)) return null;
@@ -70,13 +65,13 @@ async function readExpertPlugin(src) {
   }
 }
 
-/** One locale out of a plugin.json `{ zh, en }` pair, or null when absent. */
+/** 从 plugin.json 的 `{ zh, en }` 键对里取一个 locale，缺失时为 null。 */
 const pickLocale = (value, lang) => {
   const out = typeof value?.[lang] === "string" ? value[lang].trim() : "";
   return out || null;
 };
 
-/** `tags: [{ zh, en }]` → one locale's strings. */
+/** `tags: [{ zh, en }]` → 某一个 locale 的字符串数组。 */
 const pickTagLocale = (tags, lang) =>
   Array.isArray(tags) ? tags.map((tag) => pickLocale(tag, lang)).filter(Boolean).slice(0, 5) : [];
 
@@ -89,7 +84,7 @@ const skillEntries = skills.skills ?? [];
 const connectorEntries = connectors.connectors ?? [];
 
 const expertAvatars = expertEntries.map((e) => {
-  // `source` is already market-root relative and includes `plugins/`.
+  // `source` 本就相对市场根目录，且已包含 `plugins/`。
   const src = cleanSource(e.source);
   return pickAvatar("experts", [
     `${src}/avatars/expert.png`,
@@ -100,9 +95,8 @@ const expertAvatars = expertEntries.map((e) => {
 });
 
 /**
- * Localized expert copy. `profession` (the expert's role) is the catalog title,
- * `displayDescription` the blurb, `tags` the chip row; the marketplace manifest
- * is only a single-language fallback for plugins that predate the locale fields.
+ * 本地化的专家文案。`profession`（专家的角色）是目录页标题，`displayDescription`
+ * 是简介，`tags` 是标签行；市场清单只是那些早于 locale 字段的插件的单语言兜底。
  */
 const expertCopy = await Promise.all(
   expertEntries.map(async (e) => {
@@ -130,7 +124,7 @@ const connectorAvatars = connectorEntries.map((c) =>
 
 const out = {
   updatedAt: new Date().toISOString(),
-  // The market tree is served from this site itself; paths are site-relative.
+  // 市场树由本站自己托管，因此路径都是站内相对路径。
   base: "source",
   experts: expertEntries.map((_, i) => ({
     ...expertCopy[i],

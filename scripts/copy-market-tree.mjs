@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 /**
- * Copy the committed market tree into the build output as `/source/<market>/…`.
+ * 把已提交的市场树拷进构建产物，落点为 `/source/<market>/…`。
  *
- * The tree deliberately does NOT live in `public/`: Vite copies `publicDir`
- * during the build, and a ~8.9k-file tree there makes React Router's prerender
- * step fail (the dev server stalls while preparing the out dir) as well as
- * slowing every HMR reload. Copying after `react-router build` keeps both the
- * dev loop and the prerender fast, while the published URL stays `/source/…`.
+ * 这棵树刻意不放在 `public/`：Vite 会在构建期拷贝 `publicDir`，而约 8.9k 文件的树
+ * 放在那里会让 React Router 的预渲染步骤失败（dev server 在准备 out dir 时卡住），
+ * 还会拖慢每次 HMR 重载。在 `react-router build` 之后再拷贝，既保住了开发循环与
+ * 预渲染的速度，对外 URL 也仍然是 `/source/…`。
  *
- * Wired into `package.json` → `build`, so EdgeOne Makers runs it too.
+ * 由 `package.json` → `build` 串起来，所以 EdgeOne Makers 也会跑到它。
  */
 
 import { existsSync } from "node:fs";

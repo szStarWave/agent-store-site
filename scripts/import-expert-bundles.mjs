@@ -2,17 +2,17 @@
 /**
  * 从上游专家市场（bundle 通道）批量获取专家插件，落到**站外副本**并登记清单。
  *
- * Why bundles: 专家的发行物是 `bundles/<slug>.tar.gz`（见 docs/market-expert-import-plan.md
+ * 为何走 bundle：专家的发行物是 `bundles/<slug>.tar.gz`（见 docs/market-expert-import-plan.md
  * §3.1），与 WorkBuddy 召唤落盘的包内容一致（仅换行符差异）。本站的 url 市场契约要求
  * 上架物是解包后的文件树，因此本脚本只负责「获取 + 核验 + 解包 + 登记副本」，绝不写
  * `market-source/` 或 `content/market.json`（两者仍由 sync 脚本成对生成）。
  *
- * Usage:
+ * 用法：
  *   node scripts/import-expert-bundles.mjs --slugs a,b,c --copy <dir> [--archive <dir>]
  *   node scripts/import-expert-bundles.mjs --from-file list.txt --copy <dir> --dry-run
  *   node scripts/import-expert-bundles.mjs --from-file list.txt --copy <dir> --allow-b
  *
- * Options:
+ * 选项：
  *   --slugs a,b,c        逗号分隔的 slug 列表
  *   --from-file <file>   每行一个 slug（# 开头与空行忽略）
  *   --copy <dir>         站外副本目录（必须含 .codebuddy-plugin/marketplace.json）

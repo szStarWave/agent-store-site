@@ -1,38 +1,34 @@
 #!/usr/bin/env node
 /**
- * Guard the two artifacts of one market sync against drift and duplication.
+ * 守住一次市场同步的两个产物，防漂移、防重复登记。
  *
- * A sync produces two things that must agree:
- *   market-source/<market>/   mirrored tree + `_files.txt` — what clients fetch
- *   content/market.json       slim snapshot — what the catalog page renders
+ * 一次同步产出两样必须彼此一致的东西：
+ *   market-source/<market>/   镜像树 + `_files.txt` —— 客户端抓取的
+ *   content/market.json       精简快照 —— 目录页渲染的
  *
- * Nothing else cross-checks them: `sync:tree`'s publish gate only looks inside the
- * tree, and `sync:market` only reads the tree. So a half-finished sync — one
- * artifact committed without the other, a merge that kept only one side, a manifest
- * registering the same resource twice — passes both and ships. This is the check
- * that catches it before commit.
+ * 没有别的东西会在它们之间交叉核对：`sync:tree` 的发布门禁只看树内部，
+ * `sync:market` 只读树。于是半截同步——只提交了一个产物、合并时只留了一边、
+ * 清单把同一个资源登记了两次——两道门禁都能过，然后就上线了。这个检查就是在提交前
+ * 把它抓住的那一道。
  *
- * What is checked, per market:
- *   1. manifest.duplicate       one entry registered twice
- *   2. snapshot.count           snapshot entry count vs its manifest
- *   3. snapshot.entry           snapshot identity set vs its manifest
- *   4. snapshot.avatar-missing  snapshot avatar path vs the mirrored tree
- *   5. listing.*                `_files.txt` vs the tree
- *   6. listing.undeliverable    `_files.txt` vs what git will actually deliver
- *   7. ignore.market-tree       `.gitignore` vs the payload inside the trees
+ * 逐市场检查的内容：
+ *   1. manifest.duplicate       一个条目被登记两次
+ *   2. snapshot.count           快照条目数 vs 其清单
+ *   3. snapshot.entry           快照身份集合 vs 其清单
+ *   4. snapshot.avatar-missing  快照头像路径 vs 镜像树
+ *   5. listing.*                `_files.txt` vs 树
+ *   6. listing.undeliverable    `_files.txt` vs git 实际会交付的东西
+ *   7. ignore.market-tree       `.gitignore` vs 树里的载荷
  *
- * Duplicates get a rule of their own because neither the gate nor
- * `sync-market-data.mjs` deduplicates: a manifest listing one connector twice
- * renders two identical cards, and nothing else in the pipeline notices.
+ * 重复登记单独成规则，因为门禁与 `sync-market-data.mjs` 都不去重：清单把一个连接器列
+ * 两次，目录页就渲染两张一模一样的卡片，而流水线上没有别的东西会发现。
  *
- * The listing rules, exclusion sets and manifest paths are imported from
- * `sync-market-tree.mjs` rather than restated — that script produces the listing,
- * so its definition must not be copied here where it could drift.
+ * 清单规则、排除集合与清单路径是从 `sync-market-tree.mjs` 导入的，而不是在这里重述——
+ * 清单由那个脚本产出，它的定义不能抄到这里来漂移。
  *
- * Rules 6 and 7 shell out to git, so they run from the CLI rather than inside
- * `checkMarkets`: that keeps the exported function a filesystem-only unit the
- * test file can drive. Both are skipped, with a note, where git cannot answer
- * (no checkout) rather than passing silently.
+ * 规则 6 与 7 要 fork git，所以它们只在 CLI 里跑，不进 `checkMarkets`：
+ * 这样导出的函数仍是一个纯文件系统单元，测试文件能直接驱动。两者在 git 答不上来的地方
+ * （没有 checkout）都会带说明地跳过，而不是默默通过。
  *
  *   node scripts/check-market.mjs
  *   node scripts/check-market.mjs --json
@@ -50,20 +46,20 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const siteRoot = path.resolve(here, "..");
 const SNAPSHOT = path.resolve(siteRoot, "content", "market.json");
 
-/** Repo-relative prefix of one market's tree — what the listings are relative to. */
+/** 某个市场树的仓库相对前缀——清单就是相对它写的。 */
 const marketPrefix = (market) => `market-source/${market}`;
 
-/** `./plugins/x` → `plugins/x`; the manifests use both spellings. */
+/** `./plugins/x` → `plugins/x`；清单里两种写法都有。 */
 const normalizeSource = (value) => String(value ?? "").replace(/^\.\//, "").trim();
 
 const text = (value) => (typeof value === "string" ? value.trim() : "");
 
-/** `sync-market-data.mjs` resolves a connector's identity as `id || name`. */
+/** `sync-market-data.mjs` 把连接器的身份解析为 `id || name`。 */
 const connectorId = (entry) => text(entry?.id) || text(entry?.name);
 
 /**
- * Identities that must be unique per market, as `[label, reader]` pairs. A repeat
- * means the catalog renders the same resource more than once.
+ * 每个市场内必须唯一的身份，写成 `[标签, 读取器]` 对。重复意味着
+ * 目录页会把同一个资源渲染不止一次。
  */
 const IDENTITY = {
   experts: [
@@ -81,9 +77,8 @@ const IDENTITY = {
 };
 
 /**
- * How to read an entry's identity out of the snapshot, or null when the snapshot
- * stores nothing that traces back to the manifest — an expert's snapshot name comes
- * from the plugin's own `profession`, so only its entry count is checkable.
+ * 如何从快照里读出条目的身份；当快照没存任何能追溯到清单的东西时为 null——
+ * 专家快照名来自插件自己的 `profession`，所以只能查它的条目数。
  */
 const SNAPSHOT_IDENTITY = {
   experts: null,
@@ -99,7 +94,7 @@ const MANIFEST_IDENTITY = {
 
 const finding = (market, rule, message) => ({ market, level: "error", rule, message });
 
-/** Count occurrences of every non-empty value. */
+/** 统计每个非空值出现的次数。 */
 function countBy(values) {
   const counts = new Map();
   for (const value of values) {
@@ -109,7 +104,7 @@ function countBy(values) {
   return counts;
 }
 
-/** Repeated identities in one manifest's entry list. */
+/** 某个清单的条目列表里重复出现的身份。 */
 export function checkManifestDuplicates(market, entries) {
   const findings = [];
   for (const [label, read] of IDENTITY[market] ?? []) {
@@ -134,10 +129,10 @@ export function checkManifestDuplicates(market, entries) {
 }
 
 /**
- * Snapshot vs the manifest it was generated from.
+ * 快照 vs 生成它的清单。
  *
- * `fileExists` receives a path relative to the tree root (`sourceRoot`) and lets
- * the caller own filesystem access, so this stays testable.
+ * `fileExists` 接收相对树根（`sourceRoot`）的路径，由调用方掌握文件系统访问，
+ * 这样本函数仍可测试。
  */
 export function checkSnapshot(market, { manifestEntries, snapshotEntries, base, fileExists = () => true }) {
   const findings = [];
@@ -179,8 +174,8 @@ export function checkSnapshot(market, { manifestEntries, snapshotEntries, base, 
     }
   }
 
-  // Avatar paths are `base`-relative; without a known base there is nothing to
-  // resolve them against, so report that instead of firing on every entry.
+  // 头像路径是相对 `base` 的；没有已知 base 就无从解析，
+  // 因此报这一条，而不是对每个条目都开火。
   if (base !== "source") {
     findings.push(
       finding(
@@ -210,7 +205,7 @@ export function checkSnapshot(market, { manifestEntries, snapshotEntries, base, 
   return findings;
 }
 
-/** `_files.txt` against the files actually present. */
+/** `_files.txt` vs 实际存在的文件。 */
 export function compareListing(market, listed, actual) {
   const findings = [];
   const listedSet = new Set(listed);
@@ -256,17 +251,15 @@ export function compareListing(market, listed, actual) {
 }
 
 /**
- * `_files.txt` against what git will actually deliver.
+ * `_files.txt` vs git 实际会交付的东西。
  *
- * Every rule above compares a listing against the filesystem, which is not the
- * set a clone receives: `git add` drops paths `.gitignore` matches, silently. A
- * listing that advertises one is worse than a missing file — the App Server
- * mirrors every listed path over HTTP, so the client sees a 404 it cannot
- * explain, and the machine that ran the sync never notices (its disk has the
- * file). An unanchored `.codebuddy/` did exactly that to 84 expert payload
- * files.
+ * 上面每条规则都是拿清单与文件系统比，而文件系统并不是一次 clone 收到的东西：
+ * `git add` 会悄悄丢掉 `.gitignore` 命中的路径。清单宣传了这样的路径比文件缺失更糟——
+ * App Server 会通过 HTTP 镜像清单里的每个路径，于是客户端拿到一个它无法解释的 404，
+ * 而跑同步的机器永远发现不了（它磁盘上有这个文件）。一个没锚定的 `.codebuddy/`
+ * 对 84 个专家载荷文件干的正是这件事。
  *
- * `undeliverable` holds repo-relative paths, as `undeliverablePaths` returns.
+ * `undeliverable` 里是仓库相对路径，与 `undeliverablePaths` 的返回一致。
  */
 export function compareDeliverable(market, listed, undeliverable) {
   const prefix = `${marketPrefix(market)}/`;
@@ -281,7 +274,7 @@ export function compareDeliverable(market, listed, undeliverable) {
   ];
 }
 
-/** Rule 7: no ignore rule may catch a payload path inside a market tree. */
+/** 规则 7：不允许任何 ignore 规则命中市场树内部的载荷路径。 */
 export function compareIgnoreRules(market, probes, matched) {
   const caught = probes.filter((path) => matched.has(path));
   if (!caught.length) return [];
@@ -298,23 +291,19 @@ export function compareIgnoreRules(market, probes, matched) {
 }
 
 /**
- * The repository-relative paths in `paths` that `git add` would refuse: matched
- * by an ignore pattern and not tracked.
+ * `paths` 里会被 `git add` 拒绝的仓库相对路径：被某条 ignore 模式命中且未被跟踪。
  *
- * `git check-ignore` answers by pattern and skips tracked paths, which is the
- * distinction that matters — a tracked path reaches a clone whether or not a
- * pattern matches it (the skills market ships `…/.codebuddy/` files that
- * predate the rule). Indexed paths are filtered out first because the check
- * costs ~0.3 ms per path handed to it: on this market the unfiltered call is
- * ~8 s.
+ * `git check-ignore` 按模式作答并跳过已跟踪路径，而这个区别正是关键——
+ * 已跟踪路径不管有没有模式命中都会进 clone（技能市场就带着早于该规则的
+ * `…/.codebuddy/` 文件）。索引内的路径先被过滤掉，因为该检查对每个传入路径
+ * 约花 0.3 ms：在这个市场上不过滤的调用要 ~8 s。
  *
- * Returns `null` when git cannot answer, so the caller can say so instead of
- * reporting a clean tree.
+ * git 答不上来时返回 `null`，让调用方如实说明，而不是报「树很干净」。
  */
 export function undeliverablePaths(paths) {
   const run = (args, input) => {
     const result = spawnSync("git", args, { cwd: siteRoot, encoding: "utf8", input, maxBuffer: 8 << 20 });
-    // `check-ignore` exits 1 when nothing matches; anything above that is fatal.
+    // 无命中时 `check-ignore` 退出码为 1；高于 1 的都算致命。
     if (result.error || result.status === null || result.status > 1) return null;
     return result.stdout ?? "";
   };
@@ -330,18 +319,15 @@ export function undeliverablePaths(paths) {
 }
 
 /**
- * One probe per kind of ignore rule that would be too broad: a rule that catches
- * any of these is dropping market payload, not ignoring a file of this
- * repository's own.
+ * 每类「可能过宽」的 ignore 规则各配一个探针：命中其中任何一个的规则，
+ * 丢的是市场载荷，而不是在忽略本仓库自己的某个文件。
  *
- * The names the two sides deliberately share are absent on purpose —
- * `node_modules/`, `.DS_Store` and `Thumbs.db` are excluded by
- * `sync-market-tree.mjs` too, and `.env` is kept global for secret hygiene, so
- * listings can never advertise them and probing them would only add noise.
+ * 两侧刻意共用的那些名字是有意不列进来的——`node_modules/`、`.DS_Store`
+ * 与 `Thumbs.db` 也被 `sync-market-tree.mjs` 排除，`.env` 则出于密钥卫生保持全局，
+ * 所以清单永远不会宣传它们，探测它们只会添噪声。
  *
- * `git check-ignore` has no "list your patterns" mode, so this is a smoke test
- * over representative names, not a proof. It costs one batched call, which is
- * why it can run on every gate.
+ * `git check-ignore` 没有「列出你的模式」这种模式，所以这是一个对代表性名字的
+ * 冒烟测试，不是证明。它只花一次批量调用，因此可以每道门禁都跑。
  */
 const PROBE_NAMES = [
   "build/out.js",
@@ -361,14 +347,13 @@ const PROBE_NAMES = [
 ];
 
 /**
- * Where payload actually lives, so probes sit as deep in the tree as an entry's
- * content does. Probing at the market root would instead flag rules covering
- * `logs/`, `dist/` or `market-icons/` *there* — the sync's own top-level
- * exclusions, which agree with git and are therefore not a defect.
+ * 载荷真正所在的位置，让探针的深度与条目内容所在深度一致。
+ * 在市场根探测反而会把覆盖那里 `logs/`、`dist/`、`market-icons/` 的规则标出来——
+ * 那些是同步自己的顶层排除，它们与 git 一致，因此不是缺陷。
  */
 const probeBase = (market) => `${marketPrefix(market)}/${MANIFESTS[market].contentRoot || "plugins"}/_probe`;
 
-/** The rule behind each path, as `<source>:<line>:<pattern>`; `null` when git cannot answer. */
+/** 每个路径背后的规则，形如 `<source>:<line>:<pattern>`；git 答不上来时是 `null`。 */
 export function ignoreRuleMatches(paths) {
   const result = spawnSync("git", ["check-ignore", "--no-index", "-v", "--stdin"], {
     cwd: siteRoot,
@@ -376,7 +361,7 @@ export function ignoreRuleMatches(paths) {
     input: paths.length ? `${paths.join("\n")}\n` : "",
     maxBuffer: 8 << 20,
   });
-  // `check-ignore` exits 1 when nothing matches; anything above that is fatal.
+  // 无命中时 `check-ignore` 退出码为 1；高于 1 的都算致命。
   if (result.error || result.status === null || result.status > 1) return null;
   const matched = new Map();
   for (const line of (result.stdout ?? "").split("\n")) {
@@ -386,7 +371,7 @@ export function ignoreRuleMatches(paths) {
   return matched;
 }
 
-/** Rule 7 for every market, as `checkMarkets` results ready to merge by market. */
+/** 给每个市场跑规则 7，产出可按市场合并的 `checkMarkets` 结果。 */
 function ignoreRuleFindings(markets) {
   const probes = markets.map((market) => ({
     market,
@@ -400,7 +385,7 @@ function ignoreRuleFindings(markets) {
   return probes.flatMap(({ market, paths }) => compareIgnoreRules(market, paths, matched));
 }
 
-/** Rule 6 for every market, as `checkMarkets` results ready to merge by market. */
+/** 给每个市场跑规则 6，产出可按市场合并的 `checkMarkets` 结果。 */
 function deliverableFindings(markets) {
   const listed = new Map(
     markets.map((market) => [
@@ -423,7 +408,7 @@ export function readSnapshot() {
   return JSON.parse(readFileSync(SNAPSHOT, "utf8"));
 }
 
-/** Run every rule for one market. */
+/** 跑某个市场的全部规则。 */
 export async function checkMarket(market, snapshot) {
   const destDir = path.join(sourceRoot, market);
   const manifest = MANIFESTS[market];
@@ -465,7 +450,7 @@ export async function checkMarkets(snapshot = readSnapshot()) {
   return Promise.all(Object.keys(MANIFESTS).map((market) => checkMarket(market, snapshot)));
 }
 
-/** Same shape as `sync-market-data.mjs` prints, so the two lines can be diffed. */
+/** 与 `sync-market-data.mjs` 打印的形状相同，方便把两行对起来看。 */
 const snapshotLine = (snapshot) => {
   const counts = Object.keys(MANIFESTS)
     .map((market) => `${market}=${(snapshot[market] ?? []).length}`)

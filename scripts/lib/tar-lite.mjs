@@ -1,7 +1,7 @@
 /**
  * 极简 tar 读取/解包库（仅覆盖专家 bundle 需要的形态）。
  *
- * Why not the system tar: Windows 自带 bsdtar 在中文文件名上会因代码页问题失败
+ * 为何不用系统 tar：Windows 自带 bsdtar 在中文文件名上会因代码页问题失败
  * （`Invalid empty pathname`），导致解包中断且残留半成品目录。这里直接按 tar 块解析，
  * 文件名按 UTF-8 还原，跨平台一致。
  *
