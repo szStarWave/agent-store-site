@@ -328,10 +328,16 @@ content/market.json
 
 ## 6. 已知验证环境问题
 
-当前 Windows 工作区的 `market-source/*/_files.txt` 为 CRLF。`scripts/check-market.mjs`
-目前按 `\n` 切分但未去除行尾 `\r`，因此直接运行时会把清单误报为全量缺失和多余；规范化
-换行后，专家清单实际为 989 个文件、993 行记录，其中 4 行是已不存在的 `.DS_Store` 残留，
-没有实际文件漏列。
+**CRLF（2026-09-17 复核：已不适用）。** 当时 Windows 工作区的 `market-source/*/_files.txt`
+为 CRLF，而 `check-market.mjs` 按 `\n` 切分未去 `\r`，会把清单误报为全量缺失和多余。
+2026-09-17 复核：仓库里三份清单都是 LF，`bun run check:market` 全绿；`sync:tree` 重写清单
+时统一写 `\n`。若某台机器检出后又看到「全量缺失 + 全量多余」这种对称报错，先确认清单行尾，
+不要按「树坏了」处理。
+
+那 4 行「已不存在的 `.DS_Store` 残留」也已落地处理：`sync:tree` 的 `FILE_EXCLUDES` 现在把
+`.DS_Store` / `Thumbs.db` 排除在清单之外（任何层级），镜像里残留的那 4 个文件已删除。
+同一批还有一个更严重的同类问题——清单收录了 84 个 git 交付不了的 `.codebuddy/` 路径，
+已于同日修正，见 `market-maintenance.md` 第 1、7 节。
 
 另一个同类现象：本机上游副本的文本文件多为 CRLF，而仓库镜像为 LF。2026-09-16 对
 `experts` 做逐字节比对（仅两侧都存在的 202 个文件）：111 个完全一致、84 个只差换行符、

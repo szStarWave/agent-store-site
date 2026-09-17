@@ -32,6 +32,10 @@ description: 维护本站三个市场资源（专家 / 技能 / 连接器）的�
 - 不在文档、日志、提交信息里写上游工作目录的绝对路径。
 - **提交前跑 `bun run check:market`。** 一条命令查「清单内重复」与「两个产物是否一致」，
   退出码非 0 就别提交。门禁只管树内部，这两件事它都不看。
+- **清单必须等于 git 真正交付的集合。** 清单由扫磁盘生成，而 `git add` 会静默跳过
+  `.gitignore` 命中的路径：被忽略且未跟踪的文件留在同步机的磁盘上与清单里，却进不了提交，
+  客户端按清单拉取只会拿到 404，而同步机自己看不出任何异常。所以不要写会命中市场树的宽松
+  规则（`/.codebuddy/` 要锚根，别写 `.codebuddy/`；也别写 `*.log` 这类宽通配）。
 
 ## 标准流程
 
@@ -47,12 +51,17 @@ git push origin main
 ```
 
 第 3 步会打印本次的核对基线，例如
-`[sync-market-data] content/market.json: experts=13 skills=268 connectors=228 avatars=349`。
+`[sync-market-data] content/market.json: experts=381 skills=268 connectors=228 avatars=648`。
 数字应与预期一致（新增一个连接器则 `connectors` +1，带图标则 `avatars` 同步 +1），
 这是最省事的「改对了吗」信号。
 
 只想刷新快照（例如改了字段映射）时用 `bun run sync:market`：它**只读仓库里的
 `market-source/`**，不碰本机上游，所以不受副本新旧影响，也没有删除风险。
+
+只想重出清单（例如改了排除规则、或清单里混进了 git 不交付的路径）时用
+`bun run sync:tree -- --listing-only`：它同样只读镜像、不碰本机上游，重写三份 `_files.txt`
+并跑门禁。清单本来就是由镜像生成的，所以它不需要上游副本——这正是它的用处：本机没有上游源
+的机器也能把清单与树重新拉齐。
 
 两个环境坑：
 
@@ -72,6 +81,7 @@ git push origin main
 | 校验输出 `✗` | 按本文「校验输出解读」处理 | 同上 |
 | 目录页出现重复卡片 | 上游清单里同一资源登记了两次，门禁不拦这种；`bun run check:market` 会点出来 | 同上 |
 | 页面与树不一致，像是只提交了一半 | `bun run check:market` 报 `snapshot.*`：快照与清单的条目对不上 | 同上 |
+| 清单里有文件、提交里没有（`listing.undeliverable`，或比对出 phantom 但磁盘上有文件） | 这些路径被 `.gitignore` 忽略且未跟踪，`git add` 不会交付 | 同上（含诊断命令与修法） |
 | 换机器 / 多人协作 / `push` 被拒 | 先读协作规则再动手 | 同上 |
 
 ## 校验输出解读
@@ -85,6 +95,7 @@ git push origin main
 | `✗ source must be …` / `source "…" escapes the market` | `source` 形态或解析基准不对 → 对照三市场的基准目录 |
 | `✗ listing misses …` / `listing references … missing file(s)` | `_files.txt` 与树不一致，通常是「合并过 `market-source/` 但没重跑同步」→ 重跑 |
 | `✗ listing must exclude itself` / `illegal path in listing` | 清单被手工破坏 → 重跑 `sync:tree` |
+| `check:market` 的 `listing.undeliverable` | 清单收录了被 `.gitignore` 忽略且未跟踪的路径，git 不会交付 → `git check-ignore -v <路径>` 找规则、锚到根，再 `bun run sync:tree -- --listing-only` |
 
 完整对照表见 `docs/market-maintenance.md` 第 6 节。
 
@@ -101,7 +112,8 @@ git push origin main
 | 完整流程、协作细节、当前基线 | `docs/market-maintenance.md` |
 | 连接器条目的覆盖现状（含 ModelScope 对照） | `docs/connector-coverage.md` |
 | 门禁与警告的判定逻辑 | `scripts/sync-market-tree.mjs` |
-| 查重与两产物一致性的判定逻辑 | `scripts/check-market.mjs`（`bun run check:market`） |
+| 查重、两产物一致性、清单与 git 交付集的判定逻辑 | `scripts/check-market.mjs`（`bun run check:market`） |
+| 哪些路径 git 不会交付 | `.gitignore`（规则必须锚到根）+ `check-market.mjs` 的 `undeliverablePaths()` |
 | 快照字段映射与回落规则 | `scripts/sync-market-data.mjs` |
 | 目录页读取快照的规则 | `app/lib/market.ts` |
 | `_files.txt` 缓存策略、路由重写 | `edgeone.json` |
