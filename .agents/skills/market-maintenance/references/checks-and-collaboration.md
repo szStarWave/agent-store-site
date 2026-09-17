@@ -130,11 +130,13 @@ bun run sync:market
 
 | 项 | 数值 |
 | --- | --- |
-| 条目总数 | 512（专家 16、技能 268、连接器 228） |
-| 带图标条目 | 352（专家 10 / 16、技能 114 / 268、连接器 228 / 228） |
-| `market-source/` 文件数 | 9013（含三份 `_files.txt`） |
+| 条目总数 | 877（专家 381、技能 268、连接器 228） |
+| 带图标条目 | 648（专家 306 / 381、技能 114 / 268、连接器 228 / 228） |
+| `market-source/` 文件数 | 22,696（含三份 `_files.txt`） |
 
-2026-09-16 新增 3 个专家：`code-review-expert`、`backend-architect`、`data-engineer`。
+2026-09-16 批量收录：专家 16 → 381（agent 378 / team 3），覆盖目录 375 个 agent 中的
+374 个；`vietnam-finance-tax-expert` 明确放弃。批次与指标见
+`docs/market-expert-import-plan.md` §10。
 
 已知的上游侧缺口（站点无需处理，仅需知情）：
 

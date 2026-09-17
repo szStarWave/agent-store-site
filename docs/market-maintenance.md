@@ -218,7 +218,7 @@ bun run sync:market   # 只由 market-source/ 重新生成 content/market.json
 `sync:market` 的输出是本次更新的**核对基线**：
 
 ```text
-[sync-market-data] content/market.json: experts=16 skills=268 connectors=228 avatars=352
+[sync-market-data] content/market.json: experts=381 skills=268 connectors=228 avatars=648
 ```
 
 数字应与预期一致（新增一个连接器则 `connectors` +1，带图标则 `avatars` 同步 +1）。
@@ -353,7 +353,7 @@ bun run check:market          # 退出码非 0 即有问题；--json 供脚本�
 ✓ connectors — 0 finding(s)
 
 3 market(s), 0 finding(s)
-[check-market] content/market.json: experts=16 skills=268 connectors=228 avatars=352
+[check-market] content/market.json: experts=381 skills=268 connectors=228 avatars=648
 ```
 
 出现重复时**去上游删掉多余条目**，不要改镜像。`_files.txt` 里的重复行不必担心：
@@ -554,27 +554,28 @@ git status --short               # 两个产物成对出现，且没有手改过
 
 ## 9. 当前基线（供交接时对照）
 
-截至 **2026-09-16** 实测：
+截至 **2026-09-16** 实测（批量收录后）：
 
 | 项 | 数值 |
 | --- | --- |
-| 条目总数 | 512（专家 16、技能 268、连接器 228） |
-| 带图标条目 | 352（专家 10 / 16、技能 114 / 268、连接器 228 / 228） |
-| `market-source/` 文件数 | 9013（含三份 `_files.txt`） |
+| 条目总数 | 877（专家 381、技能 268、连接器 228） |
+| 带图标条目 | 648（专家 306 / 381、技能 114 / 268、连接器 228 / 228） |
+| `market-source/` 文件数 | 22,696（含三份 `_files.txt`） |
+| 仓库体积 | `market-source` 695.3 MB、`build/client` 699.1 MB、`.git` 约 277 MB |
 
-2026-09-16 新增 3 个专家：`code-review-expert`（1.0.3）、`backend-architect`（1.0.1）、
-`data-engineer`（1.0.1），均为 agent 型、中英文展示字段与 `avatars/expert.png` 齐全。
-本次的获取通道（bundle 直下）、核验口径与闭环结果见
-[`market-expert-import-plan.md`](./market-expert-import-plan.md) 的 §3.1 与 §7。
+2026-09-16 批量收录：专家 16 → **381**（agent 378 / team 3），覆盖目录 375 个 agent 中的
+374 个；唯一未收 `vietnam-finance-tax-expert` 已明确放弃（bundle 495 MB）。获取通道
+（bundle 直下）、核验口径、批次记录与体积指标见
+[`market-expert-import-plan.md`](./market-expert-import-plan.md) 的 §3.1、§8–§10。
 
 已知的上游侧缺口（站点无需处理，仅需知情）：
 
 - 6 个技能上游只有元数据、没有内容目录：`grill-me`、`handoff`、`mcp-builder`、
   `impeccable`、`web-access`、`skill-creator`。同步时输出警告，不阻断发布。
-- 2 个专家缺本地化字段：`frontend-backend-experts`、`software-company`——它们的
-  `plugin.json` 里没有 `profession` / `displayDescription`，因此中英文都回落成
-  「插件 id + 英文简介」。
-- 6 个专家没有 `avatars/expert.png`，页面显示字母徽标。
+- 20 个专家缺中文本地化字段（中英文简介相同，或 `profession.zh` 缺失），中文站回落成
+  「英文简介 / 插件 id」；早期已知的 `frontend-backend-experts`、`software-company` 属此类。
+- 75 个专家没有 `avatars/expert.png`，页面显示字母徽标（多数为 B 档回落收录，判定见
+  计划 §8.2）。
 - 清单没有分类字段，因此目录页没有分类筛选。
 
 ## 10. 相关文档
