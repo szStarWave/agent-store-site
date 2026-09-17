@@ -13,6 +13,7 @@ TypeScript 的**纯静态**站点。它同时承担三件事：产品落地页�
 | `bun run preview` | 本地托管构建产物。它刻意不为 `/source` 兜底，用来暴露上一条的漏拷贝。 |
 | `bun run check:docs-sync` | 双语文档结构门禁，改过 `content/docs/` 后必跑；`bun run test:docs-sync` 是它自身的测试。 |
 | `bun run sync` | 市场树同步（`sync:tree` + `sync:market`）。这是唯一允许写 `market-source/` 与 `content/market.json` 的入口，流程见 [市场维护](docs/market-maintenance.md)。 |
+| `bun run import:experts` | 从上游专家市场 bundle 批量获取专家到**站外副本**（`--slugs` / `--from-file` / `--dry-run` / `--archive` / `--allow-b`）。只写副本与存档，不碰生成物；用法见 [专家导入计划](docs/market-expert-import-plan.md) §9。 |
 | `bun run check:market` | 市场门禁：查清单内重复登记，并核对 `market-source/` 与 `content/market.json` 是否一致（条目数、条目集合、头像文件是否存在、`_files.txt` 与树）。改过任一产物后必跑；`bun run test:market` 是它自身的测试。 |
 | `bun run check:release` | 发布门禁（站点半边）：`check:docs-sync` + `test:docs-sync` + `check:market` + `test:market` + `typecheck`。发版时与源仓库的 `bun run release:check` 一起跑，流程见 [发布流程](docs/release-process.md)。 |
 
