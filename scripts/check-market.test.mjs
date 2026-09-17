@@ -1,12 +1,17 @@
 import { describe, expect, test } from "bun:test";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 import {
   checkManifestDuplicates,
   checkMarkets,
   checkSnapshot,
+  compareDeliverable,
   compareListing,
   readSnapshot,
 } from "./check-market.mjs";
+import { listFiles } from "./sync-market-tree.mjs";
 
 const rules = (findings) => findings.map((finding) => finding.rule);
 
@@ -144,6 +149,27 @@ describe("compareListing", () => {
   });
 });
 
+describe("compareDeliverable", () => {
+  test("accepts a listing whose paths git delivers", () => {
+    expect(compareDeliverable("experts", ["plugins/a/x.md"], new Set())).toEqual([]);
+  });
+
+  test("reports an advertised path git would refuse to add", () => {
+    const findings = compareDeliverable(
+      "experts",
+      ["plugins/a/ok.md", "plugins/a/.codebuddy/agents/p.md"],
+      new Set(["market-source/experts/plugins/a/.codebuddy/agents/p.md"]),
+    );
+    expect(rules(findings)).toEqual(["listing.undeliverable"]);
+    expect(findings[0].message).toContain("plugins/a/.codebuddy/agents/p.md");
+  });
+
+  test("ignores a refusal in another market", () => {
+    const ignored = new Set(["market-source/skills/skills/s/.codebuddy/agents/p.md"]);
+    expect(compareDeliverable("experts", ["plugins/a/x.md"], ignored)).toEqual([]);
+  });
+});
+
 describe("this repository's markets", () => {
   test("snapshot and tree agree, with no duplicate entries", async () => {
     const snapshot = readSnapshot();
@@ -152,7 +178,48 @@ describe("this repository's markets", () => {
     expect(results.map((result) => result.market)).toEqual(["experts", "skills", "connectors"]);
     expect(results.flatMap((result) => result.findings)).toEqual([]);
     expect([snapshot.experts.length, snapshot.skills.length, snapshot.connectors.length]).toEqual([
-      13, 268, 228,
+      381, 268, 228,
     ]);
+  });
+
+  // Rule 6 (`listing.undeliverable`) is the one rule that shells out to git, so
+  // it runs from the CLI, not from `checkMarkets` above. Its comparison is
+  // covered by `compareDeliverable`; what is left to pin here is the exclusion
+  // rule that keeps junk out of the listing in the first place.
+});
+
+describe("listFiles", () => {
+  const fixture = async (files) => {
+    const dir = await mkdtemp(path.join(tmpdir(), "market-fixture-"));
+    for (const rel of files) {
+      await mkdir(path.dirname(path.join(dir, rel)), { recursive: true });
+      await writeFile(path.join(dir, rel), "");
+    }
+    return dir;
+  };
+
+  test("skips the junk names git refuses to deliver, at any depth", async () => {
+    const dir = await fixture([
+      "plugins/a/.DS_Store",
+      "plugins/a/avatars/.DS_Store",
+      "plugins/a/Thumbs.db",
+      "plugins/a/README.md",
+    ]);
+    try {
+      expect(await listFiles(dir)).toEqual(["plugins/a/README.md"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("keeps a `.codebuddy/` directory inside a market tree", async () => {
+    // The name is only special at the repository root (`.gitignore` anchors it
+    // there): the skills market ships `…/skills/<skill>/.codebuddy/` payload.
+    const dir = await fixture(["plugins/a/skills/s/.codebuddy/agents/one.md"]);
+    try {
+      expect(await listFiles(dir)).toEqual(["plugins/a/skills/s/.codebuddy/agents/one.md"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

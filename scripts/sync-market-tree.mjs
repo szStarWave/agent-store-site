@@ -9,8 +9,9 @@
  * pre-generated at publish time — there is no dynamic directory endpoint.
  *
  * Usage:
- *   bun run sync:tree                 # mirror + emit listings + validate
- *   bun run sync:tree -- --dry-run    # show the diff, change nothing
+ *   bun run sync:tree                     # mirror + emit listings + validate
+ *   bun run sync:tree -- --dry-run        # show the diff, change nothing
+ *   bun run sync:tree -- --listing-only   # re-emit listings from the mirror, no sources needed
  *   bun run sync:tree -- --markets experts=D:\\exp skills=D:\\skl connectors=D:\\con
  *
  * Defaults: each market is read from the runtime's standard working directory
@@ -32,7 +33,16 @@
  *
  * Excluded from the mirror (top-level only, so entry content is never
  * silently dropped): `logs/`, `dist/`, `market-icons/`, plus `.git/` and
- * `node_modules/` at any depth.
+ * `node_modules/` at any depth, plus the junk file names in `FILE_EXCLUDES`.
+ *
+ * **The listing has to describe what git actually delivers.** `listFiles` is
+ * the single definition of "in the market" — the sync copies by it, emits the
+ * listing from it, and `check-market.mjs` compares against it — so a name
+ * `git add` silently refuses must never reach a listing: the App Server mirrors
+ * every listed path over HTTP, and one git dropped is a 404 for every client,
+ * invisible on the machine that ran the sync (whose disk still has the file).
+ * `.gitignore`'s unanchored `.codebuddy/` did exactly that to the experts
+ * market: 84 advertised files with nothing behind them in the commit.
  */
 
 import { createHash } from "node:crypto";
@@ -72,13 +82,22 @@ export const MANIFESTS = {
 export const LISTING = "_files.txt";
 const TOP_EXCLUDES = new Set(["logs", "dist", "market-icons"]);
 const DEEP_EXCLUDES = new Set([".git", "node_modules"]);
+/**
+ * Junk file names, excluded at any depth. `git add` refuses them (`.gitignore`)
+ * and `import-expert-bundles.mjs` grades a bundle carrying one as junk, so a
+ * market tree can hold them on disk while the published tree cannot — see the
+ * header note on why the listing must not advertise them.
+ */
+const FILE_EXCLUDES = new Set([".DS_Store", "Thumbs.db"]);
 
 function parseArgs(argv) {
   const sources = { ...DEFAULT_SOURCES };
   let dryRun = false;
+  let listingOnly = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--dry-run") dryRun = true;
+    else if (arg === "--listing-only") listingOnly = true;
     else if (arg === "--markets") {
       while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) {
         const pair = argv[++i];
@@ -87,10 +106,10 @@ function parseArgs(argv) {
       }
     }
   }
-  return { sources, dryRun };
+  return { sources, dryRun, listingOnly };
 }
 
-const { sources, dryRun } = parseArgs(process.argv.slice(2));
+const { sources, dryRun, listingOnly } = parseArgs(process.argv.slice(2));
 
 /**
  * Recursively list files under `dir` as POSIX paths relative to it.
@@ -110,6 +129,7 @@ export async function listFiles(dir, prefix = "") {
       if (prefix === "" && TOP_EXCLUDES.has(entry.name)) continue;
       out.push(...(await listFiles(path.join(dir, entry.name), `${rel}/`)));
     } else if (entry.isFile()) {
+      if (FILE_EXCLUDES.has(entry.name)) continue;
       if (prefix === "" && entry.name === LISTING) continue;
       out.push(rel);
     }
@@ -225,7 +245,60 @@ async function validate(name, destDir) {
   return { findings, warnings };
 }
 
+/** Validate every market and exit non-zero when anything blocks a publish. */
+async function report(markets) {
+  const results = await Promise.all(markets.map(({ name, destDir }) => validate(name, destDir)));
+  const findings = results.flatMap((r) => r.findings);
+  const warnings = results.flatMap((r) => r.warnings);
+  for (const warning of warnings) console.warn(`[sync-market-tree] ! ${warning}`);
+  if (warnings.length) {
+    console.warn(
+      `[sync-market-tree] ${warnings.length} entr(ies) ship no payload upstream — metadata-only, nothing to mirror`,
+    );
+  }
+  if (findings.length) {
+    for (const finding of findings) console.error(`[sync-market-tree] ✗ ${finding}`);
+    console.error(`[sync-market-tree] ${findings.length} problem(s) — tree is not publishable`);
+    process.exit(1);
+  }
+  console.log("[sync-market-tree] validation passed — tree is publishable");
+}
+
+/**
+ * Emit one market's listing from the mirror itself — that is what the listing
+ * is derived from, so writing it needs nothing else.
+ */
+async function writeListing(destDir) {
+  const files = await listFiles(destDir);
+  await writeFile(path.join(destDir, LISTING), files.length ? `${files.join("\n")}\n` : "");
+  console.log(`[sync-market-tree] wrote ${path.join(destDir, LISTING)} (${files.length} files)`);
+}
+
+/**
+ * Re-emit the listings from the mirror alone, without reading any source.
+ *
+ * The upstream working copies are per-machine (see `DEFAULT_SOURCES`), while
+ * the mirror travels with the repository. So when the exclusion rules change,
+ * a machine that does not own the sources has no other way to bring the
+ * committed listings back in line — and a listing that disagrees with the tree
+ * is exactly the drift this script's gate exists to catch.
+ */
+async function relist() {
+  const markets = Object.keys(MANIFESTS);
+  for (const name of markets) {
+    const destDir = path.join(sourceRoot, name);
+    if (!existsSync(destDir)) {
+      console.error(`[sync-market-tree] no mirror for ${name}: ${destDir}`);
+      process.exit(2);
+    }
+    await writeListing(destDir);
+  }
+  await report(markets.map((name) => ({ name, destDir: path.join(sourceRoot, name) })));
+}
+
 export async function main() {
+  if (listingOnly) return relist();
+
   const starts = Object.entries(sources);
   const unknown = starts.filter(([name]) => !MANIFESTS[name]);
   if (unknown.length) {
@@ -274,26 +347,10 @@ export async function main() {
   for (const d of diffs) {
     await prune(d.destDir, d.removed);
     await copyAll(d.srcDir, d.destDir, [...d.added, ...d.changed]);
-    const files = await listFiles(d.destDir);
-    await writeFile(path.join(d.destDir, LISTING), files.length ? `${files.join("\n")}\n` : "");
-    console.log(`[sync-market-tree] wrote ${path.join(d.destDir, LISTING)} (${files.length} files)`);
+    await writeListing(d.destDir);
   }
 
-  const results = await Promise.all(diffs.map((d) => validate(d.name, d.destDir)));
-  const findings = results.flatMap((r) => r.findings);
-  const warnings = results.flatMap((r) => r.warnings);
-  for (const warning of warnings) console.warn(`[sync-market-tree] ! ${warning}`);
-  if (warnings.length) {
-    console.warn(
-      `[sync-market-tree] ${warnings.length} entr(ies) ship no payload upstream — metadata-only, nothing to mirror`,
-    );
-  }
-  if (findings.length) {
-    for (const finding of findings) console.error(`[sync-market-tree] ✗ ${finding}`);
-    console.error(`[sync-market-tree] ${findings.length} problem(s) — tree is not publishable`);
-    process.exit(1);
-  }
-  console.log("[sync-market-tree] validation passed — tree is publishable");
+  await report(diffs);
 }
 
 // Exported for `check-market.mjs` (shared listing/manifest definitions). Only run
