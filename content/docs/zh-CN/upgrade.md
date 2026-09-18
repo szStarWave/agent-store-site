@@ -115,7 +115,7 @@ bun run typecheck && bun run test
 
 ### 6.2 从 0.1.0 回到 beta 线
 
-`0.1.0` 是首次发布且不带任何 dist-tag；三个包的**代码与类型声明与 `0.1.0-beta.2` 逐字节相同**，差别只在 `package.json`——尤其当时的 sdk **没有** `optionalDependencies`，不会随附 `@flowy-agent-store/runtime-win32-x64` 等平台运行时包，`launchClient` 可能因此找不到可执行文件。
+`0.1.0` 是首次发布且不带任何 dist-tag；三个包的**代码与类型声明与 `0.1.0-beta.2` 逐字节相同**，差别只在 `package.json`——尤其当时的 sdk **没有** `optionalDependencies`，不会随附 `@flowy-agent-store/runtime-win32-x64` 等平台运行时包，`launchHarness` 可能因此找不到可执行文件。
 
 ```bash
 # 从无 tag 的 0.1.0 切到当前 beta 线（当前 beta 见 §3）
@@ -190,7 +190,7 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. 已发布产物的差异与自查方法
 
-截至 `0.1.0-beta.5`（2026-09-17），**工作区与已发布产物之间没有未发布的协议差异**：`fp-1` → `fp-7` 的六次递增已全部随本版发布，逐条见[变更日志](/zh-CN/docs/changelog) §2.1；`0.1.0-beta.4` 相对 `0.1.0-beta.3` 的改动见同页 §2.2。下面的命令用来核对这件事——把任意两版已发布产物取回来对读。
+截至 `0.1.0-beta.5`（2026-09-17），**工作区与已发布产物之间没有未发布的协议差异**：`fp-1` → `fp-7` 的六次递增已全部随本版发布，逐条见[变更日志](/zh-CN/docs/changelog) §2.1；`0.1.0-beta.4` 相对 `0.1.0-beta.3` 的改动见同页 §2.2。下面的命令用来核对这件事——把任意两版已发布产物取回来对读。（另有一处**未发布的 SDK 形状变更**，它**不是**协议差异，见 §8.2。）
 
 ### 8.1 迁移已有配置里的市场源
 
@@ -255,6 +255,25 @@ diff <(grep -o '^export [a-z]* [A-Za-z]*' b4/package/dist/index.d.mts) \
 ```
 
 客户端侧同理：把 `@flowy-agent-store/client` 装进临时目录后数 `httpRouteTable()` 的键数，就是 §5.3 引用的映射数（`0.1.0-beta.5` 为 48）。协议侧的「没有增删类型」用上面那条 `diff` 数导出名即可核对——`0.1.0-beta.4` 与 `0.1.0-beta.5` 都是 **141 个**。
+
+### 8.2 未发布的 SDK 入口改名与形状变更（`launchClient` → `launchHarness`）
+
+`@flowy-agent-store/sdk` 的入口改名并改了形状，**尚未随任何版本发布**——已发布的最新版 `0.1.0-beta.5` 用的仍是 `launchClient` 与 `session.client.xxx`：
+
+```ts
+// 0.1.0-beta.5（已发布）
+const session = await launchClient({ client: { name: "my-app", version: "1.0.0" } });
+await session.client.conversations.create({ name: "demo" });
+
+// 工作区 / 下一个预发布序号
+const harness = await launchHarness({ client: { name: "my-app", version: "1.0.0" } });
+await harness.conversations.create({ name: "demo" });  // ← 少一跳
+harness.handshake.protocol_version;                    // ← 非空握手响应
+```
+
+一起变的是三样：函数名 `launchClient` → `launchHarness`、类型名 `LaunchedClient` → `Harness`（`LaunchOptions` → `HarnessOptions`）、返回值不再有 `.client` 一跳；文档里的变量统一叫 `harness`。
+
+**不是协议差异**：指纹（`fp-7`）未动，所以 `0.1.0-beta.5` 的运行时与本版工作区在 wire 上互通。这是一次**纯 TS 侧破坏性变更**，按[变更日志](/zh-CN/docs/changelog) §3 的口径随下一个预发布序号发布；动机与两个被撞到的实现约束见 `docs/agent-store/31`。
 
 ## 9. changelog 与 release notes 的边界
 

@@ -8,7 +8,7 @@ Flowy Agent Store 提供三个配套的 TypeScript 包，让 Node.js / Electron 
 | `@flowy-agent-store/client` | `AppServerClient` + 7 个子客户端 + `Transport` 抽象 | 任意（无 HTTP、无 DOM、无 Node） | `@flowy-agent-store/protocol` |
 | `@flowy-agent-store/sdk` | spawn `flowy-agent-store` 二进制 → 回环 WS 建连 → 就绪客户端 | Node.js（依赖 `node:child_process` 等） | `@flowy-agent-store/client`、`@flowy-agent-store/protocol` |
 
-三个包按需组合：**只用类型**取 `protocol`；**连已运行的 App Server**（如桌面端已启动）取 `client` + 自建 `WebSocketTransport`；**自己拉起整个运行时**取 `sdk` 的 `launchClient`。
+三个包按需组合：**只用类型**取 `protocol`；**连已运行的 App Server**（如桌面端已启动）取 `client` + 自建 `WebSocketTransport`；**自己拉起整个运行时**取 `sdk` 的 `launchHarness`。
 
 可运行的完整示例（Node / 浏览器 / Electron / Store / 会话 / Run）集中在 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk)。
 
@@ -309,6 +309,8 @@ await sub.close(); // 服务器端退订（也可靠关闭 socket 隐式退订�
 
 > `rearm()` 之后仍需自行补齐断线窗口的正文：该订阅没有事件重放接口，请用 `conversation/messages` 重新拉取（游标归零意味着后续重复事件由调用方按 `sequence` 去重）。
 
+**一个客户端可以同时管多个会话**：`create()` 没有数量上限，每个会话有自己的 `conversation_id`、身份（专家 / 团）与事件流；`list(limit?)` 把它们列出来，一条 WS 连接可以同时 `follow()` 多个（事件按 `conversation_id` 分流）。忙判定（`conflict`）**按会话**生效，所以两个会话能各跑各的轮次、互不阻塞。需要**进程级**隔离时不是多开会话，而是多个 `dataDir`（同一个目录有单实例锁）。可运行的完整例子见[实战示例](/zh-CN/docs/examples-sdk) §7。
+
 #### `runs` — Run 生命周期与实时事件
 
 ```ts
@@ -360,27 +362,26 @@ client.workspaces.revoke(workspaceId: string): Promise<WorkspaceRevokeResult>; /
 
 ## 4. `@flowy-agent-store/sdk` — Node 宿主
 
-### 4.1 `launchClient(options): Promise<LaunchedClient>`
+### 4.1 `launchHarness(options): Promise<Harness>`
 
-一次调用完成四件事：定位并 spawn 运行时 → 等就绪行拿到真实端口 → 回环建连 → `initialize` / `initialized` 握手。返回的 `client` 已经可以直接用。
+一次调用完成四件事：定位并 spawn 运行时 → 等就绪行拿到真实端口 → 回环建连 → `initialize` / `initialized` 握手。**返回的对象就是那个 client**——业务面直接挂在它身上，没有 `.client` 一跳（`31` §5 方案 B）。
 
 ```ts
-interface LaunchOptions extends SpawnOptions {
+interface HarnessOptions extends SpawnOptions {
   client: ClientInfo;             // { name, version }
   capabilities?: ClientCapabilities;
   token?: string;                 // 传给 WebSocketTransport
   requestTimeoutMs?: number;      // 默认 30s（不足以覆盖首次 store/list，见 §3.3 警告）
 }
 
-interface LaunchedClient {
+interface Harness extends AppServerClient {
   server: SpawnedServer;          // readiness / dataDir / exited / close
-  client: AppServerClient;        // 已握手就绪
-  initializeResult: InitializeResult;
+  handshake: InitializeResult;    // 本次握手响应（非空）
   close(): Promise<void>;         // 退订 → 关传输 → 终止子进程 → 删临时 data-dir
 }
 ```
 
-`LaunchOptions` 自带的字段（`SpawnOptions` 的字段见 §4.2）：
+`HarnessOptions` 自带的字段（`SpawnOptions` 的字段见 §4.2）：
 
 | 字段 | 默认 | 说明 |
 | --- | --- | --- |
@@ -389,16 +390,19 @@ interface LaunchedClient {
 | `token` | 省略 | 交给 `WebSocketTransport`；WebSocket 无法设自定义 header，所以它以 `?token=…` 拼在回环 URL 上。宿主以 `--auth` 启动时必需，本地模式（`auth: "disabled-local"`）可省略 |
 | `requestTimeoutMs` | `30000` | **单次请求**超时，与启动超时无关；冷启动首个 `store/list` 要下载市场镜像，务必调大（见示例页 §12） |
 
-`LaunchedClient` 的成员：
+`Harness` 的成员：
 
 | 成员 | 内容 | 用途 |
 | --- | --- | --- |
-| `client` | 已握手就绪的 `AppServerClient` | 所有业务调用 |
-| `initializeResult` | 握手响应 | 记录或断言协议指纹 |
+| （继承）`conversations` / `agents` / `teams` / `skills` / `connectors` / `models` / `workspaces` / `runs` / `store` | `AppServerClient` 的全部业务面 | 所有业务调用**直接**写在 `harness` 上：`harness.conversations.create(...)` |
+| `handshake` | 本次握手响应（**非空**） | 记录或断言协议指纹 |
+| `initializeInfo` | **当前**连接状态（可空，`close()` 之后为 `null`） | 判断连接是否仍然就绪 |
 | `server.readiness` | 就绪行解析结果 `{ host, port, url, protocol_version, version, auth }` | 打日志；自建 `HttpTransport` 时取 `url`；据 `auth` 判断是否需要 `token` |
 | `server.dataDir` | 子进程实际使用的 data-dir | 排查路径、断言隔离（自动创建的临时目录也在这里） |
 | `server.exited` | 永不 reject 的 `Promise<{ code, signal }>` | 观察崩溃与退出（契约见 §4.4） |
 | `close()` | 退订 → 关传输 → 终止子进程 → 删除自动创建的 data-dir | 在 `finally` 中调用；可重复调用 |
+
+> **破坏性变更（相对已发布的 `0.1.0-beta.5`）**：入口改名为 `launchHarness`（类型 `LaunchedClient` → `Harness`，`LaunchOptions` → `HarnessOptions`），返回值不再有 `.client` 一跳，`initializeResult` 改叫 `handshake`。也就是 `const session = await launchClient({…})` + `session.client.conversations.create(…)` 变成 `const harness = await launchHarness({…})` + `harness.conversations.create(…)`。逐项迁移见[升级与迁移指引](/zh-CN/docs/upgrade) §8.2。
 
 **它不做什么**：不配置模型与供应商（那是 `config.toml` 与宿主设置面的事）；不下载二进制；不给 `dataDir` 就不持久化（一次性沙箱）；不自动重启子进程，也不注册进程退出钩子。
 
@@ -448,7 +452,7 @@ AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node your-app.mjs
 - **就绪行格式**：子进程 stdout 单行 JSON `{"agent_store":"listening","host":...,"port":...,"url":...,"protocol_version":...,"version":...,"auth":...}`；SDK 逐行扫描、忽略其他行（tracing 也走 stdout）。
 - **stdout 持续排空**：就绪行解析完成后，SDK 继续读取并丢弃子进程 stdout（`readline.close()` 会 `pause` 该流，所以不能就此停止读取）。否则运行时日志写满 OS 管道缓冲（约 64KB）后会永久阻塞在写上，长会话（多轮 turn、市场树扫描）表现为静默卡死。后续输出仅被排空丢弃，本轮不提供日志回调。
 - **`env` / `cwd` 透传**：`env` 在父进程 `process.env` 之上**合并**（不是替换，`PATH` 等仍可见）；`cwd` 省略即继承父进程工作目录。两者原样交给 `child_process.spawn`。
-- **退出可见**：`SpawnedServer.exited`（`{ code, signal }`）在子进程**任意原因退出**时 settle，含崩溃与非零退出码；`onExit` 同时触发一次。SDK **不自动重启**，重启用 `launchClient` 的调用方负责。
+- **退出可见**：`SpawnedServer.exited`（`{ code, signal }`）在子进程**任意原因退出**时 settle，含崩溃与非零退出码；`onExit` 同时触发一次。SDK **不自动重启**，重启用 `launchHarness` 的调用方负责。
 
 ### 4.5 错误与清理
 
@@ -459,11 +463,11 @@ AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node your-app.mjs
 - 正确用法：`try/finally` 中 `close()`；进程退出时若未 close，临时目录会残留（SDK 不装退出钩子）。
 
 ```ts
-const session = await launchClient({ client: { name: "x", version: "1" } });
+const harness = await launchHarness({ client: { name: "x", version: "1" } });
 try {
-  await session.client.connectors.list();
+  await harness.connectors.list();
 } finally {
-  await session.close();
+  await harness.close();
 }
 ```
 

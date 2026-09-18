@@ -116,7 +116,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 #### 修复
 
-- 此前的 `0.1.0` 没有这份依赖，`launchClient` 可能因此**找不到可执行文件**（见[升级与迁移指引](/zh-CN/docs/upgrade) §6.2）。
+- 此前的 `0.1.0` 没有这份依赖，`launchHarness` 可能因此**找不到可执行文件**（见[升级与迁移指引](/zh-CN/docs/upgrade) §6.2）。
 
 它是 `latest` 标签当前指向的版本——**不是最新版**；升级无需改代码。
 
@@ -160,6 +160,20 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 一处口径更正（2026-09-17）：上一版台账把 `mentions` 记作「`fp-2` → `fp-3` 新增」的字段。把两版已发布产物对读可见，`MentionKind` / `MentionRef` 与两处 `mentions` **在 `0.1.0-beta.4` 的 `index.d.mts` 里就已经存在**，所以 §2.1 把它写成宿主侧的**语义**变化，不声称是 beta.5 新增的字段。已发布条目的版本号与发布时间不受此更正影响。
 
 发布节奏：条目在版本**发布之后**才追加（见 §3 的「新增」规则），本页不预告日期。
+
+### 4.1 未发布的 SDK 入口改名与形状变更（**不是协议变更**）
+
+`@flowy-agent-store/sdk` 的入口**改了名、也改了返回值形状**，且**尚未随任何版本发布**：`launchClient` → **`launchHarness`**（类型 `LaunchedClient` → `Harness`、`LaunchOptions` → `HarnessOptions`），返回值不再有 `.client` 一跳——解析出的对象**就是** `AppServerClient`，业务面直接挂在它身上（`docs/agent-store/31` §5 方案 B / §10）。
+
+| 已发布的 `0.1.0-beta.5` | 工作区（下一个预发布序号） |
+| --- | --- |
+| `await launchClient({ client: … })` | `await launchHarness({ client: … })` |
+| `session.client.conversations.create(...)` | `harness.conversations.create(...)` |
+| `session.initializeResult.protocol_version` | `harness.handshake.protocol_version` |
+
+- **不是协议差异**：`APP_SERVER_PROTOCOL_VERSION` / `PROTOCOL_VERSION`（`fp-7`）未动，`0.1.0-beta.5` 的运行时与本版工作区在 wire 上互通。
+- **属于破坏性变更**：按 §3 的口径，它随**下一个预发布序号**发布并逐条标注；发布之后本节并入 §2 的对应版本条目，本节清空。
+- 站点 [TypeScript SDK 参考](/zh-CN/docs/typescript-sdk) §4.1 已按**新形状**更新，并在那里给出同一条迁移说明。
 
 因此：**没有列在本页的变更，不要假定它已经发布。**
 

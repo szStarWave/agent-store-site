@@ -157,28 +157,28 @@ SDK 的连接器客户端是**目录读面 + OAuth 直通 + 调用代理**：`li
 2. SDK 会话内导入并安装（`import` / `install` 暂无子客户端封装，用 `transport.request` 透传协议方法）：
 
    ```ts
-   import { launchClient } from "@flowy-agent-store/sdk";
+   import { launchHarness } from "@flowy-agent-store/sdk";
 
-   const session = await launchClient({ client: { name: "my-app", version: "0.1.0" } });
+   const harness = await launchHarness({ client: { name: "my-app", version: "0.1.0" } });
 
    // 1. 导入：生成不可变 PluginSnapshot（同 digest 重复导入幂等，返回 reused=true）
-   const snap = await session.client.transport.request("import/run", {
+   const snap = await harness.transport.request("import/run", {
      source_path: "C:/abs/path/to/my-market", // 市场根目录（含 .codebuddy-connector/）
      source_kind: "workbuddy-connector-market",
    });
 
    // 2. 安装：connector 组件自动注册进运行时 mcp_servers
-   await session.client.transport.request("install/run", { snapshot_id: snap.snapshot_id });
+   await harness.transport.request("install/run", { snapshot_id: snap.snapshot_id });
 
    // 3. 查询目录并在 Run 中注入
-   const connectors = await session.client.connectors.list();
-   await session.client.runs.agent({
+   const connectors = await harness.connectors.list();
+   await harness.runs.agent({
      agentId: "<agent-id>",
      goal: "……",
      mentions: [{ kind: "connector", id: connectors[0].id }],
    });
 
-   await session.close();
+   await harness.close();
    ```
 
 3. 标准 OAuth 直接用 SDK 的 `connector.authStart(connectorId)` 发起、轮询 `connector.authStatus` 至 `authenticated`；

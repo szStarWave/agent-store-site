@@ -67,12 +67,25 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `type` | `string` | 否 | 供应商类型（映射到运行时平台），如 `openai`、`anthropic` |
+| `type` | `string` | 否 | 供应商类型（映射到运行时平台），如 `openai`、`anthropic`；取值见下方「`type` 的实际取值」 |
 | `api_key` | `string` | 否 | API 密钥，明文写在配置文件里 |
 | `base_url` | `string` | 否 | API 基础 URL |
 | `enabled` | `boolean` | 否 | 是否启用以自动注册；缺省视为启用 |
 
 > 密钥安全：`api_key` 只用于加密的供应商注册，读取后即被丢弃，**不会**出现在任何日志与追踪负载中。文件权限建议自行收紧（`chmod 600`）。
+
+### `type` 的实际取值
+
+**不写 `type` 与写 `type = ""` 完全等价**：两者都落到 `custom`，也就是 OpenAI Chat Completions 兼容协议。因此这里认的是一组**有限的拼写**，其余一律按 OpenAI 兼容处理——如果你从其他工具（如 Kimi Code）照抄配置，下表后两行的拼写会被静默当成 OpenAI，而不是报错：
+
+| 你写的值 | 实际使用的协议 | 说明 |
+| --- | --- | --- |
+| 不写 / `""` / `custom` / `openai` / `kimi` | OpenAI Chat Completions | `kimi`、`mimo`、`deepseek` 等 OpenAI 兼容服务都属于这一类 |
+| `anthropic` | Anthropic Messages | 见下方「输出上限」——这个协议对 `max_output_size` 有硬要求 |
+| `openai_responses` | **OpenAI Chat Completions**（并非 Responses） | Responses 协议请在**模型**上写 `protocol = "openai-responses"`（也接受 `openai.responses`），它不是供应商级取值 |
+| `google-genai` / `vertexai` | **OpenAI Chat Completions**（协议不符） | 这里认的供应商类型是 `gemini` 与 `gemini-vertex-ai` |
+
+单模型协议覆盖（`[models]` 的 `protocol`）分两种效力：`"openai.responses"` / `"openai-responses"` 在**任何**平台上都生效（它是 Responses 协议的唯一入口）；而 `"anthropic"` 这类只在 `new-api` 平台上改变协议选择，写在别的平台上不生效（如实入库、不报错）。所以「换个 `type` 就能换协议」只对上表前两行成立。
 
 ## `models`
 
@@ -84,9 +97,57 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 | `model` | `string` | 发给上游的模型名（必填） |
 | `display_name` | `string` | 界面显示名 |
 | `max_context_size` | `integer` | 上下文窗口上限（token 数） |
-| `max_output_size` | `integer` | 单次输出上限（token 数） |
-| `capabilities` | `array<string>` | 能力标记，如 `["thinking", "tool_use", "image_in"]` |
-| `reasoning_key` | `string` | 思考内容在响应中的字段名，如 `reasoning_content` |
+| `max_output_size` | `integer` | 单次输出上限（token 数）。见下方「输出上限」——`anthropic` 协议**必填**，且实际发出值会被钳到上下文窗口的 1/4 |
+| `protocol` | `string` | 单模型协议覆盖，如 `"openai-responses"`、`"anthropic"`；效力见「`type` 的实际取值」末段 |
+| `capabilities` | `array<string>` | 能力标记，如 `["thinking", "tool_use", "image_in"]`。**目前仅解析、不生效**（保留键位以兼容其他工具的配置文件） |
+| `reasoning_key` | `string` | 思考内容在响应中的字段名，如 `reasoning_content`。**目前仅解析、不生效** |
+
+### 输出上限（`max_output_size`）
+
+这个键的语义比看起来要紧：**`anthropic` 协议在线上必须带 `max_tokens`**，所以该协议下模型没有输出上限就不是「交给上游取默认值」，而是运行时构建直接失败：
+
+```text
+Bad request: the anthropic protocol requires an explicit output ceiling;
+set Max output tokens on the <provider>/<model> model in Settings -> Models
+```
+
+| 协议 | `max_output_size` 缺失时 | 声明了之后 |
+| --- | --- | --- |
+| `anthropic` | **报错**：运行时构建以 `BAD_REQUEST` 失败，本轮无法发送 | 作为 `max_tokens` 发出 |
+| OpenAI Chat Completions | 允许省略：请求里不带该字段，由上游决定 | 作为 `max_tokens`（部分网关为 `max_completion_tokens`）发出 |
+| OpenAI Responses | 允许省略：同上 | 作为 `max_output_tokens` 发出 |
+
+**两个协议都遵守你写的值**——差别只在「缺了会不会报错」。所以接 `anthropic` 兼容网关（不少第三方中转只提供 `/v1/messages`）时**必须**写上它；照抄一份 `type = "anthropic"` 但只写了 `max_context_size` 的配置，就会撞上上面这条错误。
+
+### 声明值不一定原样发出
+
+显式写了 `max_output_size` 也不等于线上就是这个数：有两处会**向下**收敛，都不会报错。
+
+**一、上下文窗口的 1/4（本地钳制）**
+
+实际请求上限是 `min(声明值, 上下文窗口 / 4)`。窗口足够大时这条不生效（例如 1M 窗口、声明 8000 → 发出 8000）；窗口偏小时会明显改小，且**没有日志**：
+
+| 上下文窗口 | 声明 `max_output_size` | 实际发出 |
+| --- | --- | --- |
+| 1,000,000 | 8000 | 8000（1/4 = 250,000，不构成约束） |
+| 8,000 | 8192 | 2000 |
+
+所以「我明明填了 8192，怎么发出去是 2000」的答案在 `max_context_size`：模型的上下文窗口写小了，是这个窗口而不是你的声明值在决定上限。
+
+**二、上游 `supported range` 拒绝后的协商（仅 OpenAI Chat Completions）**
+
+如果网关以 `maxOutputTokens value of 128000 but the supported range is from 1 (inclusive) to 65537 (exclusive)` 这类措辞拒绝，客户端会解析出可接受的最大值、**向下改小并重发一次**（仅一次），然后**按模型记住**这个值：此后同一模型的所有请求都被钳到它，不会再试你配置里的较大值。
+
+- 只降不升。把 `max_output_size` 改大不会顶回被记住的上限——那个记忆活在进程内，**重启后才会重新按配置值尝试**。
+- 措辞必须严格匹配 `supported range is from L (inclusive|exclusive) to U (inclusive|exclusive)`；其他形式的拒绝会原样报错，不猜值。
+- OpenAI Responses 协议**没有**这套协商（它只协商过期的 `previous_response_id` 与工具 schema），因此该协议下被拒就是被拒。
+
+### 两条与本键相关的注册行为
+
+- **只填空、不覆盖**：注册时仅当该模型还没有输出上限才写入配置值。之后你在「设置 → 模型」里手改的值不会被配置回写覆盖——上面那条报错本身就是引导你去那里手填，回写会把你的修改静默推翻。
+- **补齐存量数据**：早前版本注册的供应商可能停在「有上下文窗口、没有输出上限」的状态。同一个供应商 key 在下次模型解析时会就地把空缺补上，不必删除重建。
+
+> 顺带说明取舍：不写 `max_output_size` 时**不会**编造任何默认值。宁可在接 `anthropic` 时报一条指名到模型的错误，也不替你猜一个可能把长回答截断的上限。`<= 0` 的值按「未声明」处理。
 
 ## `default_marketplaces`
 
@@ -200,7 +261,7 @@ requirement = false
 
 ### 用环境变量覆盖（`AGENT_STORE_TOOLS`）
 
-自己 spawn 宿主时（例如 SDK 的 `launchClient`）不必改这份文件：环境变量 `AGENT_STORE_TOOLS` 的值是一段 JSON（形状同 `[tools]` 表），**整份替换**文件里的策略，而不是与它合并。
+自己 spawn 宿主时（例如 SDK 的 `launchHarness`）不必改这份文件：环境变量 `AGENT_STORE_TOOLS` 的值是一段 JSON（形状同 `[tools]` 表），**整份替换**文件里的策略，而不是与它合并。
 
 | 事实 | 行为 |
 | --- | --- |
@@ -369,7 +430,8 @@ UPSTREAM_TOKEN = "…"    # 填给 mcp.json 里的 secret:UPSTREAM_TOKEN
 | 维度 | Agent Store | Kimi Code 等 |
 | --- | --- | --- |
 | 文件位置 | `~/.agent-store/config.toml` | `~/.kimi-code/config.toml` 等（各工具独立目录） |
-| `[providers]` / `[models]` | 同构：`type`/`api_key`/`base_url`、`provider`/`model`/`max_context_size`/`capabilities` | 同构 |
+| `[providers]` / `[models]` | 同构：`type`/`api_key`/`base_url`、`provider`/`model`/`max_context_size`/`capabilities` | 同构，但 `type` 认的拼写集合不同（见「`type` 的实际取值」） |
+| `max_output_size` | 两个协议都遵守，但发出值 ≤ 上下文窗口的 1/4；**`anthropic` 协议必填** | 各工具自行推断默认值，省略通常可用；Kimi Code 按声明值直接作为上限，无窗口比例钳制 |
 | `default_model` | `"<provider>/<model>"` 别名 | 同构 |
 | 未知键 | 容忍，不报错 | 容忍 |
 | 环境变量后备 | **无**——凭证只从文件读取 | 部分工具有 `env` 子表/环境变量后备 |
@@ -377,3 +439,8 @@ UPSTREAM_TOKEN = "…"    # 填给 mcp.json 里的 secret:UPSTREAM_TOKEN
 | MCP 声明 | `~/.agent-store/mcp.json`（与 `config.toml` 同级，**只做用户级**） | `~/.kimi-code/mcp.json` 加项目级 `.kimi-code/mcp.json`（项目级覆盖用户级） |
 
 如果你的配置里已经有 Kimi Code 或其他工具的 `[providers]`、`[models]` 段落，可以**直接复制**它们到 `~/.agent-store/config.toml` 使用（前提是该供应商走 OpenAI/Anthropic 兼容协议）；不相关的段落（`thinking`、`permission`、`hooks` 等）保留与否都不影响 Agent Store 解析。
+
+照抄时有两处会被**静默**处理掉，值得先看一眼：
+
+- **`type` 的拼写集合不同**。别的工具里合法的 `google-genai` / `vertexai` / `openai_responses` 在这里不被识别，会退化成 OpenAI 兼容协议（协议类型不对，但不会报配置错误）。详见「`type` 的实际取值」。
+- **`anthropic` 需要显式输出上限**。别的工具会为 `anthropic` 按模型名推断默认 `max_tokens`，省略 `max_output_size` 通常能跑；这里不会猜，缺了就构建失败。详见「输出上限」。

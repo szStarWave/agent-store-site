@@ -116,7 +116,7 @@ The `versions` array is **not** in chronological order: `0.1.0` is listed last b
 
 #### Fixed
 
-- The earlier `0.1.0` lacks that dependency set, so `launchClient` could **fail to find the executable** (see §6.2 of the [Upgrade and migration guide](/en-US/docs/upgrade)).
+- The earlier `0.1.0` lacks that dependency set, so `launchHarness` could **fail to find the executable** (see §6.2 of the [Upgrade and migration guide](/en-US/docs/upgrade)).
 
 This is the version `latest` currently points at — **it is not the newest one**; upgrading requires no code changes.
 
@@ -160,6 +160,20 @@ As of `0.1.0-beta.5` (2026-09-17), **there is no unpublished protocol difference
 One correction (2026-09-17): the previous ledger recorded `mentions` as a field **added** in `fp-2` → `fp-3`. Reading the two published artifacts side by side shows that `MentionKind` / `MentionRef` and the two `mentions` fields **already existed in `0.1.0-beta.4`'s `index.d.mts`**, so §2.1 describes it as a host-side **semantics** change and does not claim it as a field added in beta.5. The version number and publish date of any published entry are unaffected by this correction.
 
 Release cadence: entries are appended **after** a version is published (the "Adding" rule in §3); no dates are announced here.
+
+### 4.1 Unpublished SDK entry rename and shape change (**not a protocol change**)
+
+The entry point of `@flowy-agent-store/sdk` was **renamed and reshaped**, and it has **not shipped with any version yet**: `launchClient` → **`launchHarness`** (types `LaunchedClient` → `Harness`, `LaunchOptions` → `HarnessOptions`), and the return value no longer has a `.client` hop — the object it resolves to **is** the `AppServerClient`, with the business surface hanging off it directly (doc `31` §5 option B / §10).
+
+| Published `0.1.0-beta.5` | Working tree (next pre-release counter) |
+| --- | --- |
+| `await launchClient({ client: … })` | `await launchHarness({ client: … })` |
+| `session.client.conversations.create(...)` | `harness.conversations.create(...)` |
+| `session.initializeResult.protocol_version` | `harness.handshake.protocol_version` |
+
+- **Not a protocol difference**: `APP_SERVER_PROTOCOL_VERSION` / `PROTOCOL_VERSION` (`fp-7`) are untouched, so the `0.1.0-beta.5` runtime interoperates with this working tree on the wire.
+- **It is a breaking change**: per §3 it ships with the **next pre-release counter** and is labelled there; once published, this subsection folds into the matching §2 entry and is cleared.
+- The site's [TypeScript SDK reference](/en-US/docs/typescript-sdk) §4.1 is already updated to the **new shape**, with the same migration note.
 
 So: **never assume a change has shipped unless it is listed on this page.**
 
