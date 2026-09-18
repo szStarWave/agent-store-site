@@ -95,7 +95,7 @@ const harness = await launchHarness({
   bin: "/opt/flowy-agent-store/flowy-agent-store", // omitted ⇒ §2's four routes are searched
   dataDir: "/var/lib/my-app/agent-store",          // you own it ⇒ never deleted; the store survives across calls
   readyTimeoutMs: 180_000,                         // cold start builds the database
-  requestTimeoutMs: 120_000,                       // the first store/list mirrors the whole market tree
+  requestTimeoutMs: 120_000,                       // store/list does not wait for market registration; empty? check markets_pending
   extraArgs: ["--agent-store-config", "/etc/my-app/agent-store.toml"], // point at another host config
   client: { name: "ci-smoke", version: "1.0.0" },
   onExit: (info) => console.error("runtime exited", info.code, info.signal),
@@ -656,7 +656,7 @@ const harness = await launchHarness({
   bin: process.env.AGENT_STORE_BIN, // a prebuilt binary; omit to search the four routes
   dataDir: process.env.CI_DATA_DIR, // your own dir → never removed; omit for a temp dir that close() removes
   readyTimeoutMs: 180_000,          // cold start creates the database
-  requestTimeoutMs: 120_000,        // the first store/list triggers the market mirror download
+  requestTimeoutMs: 120_000,        // store/list does not wait for registration (zip archives download in the background)
   client: { name: "ci-smoke", version: "1.0.0" },
   onExit: (info) => console.error("runtime exited", info.code, info.signal),
 });
@@ -671,7 +671,7 @@ try {
 
 - Binary resolution is `bin` → `AGENT_STORE_BIN` → the platform runtime package's `vendor/` → `PATH`; **it never downloads**, so pin a prebuilt artifact in CI.
 - One `dataDir` takes a **single-instance lock**: parallel tests need separate directories or the second host fails fast.
-- A cold first `store/list` triggers the market mirror download (about 90 seconds on a fresh data dir), so widen `requestTimeoutMs`; an empty catalogue is **not an error**.
+- A cold first `store/list` does **not** wait for market registration (the default markets are one zip archive each, downloaded in the background), so there is **no need** to widen `requestTimeoutMs`; an empty catalogue is **not an error** — that is `markets_pending: true`.
 - A crashed child is **never restarted**: observe it via `server.exited` / `onExit`, and guarantee `close()` with `try/finally` (or your test framework's `afterAll`).
 
 ## 13. Rolling your own transport: WebSocket or HTTP
@@ -706,7 +706,7 @@ console.log(Object.keys(httpRouteTable()).length);
 - **Temporary data-dir**: without `dataDir`, every `launchHarness` creates a temp directory and `close()` removes it; a hard-killed process leaves the directory behind.
 - **Single-instance lock**: one data-dir cannot host two runtimes at once.
 - **A `send()` receipt means accepted, not finished**: `accepted: true` only says the message is on disk, and `completed: false` is the normal case — that turn still has work to stream. Take the terminal state from `follow()` events, or read `is_processing` from `conversation/get`; the §7 example that throws several conversations' turns into one `Promise.all` leans on exactly that asynchrony.
-- **The first `store/list` is slow**: the default 30s request timeout may not be enough, and an empty catalogue can mean `markets_pending: true` (still registering) — **not an error**.
+- **The first `store/list` is not slow**: it does not wait for market registration; an empty catalogue with `markets_pending: true` means registration is still running — **not an error**. Poll that field rather than raising `requestTimeoutMs`.
 - **A freshly installed connector is disabled**: `store.install` enables it and probes; the flat `installStoreEntry` leaves that to you (`enableInstall`).
 - **No update verb**: `checkUpdates()` / `updateHint()` → `uninstall_reinstall`.
 - **Disabling a skill is only a catalogue marker**: `store.setEnabled(item, false)` returns `code: "skill_disable_flag_only"` for a skill; only `uninstall` removes it from the runtime.

@@ -27,8 +27,9 @@
 | `0.1.0` | 2026-09-09T09:09:04Z | 无 | 首次发布；三个包的**代码与类型声明与 beta.2 逐字节相同**，只有 `package.json` 不同：当时的 sdk 没有 `optionalDependencies`（未随附平台运行时包） |
 | `0.1.0-beta.2` | 2026-09-09T09:27:36Z | `latest` | 补齐 sdk 的 `optionalDependencies`（darwin / linux / win32 五个平台运行时包，同一版本号） |
 | `0.1.0-beta.3` | 2026-09-10T04:44:34Z | — | 为 client / sdk 新增公开声明（重连生命周期、退出观测，见 §6.1）；`package.json` 补 `engines.node >= 22`、`repository`、`sideEffects`；protocol 声明逐字节未变 |
-| `0.1.0-beta.5` | 2026-09-17T11:41:10Z | `beta` | **破坏性**：协议指纹从 `fp-1` 跳到 `fp-7`（旧客户端连不上新运行时）；其余为加法项——连接器工具的 `input_schema` / `tools_truncated`、按轮挂载技能（`mentions` 只认 `kind: "skill"`）、`agent_id` / `team_id`、`model` / `reasoning_effort`，以及市场源新增 `zip` 类型。方法面无增删，仍是 `48 / 71`（升级步骤见 §6.4） |
+| `0.1.0-beta.5` | 2026-09-17T11:41:10Z | — | **破坏性**：协议指纹从 `fp-1` 跳到 `fp-7`（旧客户端连不上新运行时）；其余为加法项——连接器工具的 `input_schema` / `tools_truncated`、按轮挂载技能（`mentions` 只认 `kind: "skill"`）、`agent_id` / `team_id`、`model` / `reasoning_effort`，以及市场源新增 `zip` 类型。方法面无增删，仍是 `48 / 71`（升级步骤见 §6.4） |
 | `0.1.0-beta.4` | 2026-09-16T10:24:02Z | — | **破坏性**：协议指纹改为严格相等的 `fp-1`（旧客户端连不上新运行时）、`event_type` 收窄为封闭联合 `ConversationEventType`；同时带上技能文件树读面、`connector/call` 调用代理与 `conversation/list-changed` 等加法项，客户端映射到 HTTP 的方法数现为 `48 / 71`（升级步骤见 §6.3） |
+| `0.1.0-beta.6` | 2026-09-18T11:08:21Z | `beta` | **破坏性**：`@flowy-agent-store/sdk` 入口**改名并改了形状**（`launchClient` → `launchHarness`、返回值不再有 `.client` 一跳、`initializeResult` → `handshake`），**必须改代码**；wire 面未动——指纹仍 `fp-7`、方法仍 `48 / 71`（升级步骤见 §6.5） |
 
 注意 `0.1.0` 是**时间最早**的一次发布（比 beta.2 早约 18 分钟），却没有任何 dist-tag 指向它；它既不是稳定版，也不比 beta 线新。
 
@@ -39,7 +40,7 @@
 | dist-tag | 当前指向 |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.5` |
+| `beta` | `0.1.0-beta.6` |
 
 `0.1.0` 不带任何 tag。三个包与 `@flowy-agent-store/runtime-*` 两个 tag 的指向一致（已实测）。
 
@@ -49,14 +50,14 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.5", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.6", "latest": "0.1.0-beta.2" }
 }
 ```
 
 两个陷阱：
 
-1. `latest` **不是**最新版——它指向 `0.1.0-beta.2`；最新的 beta 是 `beta` tag 指向的 `0.1.0-beta.5`。
+1. `latest` **不是**最新版——它指向 `0.1.0-beta.2`；最新的 beta 是 `beta` tag 指向的 `0.1.0-beta.6`。
 2. `0.1.0` 虽然没有 tag，但版本范围仍可能解析到它（见 §4）。
 
 另外，`versions` 数组的**排列顺序不是时间顺序**：`0.1.0` 排在最后，却是最早发布的。
@@ -69,7 +70,7 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```bash
 bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2（latest）
-bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.5
+bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.6
 bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → bun 解析到 0.1.0-beta.2
 npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → npm 解析到 0.1.0（那个无 tag 的早期发布）
 ```
@@ -80,14 +81,14 @@ npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → npm 解析到 0.
 
 ```bash
 # 明确写出确切版本；不要用 ^ 或 ~
-bun add @flowy-agent-store/sdk@0.1.0-beta.5
-bun add @flowy-agent-store/protocol@0.1.0-beta.5   # 需要协议类型时
+bun add @flowy-agent-store/sdk@0.1.0-beta.6
+bun add @flowy-agent-store/protocol@0.1.0-beta.6   # 需要协议类型时
 
 # npm / pnpm 同理
-npm install @flowy-agent-store/sdk@0.1.0-beta.5
+npm install @flowy-agent-store/sdk@0.1.0-beta.6
 ```
 
-`package.json` 里应当落到 `"@flowy-agent-store/sdk": "0.1.0-beta.5"`（**不带** `^`）。sdk 的平台运行时包由它的 `optionalDependencies` 按同一版本号钉住，不需要单独声明。
+`package.json` 里应当落到 `"@flowy-agent-store/sdk": "0.1.0-beta.6"`（**不带** `^`）。sdk 的平台运行时包由它的 `optionalDependencies` 按同一版本号钉住，不需要单独声明。
 
 锁文件也要提交进版本库：`bun.lock` / `package-lock.json` / `pnpm-lock.yaml` 是「这次到底装了什么」的唯一权威记录。
 
@@ -119,11 +120,11 @@ bun run typecheck && bun run test
 
 ```bash
 # 从无 tag 的 0.1.0 切到当前 beta 线（当前 beta 见 §3）
-bun add @flowy-agent-store/sdk@0.1.0-beta.5
+bun add @flowy-agent-store/sdk@0.1.0-beta.6
 bun pm ls | grep '@flowy-agent-store'   # 确认 0.1.0 已经不在了
 ```
 
-`0.1.0` 升到 `beta.3` 是纯加法：公开声明面只增不减（`beta.2` 补的运行时包、`beta.3` 补的重连与退出观测），没有删除或改名；**再往上的 `beta.4` 不是纯加法**——它带类型收窄与严格相等的协议指纹，见 §6.3；**`beta.5` 也不是纯加法**（指纹再次严格相等），但**不需要改代码**，见 §6.4。
+`0.1.0` 升到 `beta.3` 是纯加法：公开声明面只增不减（`beta.2` 补的运行时包、`beta.3` 补的重连与退出观测），没有删除或改名；**再往上的 `beta.4` 不是纯加法**——它带类型收窄与严格相等的协议指纹，见 §6.3；**`beta.5` 也不是纯加法**（指纹再次严格相等），但**不需要改代码**，见 §6.4；**`beta.6` 也不是纯加法**——SDK 入口改名且形状变了，是**必须改代码**的一版，见 §6.5。
 
 ### 6.3 从 0.1.0-beta.3 升到 0.1.0-beta.4
 
@@ -173,6 +174,44 @@ bun run typecheck && bun run test
 1. **宿主配置 `[connector_proxy]` 的授权形状**（`fp-2`）：`allow` 由**必填的逐工具白名单**改为**可选收窄**，并新增 `deny`（在 `allow` 之后做减法）。现在的语义是——`enabled = true` 且**没有** `allow` ⇒ 该连接器的工具**全部可调**；写了 `allow` 就按它收窄，而 `allow` 存在但为空（`allow = []`）⇒ **什么都调不了**；整张表不存在 ⇒ 什么都不调。因此**此前只写了 `enabled = true`、没逐条列工具的宿主，升级后授权面会变大**，请重读该表；启动时会为此打一条告警（`enabled with neither "allow" nor "deny"`），按它核对即可。
 2. **`conversation/send` 的 `mentions` 只认 `kind: "skill"`**（`fp-3`）：`agent` / `connector` 两类以 `invalid_request` 显式拒绝。该字段的类型面在 `0.1.0-beta.4` 就已发布，所以这一条只在运行期可见。
 
+### 6.5 从 0.1.0-beta.5 升到 0.1.0-beta.6
+
+**必须升级，而且必须改代码**：指纹没动（仍是 `fp-7`，wire 面与 `0.1.0-beta.5` 互通），但 `@flowy-agent-store/sdk` 的入口**改了名、也改了形状**——这是本版唯一的破坏性变更，也是它走预发布序号而不是 minor 号的原因。
+
+```bash
+# 1) 先看当前实际装的是什么
+bun pm ls | grep '@flowy-agent-store'          # npm 项目：npm ls @flowy-agent-store/sdk
+# 2) 固定到 0.1.0-beta.6（需要几个包就升几个，版本号保持一致）
+bun add @flowy-agent-store/sdk@0.1.0-beta.6
+bun add @flowy-agent-store/protocol@0.1.0-beta.6
+# 3) 确认解析结果
+node -p "require('@flowy-agent-store/sdk/package.json').version"
+# 4) 重跑类型检查——这一次会**报错**，每个报错点就是要改的地方
+bun run typecheck
+```
+
+**要改的三件事**（`launchClient` 返回的对象**就是**那个 client，不再有外壳）：
+
+```ts
+// 之前（0.1.0-beta.5）
+const session = await launchClient({ client: { name: "my-app", version: "1.0.0" } });
+await session.client.conversations.create({ name: "demo" });
+session.initializeResult.protocol_version;
+
+// 之后（0.1.0-beta.6）
+const harness = await launchHarness({ client: { name: "my-app", version: "1.0.0" } });
+await harness.conversations.create({ name: "demo" });
+harness.handshake.protocol_version;
+```
+
+1. 函数 `launchClient` → **`launchHarness`**，类型 `LaunchedClient` → **`Harness`**、`LaunchOptions` → **`HarnessOptions`**；
+2. 业务面**直接**挂在返回值上：`session.client.conversations` → `harness.conversations`（`store` / `agents` / `teams` / `skills` / `connectors` / `models` / `workspaces` / `runs` 同理）；
+3. `initializeResult` → **`handshake`**（非空握手响应）。基类的 `initializeInfo` 仍在，语义是「**当前**连接状态」，`close()` 之后变回 `null`。
+
+`close()` 的语义**变强**了：现在一次覆盖「退订 → 关传输 → 终止子进程 → 删除自动创建的 data-dir」。此前只调 `server.close()` 的代码留着也能跑，但不会再漏掉传输。
+
+**不需要改的**：wire 面。指纹仍是 `fp-7`、方法计数仍是 `48 / 71`，所以 `0.1.0-beta.5` 的运行时与本版 SDK 可以混用（改名本身跨版本类型不兼容）。`client` 选项（自报身份）与直传 `transport.request(...)` 的用法都不变。
+
 ## 7. 自查当前安装的版本
 
 ```bash
@@ -190,7 +229,7 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. 已发布产物的差异与自查方法
 
-截至 `0.1.0-beta.5`（2026-09-17），**工作区与已发布产物之间没有未发布的协议差异**：`fp-1` → `fp-7` 的六次递增已全部随本版发布，逐条见[变更日志](/zh-CN/docs/changelog) §2.1；`0.1.0-beta.4` 相对 `0.1.0-beta.3` 的改动见同页 §2.2。下面的命令用来核对这件事——把任意两版已发布产物取回来对读。（另有一处**未发布的 SDK 形状变更**，它**不是**协议差异，见 §8.2。）
+截至 `0.1.0-beta.6`（2026-09-18），**工作区与已发布产物之间没有未发布的差异**：本版（`beta.6`）的 SDK 入口改名与形状变更见[变更日志](/zh-CN/docs/changelog) §2.1（迁移步骤见本文 §6.5），`0.1.0-beta.5` 的六次指纹递增见同页 §2.2，`0.1.0-beta.4` 相对 `0.1.0-beta.3` 的改动见同页 §2.3。下面的命令用来核对这件事——把任意两版已发布产物取回来对读。
 
 ### 8.1 迁移已有配置里的市场源
 
@@ -255,25 +294,6 @@ diff <(grep -o '^export [a-z]* [A-Za-z]*' b4/package/dist/index.d.mts) \
 ```
 
 客户端侧同理：把 `@flowy-agent-store/client` 装进临时目录后数 `httpRouteTable()` 的键数，就是 §5.3 引用的映射数（`0.1.0-beta.5` 为 48）。协议侧的「没有增删类型」用上面那条 `diff` 数导出名即可核对——`0.1.0-beta.4` 与 `0.1.0-beta.5` 都是 **141 个**。
-
-### 8.2 未发布的 SDK 入口改名与形状变更（`launchClient` → `launchHarness`）
-
-`@flowy-agent-store/sdk` 的入口改名并改了形状，**尚未随任何版本发布**——已发布的最新版 `0.1.0-beta.5` 用的仍是 `launchClient` 与 `session.client.xxx`：
-
-```ts
-// 0.1.0-beta.5（已发布）
-const session = await launchClient({ client: { name: "my-app", version: "1.0.0" } });
-await session.client.conversations.create({ name: "demo" });
-
-// 工作区 / 下一个预发布序号
-const harness = await launchHarness({ client: { name: "my-app", version: "1.0.0" } });
-await harness.conversations.create({ name: "demo" });  // ← 少一跳
-harness.handshake.protocol_version;                    // ← 非空握手响应
-```
-
-一起变的是三样：函数名 `launchClient` → `launchHarness`、类型名 `LaunchedClient` → `Harness`（`LaunchOptions` → `HarnessOptions`）、返回值不再有 `.client` 一跳；文档里的变量统一叫 `harness`。
-
-**不是协议差异**：指纹（`fp-7`）未动，所以 `0.1.0-beta.5` 的运行时与本版工作区在 wire 上互通。这是一次**纯 TS 侧破坏性变更**，按[变更日志](/zh-CN/docs/changelog) §3 的口径随下一个预发布序号发布；动机与两个被撞到的实现约束见 `docs/agent-store/31`。
 
 ## 9. changelog 与 release notes 的边界
 

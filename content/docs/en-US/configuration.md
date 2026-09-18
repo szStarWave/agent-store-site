@@ -206,7 +206,7 @@ Background **auto-update** cadence. When enabled, the runtime polls marketplace 
 auto_update_interval_hours = 6
 ```
 
-> Both gates must hold before anything is fetched: ① the marketplace's auto-update toggle is on, and ② its source address is one of the **official mirrors**. A third-party source keeps its toggle for display but is never polled. Each sweep still goes through `market/refresh`'s revision / ETag short-circuit, so an unchanged source does not re-download the whole tree.
+> Both gates must hold before anything is fetched: ① the marketplace's auto-update toggle is on, and ② its source address is one of the **official mirrors**. A third-party source keeps its toggle for display but is never polled. Each sweep still probes freshness first (`url` sources via revision / ETag, `zip` sources via a `HEAD` request's `X-Linked-Etag`, i.e. the content sha256), so an unchanged source is not re-fetched.
 
 ## `tools`
 

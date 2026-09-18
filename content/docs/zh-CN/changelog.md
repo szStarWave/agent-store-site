@@ -21,21 +21,23 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.5", "latest": "0.1.0-beta.2" },
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.6", "latest": "0.1.0-beta.2" },
   "time": {
     "0.1.0": "2026-09-09T09:09:04.795Z",
     "0.1.0-beta.2": "2026-09-09T09:27:36.122Z",
     "0.1.0-beta.3": "2026-09-10T04:44:34.609Z",
     "0.1.0-beta.4": "2026-09-16T10:24:02.588Z",
-    "0.1.0-beta.5": "2026-09-17T11:41:10.171Z"
+    "0.1.0-beta.5": "2026-09-17T11:41:10.171Z",
+    "0.1.0-beta.6": "2026-09-18T11:08:21.813Z"
   }
 }
 ```
 
 | 版本 | 发布（UTC） | 变更类型 | 当前 dist-tag |
 | --- | --- | --- | --- |
-| `0.1.0-beta.5` | 2026-09-17 | 破坏性（协议指纹严格相等：`fp-1` → `fp-7`） | `beta` |
+| `0.1.0-beta.6` | 2026-09-18 | 破坏性（SDK 入口改名 + 返回形状变更，**要改代码**） | `beta` |
+| `0.1.0-beta.5` | 2026-09-17 | 破坏性（协议指纹严格相等：`fp-1` → `fp-7`） | — |
 | `0.1.0-beta.4` | 2026-09-16 | 破坏性（协议指纹严格相等 + 类型收窄） | — |
 | `0.1.0-beta.3` | 2026-09-10 | 加法（无破坏性） | — |
 | `0.1.0-beta.2` | 2026-09-09 | 加法（无破坏性） | `latest` |
@@ -43,7 +45,20 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 `versions` 的排列顺序**不是**时间顺序：`0.1.0` 排在最后，却是**最早**的一次发布（比 `beta.2` 早约 18 分钟），且不带任何 dist-tag。它不是稳定版，也不比 beta 线新——dist-tag 语义见[升级与迁移指引](/zh-CN/docs/upgrade) §3。
 
-### 2.1 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
+### 2.1 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
+
+> **本版含破坏性变更**：`@flowy-agent-store/sdk` 的入口**改了名、也改了形状**，用它的代码必须跟着改（wire 面未动，运行时可以混用），迁移步骤见[升级与迁移指引](/zh-CN/docs/upgrade) §6.5。
+
+#### 破坏性
+
+- `launchClient` → **`launchHarness`**；类型 `LaunchedClient` → **`Harness`**、`LaunchOptions` → **`HarnessOptions`**。
+- 返回值不再有 `.client` 一跳：解析出的对象**就是** `AppServerClient`，业务面直接挂在它身上（`session.client.conversations` → `harness.conversations`）。
+- `initializeResult` → **`handshake`**（非空握手响应）；基类的 `initializeInfo` 仍是「当前连接状态」，`close()` 之后为 `null`。
+- `close()` 的语义变强：一次覆盖「退订 → 关传输 → 终止子进程 → 删除自动创建的 data-dir」。
+
+**升级影响**：用 `@flowy-agent-store/sdk` 的**必须升级、且必须改代码**（上面四处）；只用 `protocol` / `client`，或只用运行时二进制的，**不受影响**——协议指纹仍是 `fp-7`、方法计数仍是 `48 / 71`，wire 面与 `0.1.0-beta.5` 互通。
+
+### 2.2 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
 
 > **本版含破坏性变更**：`0.1.0-beta.4` 及更早版本的客户端**连不上**本版运行时，必须一并升级，步骤见[升级与迁移指引](/zh-CN/docs/upgrade) §6.4。
 
@@ -71,7 +86,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 **升级影响**：**必须升级**，但**无需改代码**——两版已发布产物的导出名都是 **141 个**，新增的只有可选字段。
 
-### 2.2 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
+### 2.3 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
 
 > **本版含破坏性变更**：`0.1.0-beta.3` 及更早版本的客户端**连不上**本版运行时，必须一并升级，步骤见[升级与迁移指引](/zh-CN/docs/upgrade) §6.3。
 
@@ -95,7 +110,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 **升级影响**：**必须升级**，且**需要改代码**——`event_type` 现在按封闭联合检查。
 
-### 2.3 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
+### 2.4 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
 
 #### 新增
 
@@ -108,7 +123,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 **升级影响**：从 `0.1.0-beta.2` 升级**无需改代码**（protocol 的类型声明逐字节未变），步骤见[升级与迁移指引](/zh-CN/docs/upgrade) §6.1。
 
-### 2.4 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
+### 2.5 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
 
 #### 新增
 
@@ -120,7 +135,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 它是 `latest` 标签当前指向的版本——**不是最新版**；升级无需改代码。
 
-### 2.5 `0.1.0` — 2026-09-09T09:09:04Z
+### 2.6 `0.1.0` — 2026-09-09T09:09:04Z
 
 #### 新增
 
@@ -155,25 +170,11 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-截至 `0.1.0-beta.5`（2026-09-17），**工作区与已发布产物之间没有未发布的协议差异**：`0.1.0-beta.4` 之后积累的六次指纹递增（`fp-1` → `fp-7`）已全部随本版发布，逐条见 §2.1。上一版留下的这份台账因此清零。
+截至 `0.1.0-beta.6`（2026-09-18），**工作区与已发布产物之间没有未发布的差异**：`0.1.0-beta.5` 之后积累的 SDK 入口改名与返回形状变更已随本版发布（逐条见 §2.1），协议面本来就未动——指纹仍是 `fp-7`、方法计数仍是 `48 / 71`。上一版留下的这份台账因此清零。
 
-一处口径更正（2026-09-17）：上一版台账把 `mentions` 记作「`fp-2` → `fp-3` 新增」的字段。把两版已发布产物对读可见，`MentionKind` / `MentionRef` 与两处 `mentions` **在 `0.1.0-beta.4` 的 `index.d.mts` 里就已经存在**，所以 §2.1 把它写成宿主侧的**语义**变化，不声称是 beta.5 新增的字段。已发布条目的版本号与发布时间不受此更正影响。
+一处口径更正（2026-09-17）：上一版台账把 `mentions` 记作「`fp-2` → `fp-3` 新增」的字段。把两版已发布产物对读可见，`MentionKind` / `MentionRef` 与两处 `mentions` **在 `0.1.0-beta.4` 的 `index.d.mts` 里就已经存在**，所以 §2.2 把它写成宿主侧的**语义**变化，不声称是 beta.5 新增的字段。已发布条目的版本号与发布时间不受此更正影响。
 
 发布节奏：条目在版本**发布之后**才追加（见 §3 的「新增」规则），本页不预告日期。
-
-### 4.1 未发布的 SDK 入口改名与形状变更（**不是协议变更**）
-
-`@flowy-agent-store/sdk` 的入口**改了名、也改了返回值形状**，且**尚未随任何版本发布**：`launchClient` → **`launchHarness`**（类型 `LaunchedClient` → `Harness`、`LaunchOptions` → `HarnessOptions`），返回值不再有 `.client` 一跳——解析出的对象**就是** `AppServerClient`，业务面直接挂在它身上（`docs/agent-store/31` §5 方案 B / §10）。
-
-| 已发布的 `0.1.0-beta.5` | 工作区（下一个预发布序号） |
-| --- | --- |
-| `await launchClient({ client: … })` | `await launchHarness({ client: … })` |
-| `session.client.conversations.create(...)` | `harness.conversations.create(...)` |
-| `session.initializeResult.protocol_version` | `harness.handshake.protocol_version` |
-
-- **不是协议差异**：`APP_SERVER_PROTOCOL_VERSION` / `PROTOCOL_VERSION`（`fp-7`）未动，`0.1.0-beta.5` 的运行时与本版工作区在 wire 上互通。
-- **属于破坏性变更**：按 §3 的口径，它随**下一个预发布序号**发布并逐条标注；发布之后本节并入 §2 的对应版本条目，本节清空。
-- 站点 [TypeScript SDK 参考](/zh-CN/docs/typescript-sdk) §4.1 已按**新形状**更新，并在那里给出同一条迁移说明。
 
 因此：**没有列在本页的变更，不要假定它已经发布。**
 

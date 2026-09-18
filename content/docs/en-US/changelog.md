@@ -21,21 +21,23 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.5", "latest": "0.1.0-beta.2" },
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.6", "latest": "0.1.0-beta.2" },
   "time": {
     "0.1.0": "2026-09-09T09:09:04.795Z",
     "0.1.0-beta.2": "2026-09-09T09:27:36.122Z",
     "0.1.0-beta.3": "2026-09-10T04:44:34.609Z",
     "0.1.0-beta.4": "2026-09-16T10:24:02.588Z",
-    "0.1.0-beta.5": "2026-09-17T11:41:10.171Z"
+    "0.1.0-beta.5": "2026-09-17T11:41:10.171Z",
+    "0.1.0-beta.6": "2026-09-18T11:08:21.813Z"
   }
 }
 ```
 
 | Version | Released (UTC) | Change type | Current dist-tag |
 | --- | --- | --- | --- |
-| `0.1.0-beta.5` | 2026-09-17 | Breaking (strict-equality protocol fingerprint: `fp-1` → `fp-7`) | `beta` |
+| `0.1.0-beta.6` | 2026-09-18 | Breaking (SDK entry renamed + return shape changed; **code changes required**) | `beta` |
+| `0.1.0-beta.5` | 2026-09-17 | Breaking (strict-equality protocol fingerprint: `fp-1` → `fp-7`) | — |
 | `0.1.0-beta.4` | 2026-09-16 | Breaking (strict-equality protocol fingerprint + type narrowing) | — |
 | `0.1.0-beta.3` | 2026-09-10 | Additive (no breaking change) | — |
 | `0.1.0-beta.2` | 2026-09-09 | Additive (no breaking change) | `latest` |
@@ -43,7 +45,20 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 The `versions` array is **not** in chronological order: `0.1.0` is listed last but was the **earliest** release (about 18 minutes before `beta.2`), and it carries no dist-tag. It is not a stable release and it is not newer than the beta line — for dist-tag semantics see §3 of the [Upgrade and migration guide](/en-US/docs/upgrade).
 
-### 2.1 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
+### 2.1 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
+
+> **This release contains breaking changes**: the entry point of `@flowy-agent-store/sdk` was **renamed and reshaped**, so code that uses it must change too (the wire is untouched, and runtimes can be mixed); migration steps are in §6.5 of the [Upgrade and migration guide](/en-US/docs/upgrade).
+
+#### Breaking
+
+- `launchClient` → **`launchHarness`**; the types `LaunchedClient` → **`Harness`** and `LaunchOptions` → **`HarnessOptions`**.
+- The return value no longer has a `.client` hop: the object it resolves to **is** the `AppServerClient`, with the business surface hanging off it directly (`session.client.conversations` → `harness.conversations`).
+- `initializeResult` → **`handshake`** (the non-null handshake response); the base class still carries `initializeInfo`, meaning the **current** connection state — `null` after `close()`.
+- `close()` got stronger: one call now covers unsubscribe → close transport → kill the child → remove an auto-created data-dir.
+
+**Upgrade impact**: if you use `@flowy-agent-store/sdk` you **must upgrade and change code** (the four items above); if you only use `protocol` / `client`, or only the runtime binary, you are **unaffected** — the fingerprint is still `fp-7`, the method count is still `48 / 71`, and the wire interoperates with `0.1.0-beta.5`.
+
+### 2.2 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
 
 > **This release contains breaking changes**: clients on `0.1.0-beta.4` or earlier **cannot connect** to this runtime and must be upgraded along with it — steps in §6.4 of the [Upgrade and migration guide](/en-US/docs/upgrade).
 
@@ -71,7 +86,7 @@ The `versions` array is **not** in chronological order: `0.1.0` is listed last b
 
 **Upgrade impact**: upgrading is **mandatory**, but **no code changes are required** — both published artifacts expose the same **141** export names; the only additions are optional fields.
 
-### 2.2 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
+### 2.3 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
 
 > **This release contains breaking changes**: clients on `0.1.0-beta.3` or earlier **cannot connect** to this runtime and must be upgraded along with it — steps in §6.3 of the [Upgrade and migration guide](/en-US/docs/upgrade).
 
@@ -95,7 +110,7 @@ The `versions` array is **not** in chronological order: `0.1.0` is listed last b
 
 **Upgrade impact**: upgrading is **mandatory**, and **code changes are required** — `event_type` is now checked as a closed union.
 
-### 2.3 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
+### 2.4 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
 
 #### Added
 
@@ -108,7 +123,7 @@ The `versions` array is **not** in chronological order: `0.1.0` is listed last b
 
 **Upgrade impact**: moving up from `0.1.0-beta.2` requires **no code changes** (the protocol declarations are unchanged, byte for byte); steps are in §6.1 of the [Upgrade and migration guide](/en-US/docs/upgrade).
 
-### 2.4 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
+### 2.5 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
 
 #### Added
 
@@ -120,7 +135,7 @@ The `versions` array is **not** in chronological order: `0.1.0` is listed last b
 
 This is the version `latest` currently points at — **it is not the newest one**; upgrading requires no code changes.
 
-### 2.5 `0.1.0` — 2026-09-09T09:09:04Z
+### 2.6 `0.1.0` — 2026-09-09T09:09:04Z
 
 #### Added
 
@@ -155,25 +170,11 @@ Rules for adding and correcting entries:
 
 ## 4. Unpublished changes and release cadence
 
-As of `0.1.0-beta.5` (2026-09-17), **there is no unpublished protocol difference between the working tree and the published artifacts**: the six fingerprint increments accumulated after `0.1.0-beta.4` (`fp-1` → `fp-7`) all shipped with this version, listed one by one in §2.1. The ledger left behind by the previous version is therefore cleared.
+As of `0.1.0-beta.6` (2026-09-18), **there is no unpublished difference between the working tree and the published artifacts**: the SDK entry rename and return-shape change accumulated after `0.1.0-beta.5` shipped with this version (listed one by one in §2.1), and the protocol surface never moved — the fingerprint is still `fp-7` and the method count is still `48 / 71`. The ledger left behind by the previous version is therefore cleared.
 
-One correction (2026-09-17): the previous ledger recorded `mentions` as a field **added** in `fp-2` → `fp-3`. Reading the two published artifacts side by side shows that `MentionKind` / `MentionRef` and the two `mentions` fields **already existed in `0.1.0-beta.4`'s `index.d.mts`**, so §2.1 describes it as a host-side **semantics** change and does not claim it as a field added in beta.5. The version number and publish date of any published entry are unaffected by this correction.
+One correction (2026-09-17): the previous ledger recorded `mentions` as a field **added** in `fp-2` → `fp-3`. Reading the two published artifacts side by side shows that `MentionKind` / `MentionRef` and the two `mentions` fields **already existed in `0.1.0-beta.4`'s `index.d.mts`**, so §2.2 describes it as a host-side **semantics** change and does not claim it as a field added in beta.5. The version number and publish date of any published entry are unaffected by this correction.
 
 Release cadence: entries are appended **after** a version is published (the "Adding" rule in §3); no dates are announced here.
-
-### 4.1 Unpublished SDK entry rename and shape change (**not a protocol change**)
-
-The entry point of `@flowy-agent-store/sdk` was **renamed and reshaped**, and it has **not shipped with any version yet**: `launchClient` → **`launchHarness`** (types `LaunchedClient` → `Harness`, `LaunchOptions` → `HarnessOptions`), and the return value no longer has a `.client` hop — the object it resolves to **is** the `AppServerClient`, with the business surface hanging off it directly (doc `31` §5 option B / §10).
-
-| Published `0.1.0-beta.5` | Working tree (next pre-release counter) |
-| --- | --- |
-| `await launchClient({ client: … })` | `await launchHarness({ client: … })` |
-| `session.client.conversations.create(...)` | `harness.conversations.create(...)` |
-| `session.initializeResult.protocol_version` | `harness.handshake.protocol_version` |
-
-- **Not a protocol difference**: `APP_SERVER_PROTOCOL_VERSION` / `PROTOCOL_VERSION` (`fp-7`) are untouched, so the `0.1.0-beta.5` runtime interoperates with this working tree on the wire.
-- **It is a breaking change**: per §3 it ships with the **next pre-release counter** and is labelled there; once published, this subsection folds into the matching §2 entry and is cleared.
-- The site's [TypeScript SDK reference](/en-US/docs/typescript-sdk) §4.1 is already updated to the **new shape**, with the same migration note.
 
 So: **never assume a change has shipped unless it is listed on this page.**
 

@@ -56,7 +56,7 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 Two traps:
 
-1. `latest` is **not** the newest version — it points at `0.1.0-beta.2`, while the newest beta is `0.1.0-beta.5` under the `beta` tag.
+1. `latest` is **not** the newest version — it points at `0.1.0-beta.2`, while the newest beta is `0.1.0-beta.6` under the `beta` tag.
 2. `0.1.0` has no tag, but a version range can still resolve to it (see §4).
 
 Also note that the `versions` array is **not** in chronological order: `0.1.0` is listed last and was published first.
@@ -69,7 +69,7 @@ Measured in throwaway directories with an empty `node_modules`:
 
 ```bash
 bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2 (latest)
-bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.5
+bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.6
 bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → bun resolves 0.1.0-beta.2
 npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → npm resolves 0.1.0 (the untagged early publish)
 ```
@@ -80,14 +80,14 @@ Conclusion: **do not rely on range resolution**. A tag alias is no safer — `la
 
 ```bash
 # Write the exact version; avoid ^ and ~
-bun add @flowy-agent-store/sdk@0.1.0-beta.5
-bun add @flowy-agent-store/protocol@0.1.0-beta.5   # when you import wire types
+bun add @flowy-agent-store/sdk@0.1.0-beta.6
+bun add @flowy-agent-store/protocol@0.1.0-beta.6   # when you import wire types
 
 # same for npm / pnpm
-npm install @flowy-agent-store/sdk@0.1.0-beta.5
+npm install @flowy-agent-store/sdk@0.1.0-beta.6
 ```
 
-`package.json` should end up with `"@flowy-agent-store/sdk": "0.1.0-beta.5"` (**no** `^`). The sdk's platform runtime packages are pinned to the same version by its `optionalDependencies`, so they need no separate entry.
+`package.json` should end up with `"@flowy-agent-store/sdk": "0.1.0-beta.6"` (**no** `^`). The sdk's platform runtime packages are pinned to the same version by its `optionalDependencies`, so they need no separate entry.
 
 Commit the lockfile too: `bun.lock` / `package-lock.json` / `pnpm-lock.yaml` is the only authoritative record of what an install actually pulled.
 
@@ -119,11 +119,11 @@ If you point `AGENT_STORE_BIN` at a self-built binary, note that the SDK **check
 
 ```bash
 # move off the untagged 0.1.0 onto the current beta line (current beta: see §3)
-bun add @flowy-agent-store/sdk@0.1.0-beta.5
+bun add @flowy-agent-store/sdk@0.1.0-beta.6
 bun pm ls | grep '@flowy-agent-store'   # confirm 0.1.0 is gone
 ```
 
-The move from `0.1.0` to `beta.3` is additive: the public declaration surface only grew (the runtime packages added in `beta.2`, the reconnect and exit observation added in `beta.3`) — nothing was removed or renamed. **`beta.4` is not additive** — it carries type narrowing and a strict-equality protocol fingerprint, see §6.3; **`beta.5` is not additive either** (the fingerprint is compared for strict equality again), but it needs **no code changes**, see §6.4.
+The move from `0.1.0` to `beta.3` is additive: the public declaration surface only grew (the runtime packages added in `beta.2`, the reconnect and exit observation added in `beta.3`) — nothing was removed or renamed. **`beta.4` is not additive** — it carries type narrowing and a strict-equality protocol fingerprint, see §6.3; **`beta.5` is not additive either** (the fingerprint is compared for strict equality again), but it needs **no code changes**, see §6.4. **`beta.6` is not additive either** — the SDK entry point was renamed and reshaped, and it **does** require code changes, see §6.5.
 
 ### 6.3 From 0.1.0-beta.3 to 0.1.0-beta.4
 
@@ -173,6 +173,44 @@ Two **behaviour** changes (the signatures are unchanged, so type checking will n
 1. **The host config `[connector_proxy]` grant shape** (`fp-2`): `allow` went from a **mandatory per-tool allowlist** to an **optional narrowing**, and `deny` was added (it subtracts **after** `allow`). The semantics are now: `enabled = true` with **no** `allow` ⇒ every tool of that connector is **callable**; writing an `allow` narrows to it, and an `allow` that is present but empty (`allow = []`) ⇒ **nothing is callable**; with no such table at all ⇒ nothing is callable. So **a host that previously wrote only `enabled = true` without listing tools one by one ends up with a wider grant surface after upgrading** — re-read that table; a warning is logged at startup for exactly this case (`enabled with neither "allow" nor "deny"`), so use it as the checklist.
 2. **`conversation/send`'s `mentions` honours `kind: "skill"` only** (`fp-3`): `agent` / `connector` are explicitly refused with `invalid_request`. The field's type surface already shipped in `0.1.0-beta.4`, so this one is only visible at runtime.
 
+### 6.5 From 0.1.0-beta.5 to 0.1.0-beta.6
+
+**Upgrading is mandatory, and code changes are required**: the fingerprint did not move (still `fp-7`, so the wire interoperates with `0.1.0-beta.5`), but the entry point of `@flowy-agent-store/sdk` was **renamed and reshaped** — this release's only breaking change, and the reason it rides a pre-release counter rather than a minor number.
+
+```bash
+# 1) see what is actually installed
+bun pm ls | grep '@flowy-agent-store'          # npm projects: npm ls @flowy-agent-store/sdk
+# 2) pin 0.1.0-beta.6 (upgrade the packages you use, on one version)
+bun add @flowy-agent-store/sdk@0.1.0-beta.6
+bun add @flowy-agent-store/protocol@0.1.0-beta.6
+# 3) confirm what got resolved
+node -p "require('@flowy-agent-store/sdk/package.json').version"
+# 4) re-run your type check — this time it **fails**, and every error is a site to fix
+bun run typecheck
+```
+
+**The three things to change** (what `launchClient` returned **is** the client now; there is no wrapper):
+
+```ts
+// before (0.1.0-beta.5)
+const session = await launchClient({ client: { name: "my-app", version: "1.0.0" } });
+await session.client.conversations.create({ name: "demo" });
+session.initializeResult.protocol_version;
+
+// after (0.1.0-beta.6)
+const harness = await launchHarness({ client: { name: "my-app", version: "1.0.0" } });
+await harness.conversations.create({ name: "demo" });
+harness.handshake.protocol_version;
+```
+
+1. the function `launchClient` → **`launchHarness`**, and the types `LaunchedClient` → **`Harness`** / `LaunchOptions` → **`HarnessOptions`**;
+2. the business surface hangs **directly** off the return value: `session.client.conversations` → `harness.conversations` (same for `store` / `agents` / `teams` / `skills` / `connectors` / `models` / `workspaces` / `runs`);
+3. `initializeResult` → **`handshake`** (the non-null handshake response). The base class still carries `initializeInfo`, meaning the **current** connection state — it goes back to `null` after `close()`.
+
+`close()` got **stronger**: one call now covers unsubscribe → close transport → kill the child → remove an auto-created data-dir. Code that only called `server.close()` still runs, but can no longer leave the transport open.
+
+**What does not change**: the wire. The fingerprint is still `fp-7` and the method count is still `48 / 71`, so a `0.1.0-beta.5` runtime and this SDK interoperate (the rename itself is not type-compatible across versions). The `client` option (self-reported identity) and direct `transport.request(...)` calls are unchanged.
+
 ## 7. Check which version you actually have
 
 ```bash
@@ -190,7 +228,7 @@ When the three disagree, trust the **lockfile and the installed `package.json`**
 
 ## 8. Published-artifact differences and how to check them
 
-As of `0.1.0-beta.5` (2026-09-17), **there is no unpublished protocol difference between the working tree and the published artifacts**: all six increments from `fp-1` to `fp-7` shipped with this version, listed one by one in §2.1 of the [Changelog](/en-US/docs/changelog); for what `0.1.0-beta.4` changed relative to `0.1.0-beta.3`, see §2.2 of the same page. The commands below are how you check that — fetch the published artifacts of any two versions and read them side by side. (There is one **unpublished SDK shape change**; it is **not** a protocol difference — see §8.2.)
+As of `0.1.0-beta.6` (2026-09-18), **there is no unpublished difference between the working tree and the published artifacts**: this release's SDK entry rename and shape change are in §2.1 of the [Changelog](/en-US/docs/changelog) (migration steps in §6.5 below), the six fingerprint increments of `0.1.0-beta.5` are in §2.2 of the same page, and what `0.1.0-beta.4` changed relative to `0.1.0-beta.3` is in §2.3. The commands below are how you check that — fetch the published artifacts of any two versions and read them side by side.
 
 ### 8.1 Migrating a config's marketplace sources
 
@@ -255,25 +293,6 @@ diff <(grep -o '^export [a-z]* [A-Za-z]*' b4/package/dist/index.d.mts) \
 ```
 
 The same works on the client side: install `@flowy-agent-store/client` into a throwaway directory and count the keys of `httpRouteTable()` — that is the mapped number quoted in §5.3 (`0.1.0-beta.5` reports 48). For the protocol side's "no types added or removed", the `diff` above that counts export names is enough — `0.1.0-beta.4` and `0.1.0-beta.5` are both **141**.
-
-### 8.2 Unpublished SDK entry rename and shape change (`launchClient` → `launchHarness`)
-
-The entry point of `@flowy-agent-store/sdk` was renamed and reshaped, and it has **not shipped with any version yet** — the newest published one, `0.1.0-beta.5`, still uses `launchClient` and `session.client.xxx`:
-
-```ts
-// 0.1.0-beta.5 (published)
-const session = await launchClient({ client: { name: "my-app", version: "1.0.0" } });
-await session.client.conversations.create({ name: "demo" });
-
-// Working tree / next pre-release counter
-const harness = await launchHarness({ client: { name: "my-app", version: "1.0.0" } });
-await harness.conversations.create({ name: "demo" });  // ← one hop fewer
-harness.handshake.protocol_version;                    // ← the non-null handshake response
-```
-
-Three things change together: the function `launchClient` → `launchHarness`, the types `LaunchedClient` → `Harness` (`LaunchOptions` → `HarnessOptions`), and the missing `.client` hop; the variable in the docs is uniformly `harness`.
-
-**Not a protocol difference**: the fingerprint (`fp-7`) is untouched, so the `0.1.0-beta.5` runtime interoperates with this working tree on the wire. This is a **purely TypeScript-side breaking change**, shipping with the next pre-release counter per §3 of the [Changelog](/en-US/docs/changelog); the motivation and the two implementation constraints it hit are in doc `31`.
 
 ## 9. Changelog and release notes boundary
 
