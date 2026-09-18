@@ -5,7 +5,7 @@ Flowy Agent Store 提供三个配套的 TypeScript 包，让 Node.js / Electron 
 | 包 | 职责 | 运行环境 | 依赖 |
 | --- | --- | --- | --- |
 | `@flowy-agent-store/protocol` | 协议线类型（请求/响应/通知/错误） | 任意（零运行时、无 DOM/Node） | 无 |
-| `@flowy-agent-store/client` | `AppServerClient` + 7 个子客户端 + `Transport` 抽象 | 任意（无 HTTP、无 DOM、无 Node） | `@flowy-agent-store/protocol` |
+| `@flowy-agent-store/client` | `AppServerClient` + 9 个子客户端 + `Transport` 抽象 | 任意（无 HTTP、无 DOM、无 Node） | `@flowy-agent-store/protocol` |
 | `@flowy-agent-store/sdk` | spawn `flowy-agent-store` 二进制 → 回环 WS 建连 → 就绪客户端 | Node.js（依赖 `node:child_process` 等） | `@flowy-agent-store/client`、`@flowy-agent-store/protocol` |
 
 三个包按需组合：**只用类型**取 `protocol`；**连已运行的 App Server**（如桌面端已启动）取 `client` + 自建 `WebSocketTransport`；**自己拉起整个运行时**取 `sdk` 的 `launchHarness`。
@@ -28,7 +28,7 @@ bun add @flowy-agent-store/protocol
 
 包均发布为 ESM + CJS 双格式（`exports` 提供 `import` / `require` / `types`），Node 与打包器开箱即用。
 
-> **版本状态**：三个包当前均为 `0.1.0-beta.*` 预发布（API 尚未冻结，beta 期间**不承诺向后兼容**）。生产接入请固定**确切版本**——本文与仓库当前对应 `0.1.0-beta.5`（`beta` tag）。注意不要依赖裸 `bun add`：注册表 `latest` 当前指向 `0.1.0-beta.2`，**不是**最新的 `0.1.0-beta.5`。dist-tag 语义、逐版本升级步骤与自查命令见[升级与迁移指引](/zh-CN/docs/upgrade)。
+> **版本状态**：三个包当前均为 `0.1.0-beta.*` 预发布（API 尚未冻结，beta 期间**不承诺向后兼容**）。生产接入请固定**确切版本**——本文与仓库当前对应 `0.1.0-beta.6`（`beta` tag）。注意不要依赖裸 `bun add`：注册表 `latest` 当前指向 `0.1.0-beta.2`，**不是**最新的 `0.1.0-beta.6`。dist-tag 语义、逐版本升级步骤与自查命令见[升级与迁移指引](/zh-CN/docs/upgrade)。
 > **协议面口径**：§2 的 `APP_SERVER_PROTOCOL_VERSION` 示例与 §5.3 的方法计数（`48 / 71`）取自**仓库工作区**，而工作区当前**与已发布产物一致**（自 `0.1.0-beta.5` 起；此前几版工作区曾领先于产物，那批差异随本版发布，登记在[升级与迁移指引](/zh-CN/docs/upgrade) §8，自查命令也在那一节）。指纹按**严格相等**校验（按旧值编出来的客户端连不上新运行时），所以自己拉二进制或改协议时，请以 §2 常量为准，不要从本文正文里抄值。
 > **运行环境**：Node.js **≥ 22**（依赖全局 `WebSocket`）或 Bun；版本下限由各包 `engines.node` 声明。
 
@@ -38,7 +38,7 @@ bun add @flowy-agent-store/protocol
 
 ### 2.1 定位
 
-线协议的唯一 TypeScript 真源：所有请求/响应/通知类型、`APP_SERVER_PROTOCOL_VERSION` 常量与结构化错误。**无任何运行时代码**，可被 client/sdk/Rust 之外任何方言消费。
+线协议的唯一 TypeScript 真源：所有请求/响应/通知类型、`APP_SERVER_PROTOCOL_VERSION` 常量与结构化错误。**没有传输、没有 I/O**——可执行的只有几个纯函数（错误判定与格式化、事件解码、本地化文案），所以能被 client/sdk/Rust 之外的任何方言消费。
 
 ### 2.2 主要导出
 
@@ -59,7 +59,7 @@ bun add @flowy-agent-store/protocol
 | `ServerNotification` | 服务器下行通知（`event`、`conversation/event`、`conversation/list-changed`、`run/resync-required` 等） |
 | `WireError` | 服务器错误载荷 |
 
-> 实验性能力（Team 完整协作、事件 cursor 追平）在协议中标注 `experimental`，不进稳定导出。
+> 协议面**只有一个版本**（`16` §7 决策 4）：发版前不存在「稳定导出 / 实验性导出」两套，源码里也没有 `experimental` 标记。Team 完整协作（`TeamRunInput` / `TeamSummary` / `TeamDetail`…）与事件游标追平都在同一个导出面上。
 
 ### 2.3 错误模型（包内 `errors.ts`）
 
@@ -67,7 +67,7 @@ bun add @flowy-agent-store/protocol
 
 | 类型 | 触发 | 关键字段 |
 | --- | --- | --- |
-| `AppServerError` | 服务器返回 JSON-RPC error | `code`、`request_id`、`retryable`、`details` |
+| `AppServerError` | 服务器返回 JSON-RPC error | `code`、`requestId`（wire 上叫 `request_id`）、`retryable`、`details` |
 | `TransportError` | 传输层（连接/发送/关闭） | `phase`（connect/send/receive/close）、`retryable` |
 | `ProtocolError` | 本地协议校验失败 | `kind`（`invalid_message` / `version_mismatch` / `unexpected_response`） |
 | `RequestTimeoutError` | 请求超时 | `method`、`timeoutMs` |
@@ -157,7 +157,7 @@ await client.connect(); // initialize 握手 + 版本校验
 | `installStoreEntry(mkt, entry)` | `store/install-entry` | 一键安装：缺导入就导入 + 注册 |
 
 > ℹ️ **首次 `listStore()` 可能返回空或不完整的目录——这是设计如此，不是错误**：内置默认市场的注册在**后台**进行（D-SDK-1 ①）。首个 `store/list` 只负责触发它，然后立即用**当前已注册**的内容作答，不会等待镜像完成。
-> 注册本身要把市场源整棵树从镜像站 HTTP 下载到本地（数百个技能目录 + 上千个资产），全新 data-dir 上约 **90 秒**，这段时间内该调用返回 `items: 0`。
+> 注册在**后台**跑，`store/list` 不等它。自 `fp-7` 起，内置默认市场是**每个市场一个 zip 归档**（一次请求；旧的逐文件整树镜像形态——实测 14,714 个请求 / 611 MiB——已被它取代），所以全新 data-dir 上首次调用会**很快**返回 `items: 0` 且带 `markets_pending: true`（§3.3），注册完成后同一次调用就能拿到目录。
 > 实测（2026-09-10，本地全新 data-dir）：`first store/list: 1ms items=0` → 130 秒后 `store/list: 133ms items=438`、`market/list count=3`。
 > 因此：**不需要为首次调用加大 `requestTimeoutMs`**；要完整目录请在预热后**重新调用**（WebUI 有显式刷新）。若镜像源不可达，本次热身记为不完整，下一次 store/market 调用会自动重试。
 > 想区分「真的没有市场」与「仍在载入」：`listStore()` 的返回（`store/list`）现在带 `markets_pending` —— 为 `true` 时表示内置市场仍在后台注册、目录可能不完整。
@@ -260,7 +260,7 @@ client.conversations.send(id, content, key, {
 ```ts
 await client.conversations.send(id, content, key, {
   model: { provider_id: "opencode", model: "mimo-v2.5" }, // 也可以是 config.toml 里的 provider 名
-  reasoningEffort: "high",                                 // low | medium | high | xhigh
+  reasoningEffort: "high",                                 // low | medium | high | xhigh | max（服务端当前只认前四个）
 });
 ```
 
@@ -317,6 +317,7 @@ await sub.close(); // 服务器端退订（也可靠关闭 socket 隐式退订�
 client.runs.agent(input: AgentRunInput): Promise<RunReceipt>; // 异步回执，非最终结果
 client.runs.team(input: TeamRunInput): Promise<TeamRunReceipt>; // Team Run：Leader 会话 + planned 委派
 client.runs.get(runId): Promise<RunView>;                     // 权威状态
+client.runs.plan(runId): Promise<RunPlan>;                    // 计划视图（run/plan，HTTP 也有绑定）
 client.runs.result(runId): Promise<RunResult>;                // 终态后才成功
 client.runs.events({ runId, afterSequence, limit }): Promise<RunEvent[]>; // 游标重放
 client.runs.cancel({ runId, expectedVersion, commandId, idempotencyKey }): Promise<RunView>;
@@ -388,7 +389,7 @@ interface Harness extends AppServerClient {
 | `client` | — | **必填**，握手时自报身份（进服务端日志与审计） |
 | `capabilities` | 省略 | `{ events?, approvals?, team_runtime?, artifacts? }`：声明客户端会消费哪些能力 |
 | `token` | 省略 | 交给 `WebSocketTransport`；WebSocket 无法设自定义 header，所以它以 `?token=…` 拼在回环 URL 上。宿主以 `--auth` 启动时必需，本地模式（`auth: "disabled-local"`）可省略 |
-| `requestTimeoutMs` | `30000` | **单次请求**超时，与启动超时无关；冷启动首个 `store/list` 要下载市场镜像，务必调大（见示例页 §12） |
+| `requestTimeoutMs` | `30000` | **单次请求**超时，与启动超时无关。**不需要**为首个 `store/list` 调大——它不等市场注册（§3.3）；要等注册结果就轮询 `markets_pending` |
 
 `Harness` 的成员：
 
@@ -397,7 +398,7 @@ interface Harness extends AppServerClient {
 | （继承）`conversations` / `agents` / `teams` / `skills` / `connectors` / `models` / `workspaces` / `runs` / `store` | `AppServerClient` 的全部业务面 | 所有业务调用**直接**写在 `harness` 上：`harness.conversations.create(...)` |
 | `handshake` | 本次握手响应（**非空**） | 记录或断言协议指纹 |
 | `initializeInfo` | **当前**连接状态（可空，`close()` 之后为 `null`） | 判断连接是否仍然就绪 |
-| `server.readiness` | 就绪行解析结果 `{ host, port, url, protocol_version, version, auth }` | 打日志；自建 `HttpTransport` 时取 `url`；据 `auth` 判断是否需要 `token` |
+| `server.readiness` | 就绪行解析结果 `{ host, port, url, protocol_version, version, auth }` | 打日志；据 `auth` 判断是否需要 `token`。⚠️ `url` 是**站点根**（`http://{host}:{port}/`），**不能**当 API 根——自建传输要用 `ws://{host}:{port}/api/app-server/ws`（示例页 §13） |
 | `server.dataDir` | 子进程实际使用的 data-dir | 排查路径、断言隔离（自动创建的临时目录也在这里） |
 | `server.exited` | 永不 reject 的 `Promise<{ code, signal }>` | 观察崩溃与退出（契约见 §4.4） |
 | `close()` | 退订 → 关传输 → 终止子进程 → 删除自动创建的 data-dir | 在 `finally` 中调用；可重复调用 |
@@ -457,7 +458,7 @@ AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node your-app.mjs
 ### 4.5 错误与清理
 
 - spawn 失败：报错附 **stderr 尾部 50 行**（`stderr tail:` 段）。
-- 超时：默认 120s 后抛 `timed out waiting for the runtime readiness line`。
+- 超时：默认 120s 后抛 `timed out after ${timeoutMs}ms waiting for the runtime readiness line`（`timeoutMs` 即 `readyTimeoutMs`）。
 - 任何失败路径都会 `child.kill()` → 2s 宽限 → `SIGKILL`，并删除自动创建的 data-dir。
 - 就绪成功后 promise 已结算：此后子进程再 `exit` / `error` 不再走失败路径（不会被当成启动失败）；这类退出（含崩溃）只通过 `SpawnedServer.exited` 与 `onExit` 暴露，SDK 不自动重启，生命周期由调用方以 `close()` 负责。
 - 正确用法：`try/finally` 中 `close()`；进程退出时若未 close，临时目录会残留（SDK 不装退出钩子）。
@@ -508,11 +509,11 @@ try {
 | --- | --- | --- |
 | `agents` | `list()` / `get(agentId)` | `agent/list` / `agent/get` |
 | `teams` | `list()` / `get(teamId)` | `team/list` / `team/get` |
-| `skills` | `list()` / `get(skillId)` | `skill/list` / `skill/get` |
-| `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `logout(id)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` |
+| `skills` | `list()` / `get(skillId)` / `files(skillId)` / `readFile(skillId, path)` / `readFileWithType(skillId, path)` | `skill/list` / `skill/get` / `skill/files` / `skill/file` |
+| `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `logout(id)` / `call(id, tool, args?)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` · `call` |
 | `store` | `list()` / `search(query, filter?)` / `installed()` / `checkUpdates()` / `updateHint(item)` / `install(item, opts?)` / `setEnabled(item, enabled, opts?)` / `uninstall(item, opts?)` | 组合方法，无独立 wire 方法：`store/list` · `store/install-entry` · `install/run` · `install/status` · `install/disable` · `install/enable` · `install/uninstall` |
 | `conversations` | `create(input)` / `update(id, input)` / `modelOptions()` / `list(limit?)` / `get(id)` / `messages(query)` / `send(id, content, idempotencyKey, options?)` / `cancel(id)` / `delete(id)` / `follow(id, options?)` | `conversation/*` 同名方法 |
-| `runs` | `agent(input)` / `team(input)` / `get(id)` / `result(id)` / `events(query)` / `cancel(input)` / `steer(input)` / `answerDecision(input)` / `follow(id, options?)` | `agent/run` · `team/run` · `run/get` · `run/result` · `run/events` · `run/cancel` · `run/steer` · `run/answer-decision` |
+| `runs` | `agent(input)` / `team(input)` / `get(id)` / `plan(id)` / `result(id)` / `events(query)` / `cancel(input)` / `steer(input)` / `answerDecision(input)` / `follow(id, options?)` | `agent/run` · `team/run` · `run/get` · `run/plan` · `run/result` · `run/events` · `run/cancel` · `run/steer` · `run/answer-decision` |
 | `workspaces` | `list()` / `create(path)` / `revoke(id)` | `workspace/list` / `workspace/create` / `workspace/revoke` |
 | `models` | `list()` | `models/list` |
 
@@ -528,7 +529,7 @@ const routes = httpRouteTable();
 ```
 
 - 覆盖 **48 / 71** 个方法。路由表外的 23 个方法：`initialize`、`initialized`、`workspace/create`、`conversation/model-options`、`conversation/update`、`conversation/subscribe`、`conversation/unsubscribe`、`run/subscribe`、`run/unsubscribe`、`agent/list`、`agent/get`、`team/list`、`team/get`、`config/get`、`config/set`、`skill/create`、`skill/update`、`skill/delete`、`skill/copy`、`config/get-mcp`、`config/set-mcp`、`config/set-mcp-enabled`、`skill/file`。
-  - 其中**只有 `skill/file` 在服务端有 HTTP 路由**（`GET /api/app-server/skills/{skill_id}/files/{path}`），但它回的是**原始字节 + `content-type`**，不是 JSON 信封，所以没有进 JSON 传输的路由表——用 `client.skills.readFile()`（WS，base64）或 `fetch` 直连该路由。
+  - 这 23 个方法**不代表服务端没有 HTTP 路由**：`initialize` / `initialized` 就有（`POST /api/app-server/initialize`、`/initialized`，HTTP 传输的握手正走它们），只是它们不是业务方法；`skill/file` 也有（`GET /api/app-server/skills/{skill_id}/files/{path}`），但它回的是**原始字节 + `content-type`**、不是 JSON 信封，所以同样没进 JSON 传输的路由表——用 `client.skills.readFile()`（WS，base64）或 `fetch` 直连该路由。
 - `config/get` / `config/set`（宿主设置文件 `~/.agent-store/config.toml`）是**宿主管理面**（`16` §6）：只有 wire 方法，没有 HTTP 绑定，也**不在本包客户端内**——Web UI 自己经 transport 调用。契约见 `05` §4.10。
 - `config/get-mcp` / `config/set-mcp` / `config/set-mcp-enabled`（MCP 声明文件 `~/.agent-store/mcp.json`）同样按 `16` §6 判定为**宿主管理面**：只有 wire 方法、没有 HTTP 绑定，也不在本包客户端内。写面是**失败即不写**（整文件解析不过、或目标条目不合法 → 磁盘逐字节不变），开关是**文本级最小编辑**（只改那一条的 `enabled`，注释与缩进原样保留）。注意 `config/get-mcp` 是**唯一**返回文件原文的读面（供宿主自己的编辑器按需调用，全程只在回环与 owner 闸门内）；其余读面（`config/get.mcp`）仍然不含 `env` / `headers` 的取值。契约见 `05` §4.10。
 - `skill/create` / `skill/update` / `skill/delete` / `skill/copy`（技能写面，`16` R17 / W12）同样按 `16` §6 判定为**宿主管理面**：第三方消费者不应能往宿主的技能树里写文件，因此只有 wire 方法、没有 HTTP 绑定，也不在本包客户端内。`skill/update` 是**字段级补丁**（只改点名的字段，`name` 不可改），`skill/copy` 从任意来源派生一份可写的用户技能。读面的 `SkillSummary` 新增 `origin` / `writable` 两个字段（增量），契约见 `05` §4.11。
@@ -587,7 +588,7 @@ await client.runs.answerDecision({
 
 ### 6.2 `sequence` 语义
 
-- `sequence` 是**单会话内单调自增且连续**的计数器（服务端按会话维护），不是全局序号。
+- `sequence` 是**单会话内单调自增且连续**的计数器，不是全局序号。服务端在**每条连接**上按会话分桶维护它（源码注释：`Notification sequence is connection-local`），所以**重连后编号从头开始**——可持续的那份是 `conversation/messages`，不是这个计数器。
 - 取消订阅后该计数器销毁；重新订阅从 `1` 开始，因此 `rearm()` 会把本地游标重置为 `0`。
 - 缺口判定：收到 `sequence > lastSeen + 1` 且 `lastSeen > 0` 即判定丢帧，订阅会发出 `onResync("gap")` 并触发追平。
 - 重复与乱序（`sequence <= lastSeen`）直接丢弃，不重复投递。
@@ -600,7 +601,7 @@ await client.runs.answerDecision({
 | 场景 | 服务端信号 | 追平手段 | 包内入口 |
 | --- | --- | --- | --- |
 | 会话 | `conversation/resync-required` | `conversation/messages` 重新拉取（V1 不提供会话事件回放） | `follow(..., { fetchMessages })` → `onBackfill` |
-| Run | `run/resync-required` | `run/events` 带 `after_sequence` 回放 | `follow()` 自动追平；`resync()` / `catchUp()` 手动 |
+| Run | `run/resync-required` | `run/events` 带 `after_sequence` 回放 | `follow()` 自动追平；手动只有 **`resync()`**（`catchUp()` **不是**追平——它只把已持久化事件标为已见、**不投递**，`follow()` 建订阅时自己调它一次） |
 
 会话订阅默认自动追平（`autoResync`），一次只跑一个取数请求（突发信号合并）；拉取到的新页经 `onBackfill` 交给上层。若上层自己持有分页游标，传 `autoResync: false` 并只监听 `onResync`，由上层做权威重载。
 
@@ -622,7 +623,7 @@ subscription.onError((error) => report(error));
 
 | 类 | 出现场景 | `retryable` |
 | --- | --- | --- |
-| `AppServerError` | 服务端返回的业务错误；带 `code` / `request_id` / `details` | 由服务端 hint 决定 |
+| `AppServerError` | 服务端返回的业务错误；带 `code` / `requestId` / `details` | 由服务端 hint 决定 |
 | `TransportError` | 连接、发送、接收、关闭失败；带 `phase` | 由 `phase` 与调用方判定 |
 | `ProtocolError` | 报文不合规、版本不匹配、响应不符合预期；带 `kind` | 否 |
 | `RequestTimeoutError` | 请求超时；带 `method` / `timeoutMs` | 否 |

@@ -95,7 +95,7 @@ const harness = await launchHarness({
   bin: "/opt/flowy-agent-store/flowy-agent-store", // 省略则按 §2 的四条途径自动查找
   dataDir: "/var/lib/my-app/agent-store",          // 自持目录 ⇒ 不删除，跨调用复用同一个库
   readyTimeoutMs: 180_000,                         // 冷启动要建库
-  requestTimeoutMs: 120_000,                       // 首个 store/list 会镜像整棵市场树
+  requestTimeoutMs: 120_000,                       // store/list 不等市场注册；空目录看 markets_pending
   extraArgs: ["--agent-store-config", "/etc/my-app/agent-store.toml"], // 换一份宿主配置
   client: { name: "ci-smoke", version: "1.0.0" },
   onExit: (info) => console.error("runtime exited", info.code, info.signal),
@@ -648,7 +648,7 @@ const harness = await launchHarness({
   bin: process.env.AGENT_STORE_BIN, // 预构建二进制；省略则按四条途径自动查找
   dataDir: process.env.CI_DATA_DIR, // 自持目录 → 不删除；省略 = 临时目录 + close 时删除
   readyTimeoutMs: 180_000,          // 冷启动建库
-  requestTimeoutMs: 120_000,        // 首个 store/list 会触发市场镜像下载
+  requestTimeoutMs: 120_000,        // store/list 不等市场注册（zip 归档在后台下载）
   client: { name: "ci-smoke", version: "1.0.0" },
   onExit: (info) => console.error("runtime exited", info.code, info.signal),
 });
@@ -663,7 +663,7 @@ try {
 
 - 二进制定位顺序 `bin` → `AGENT_STORE_BIN` → 平台运行时包的 `vendor/` → `PATH`；**找不到就报错，不会下载**，CI 里请固定一份预构建产物。
 - 同一 `dataDir` 有**单实例锁**：并行跑测试要各用各的目录，否则后启动的那个会 fail-fast。
-- 冷启动的首次 `store/list` 会触发市场镜像下载（全新 data-dir 实测约 90 秒），所以要放宽 `requestTimeoutMs`；它返回空目录**不是错误**。
+- 冷启动的首次 `store/list` **不等**市场注册（默认市场是每个市场一个 zip 归档，在后台下载），所以**不必**放宽 `requestTimeoutMs`；它返回空目录**不是错误**——那是 `markets_pending: true`。
 - 子进程异常退出**不会自动重启**：用 `server.exited` / `onExit` 观测，并用 `try/finally`（或测试框架的 `afterAll`）保证 `close()`。
 
 ## 13. 自建传输：WebSocket 还是 HTTP
@@ -698,7 +698,7 @@ console.log(Object.keys(httpRouteTable()).length);
 - **临时 data-dir**：省略 `dataDir` → 每次 `launchHarness` 新建临时目录并在 `close()` 时删除；进程被强杀时目录会残留。
 - **单实例锁**：同一个 data-dir 不能并发跑两个宿主。
 - **`send()` 的回执是「已受理」不是「已跑完」**：`accepted: true` 只代表消息落库，`completed: false` 是常态——这一轮还有活要流式收。终态从 `follow()` 的事件拿，或读 `conversation/get` 的 `is_processing`；§7 那个把多个会话的轮次一起丢进 `Promise.all` 的例子，靠的就是这层异步。
-- **首个 `store/list` 慢**：默认 30s 的请求超时可能不够；返回空目录可能是 `markets_pending: true`（仍在后台注册），**不是错误**。
+- **首个 `store/list` 不慢**：它不等市场注册；返回空目录且带 `markets_pending: true` 表示仍在后台注册，**不是错误**——轮询这个字段即可，不要靠加大 `requestTimeoutMs`。
 - **连接器装完是 disabled**：`store.install` 会先 enable 再探针；用顶层 `installStoreEntry` 则要自己 `enableInstall`。
 - **没有更新动词**：`checkUpdates()` / `updateHint()` → `uninstall_reinstall`。
 - **技能禁用只是目录标记**：`store.setEnabled(item, false)` 对技能返回 `code: "skill_disable_flag_only"`；要让技能离开运行时只能 `uninstall`。

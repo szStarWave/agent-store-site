@@ -5,7 +5,7 @@ Flowy Agent Store ships three companion TypeScript packages that let Node.js / E
 | Package | Responsibility | Runtime | Depends on |
 | --- | --- | --- | --- |
 | `@flowy-agent-store/protocol` | Wire types (requests/responses/notifications/errors) | Any — zero runtime, no DOM/Node | — |
-| `@flowy-agent-store/client` | `AppServerClient` + 7 sub-clients + `Transport` abstraction | Any — no HTTP, no DOM, no Node | `@flowy-agent-store/protocol` |
+| `@flowy-agent-store/client` | `AppServerClient` + 9 sub-clients + `Transport` abstraction | Any — no HTTP, no DOM, no Node | `@flowy-agent-store/protocol` |
 | `@flowy-agent-store/sdk` | Spawn the `flowy-agent-store` binary → loopback WebSocket → ready client | Node.js (`node:child_process`, …) | `@flowy-agent-store/client`, `@flowy-agent-store/protocol` |
 
 Mix and match: **types only** → `protocol`; **connect to an already-running App Server** (e.g. a desktop app) → `client` with your own `WebSocketTransport`; **launch the whole runtime yourself** → `launchHarness` from `sdk`.
@@ -28,7 +28,7 @@ bun add @flowy-agent-store/protocol
 
 All packages ship ESM + CJS (`exports` maps `import` / `require` / `types`); they work out of the box in Node and bundlers.
 
-> **Version status**: all three packages are `0.1.0-beta.*` pre-releases (the API is not frozen, and **no backward compatibility is promised during beta**). Pin an **exact** version in production — this page and the repo currently correspond to `0.1.0-beta.5` (the `beta` tag). Do not rely on a bare `bun add`: the registry's `latest` currently points at `0.1.0-beta.2`, **not** the newest `0.1.0-beta.5`. For dist-tag semantics, per-version upgrade steps and self-check commands see the [Upgrade and migration guide](/en-US/docs/upgrade).
+> **Version status**: all three packages are `0.1.0-beta.*` pre-releases (the API is not frozen, and **no backward compatibility is promised during beta**). Pin an **exact** version in production — this page and the repo currently correspond to `0.1.0-beta.6` (the `beta` tag). Do not rely on a bare `bun add`: the registry's `latest` currently points at `0.1.0-beta.2`, **not** the newest `0.1.0-beta.6`. For dist-tag semantics, per-version upgrade steps and self-check commands see the [Upgrade and migration guide](/en-US/docs/upgrade).
 > **Protocol surface scope**: the `APP_SERVER_PROTOCOL_VERSION` example in §2 and the method counts in §5.3 (`48 / 71`) are taken from the **working tree**, which currently **matches the published artifacts** (since `0.1.0-beta.5`; earlier versions led them, and that batch shipped with this one — it is recorded in §8 of the [Upgrade and migration guide](/en-US/docs/upgrade), together with the self-check commands). The fingerprint is compared for **strict equality** (a client built against an old value cannot connect to a new runtime), so when you build your own binary or touch the protocol, read the constant in §2 rather than copying a value out of this page's prose.
 > **Runtime**: Node.js **≥ 22** (relies on the global `WebSocket`) or Bun; the lower bound is declared by each package's `engines.node`.
 
@@ -38,7 +38,7 @@ All packages ship ESM + CJS (`exports` maps `import` / `require` / `types`); the
 
 ### 2.1 Position
 
-The single TypeScript source of truth for the wire contract: every request/response/notification type, the `APP_SERVER_PROTOCOL_VERSION` constant, and structured errors. **No runtime code at all** — consumable by client, sdk, or anything else speaking the protocol.
+The single TypeScript source of truth for the wire contract: every request/response/notification type, the `APP_SERVER_PROTOCOL_VERSION` constant, and structured errors. **No transport and no I/O** — the only executable code is a handful of pure functions (error predicates and formatters, event decoding, localized text), so anything speaking the protocol can consume it.
 
 ### 2.2 Main exports
 
@@ -59,7 +59,7 @@ The single TypeScript source of truth for the wire contract: every request/respo
 | `ServerNotification` | Server notifications (`event`, `conversation/event`, `conversation/list-changed`, `run/resync-required`, …) |
 | `WireError` | Server error payload |
 
-> Experimental capabilities (full Team collaboration, event cursor catch-up) stay marked `experimental` and are excluded from stable exports.
+> There is **exactly one** protocol surface (`16` §7 decision 4): before a release there is no separate stable and experimental export set, and no `experimental` marker exists in the source. Full Team collaboration (`TeamRunInput` / `TeamSummary` / `TeamDetail`, …) and event cursor catch-up live on that same surface.
 
 ### 2.3 Error model (`errors.ts`)
 
@@ -67,7 +67,7 @@ The single TypeScript source of truth for the wire contract: every request/respo
 
 | Class | Trigger | Key fields |
 | --- | --- | --- |
-| `AppServerError` | Server returned a JSON-RPC error | `code`, `request_id`, `retryable`, `details` |
+| `AppServerError` | Server returned a JSON-RPC error | `code`, `requestId` (wire: `request_id`), `retryable`, `details` |
 | `TransportError` | Transport layer (connect/send/close) | `phase` (`connect`/`send`/`receive`/`close`), `retryable` |
 | `ProtocolError` | Local protocol validation failed | `kind` (`invalid_message` / `version_mismatch` / `unexpected_response`) |
 | `RequestTimeoutError` | Request timed out | `method`, `timeoutMs` |
@@ -157,7 +157,7 @@ Bring your own transport by implementing the interface: an in-memory fake for te
 | `installStoreEntry(mkt, entry)` | `store/install-entry` | One-click install: import (if missing) + register |
 
 > ℹ️ **The first `listStore()` may come back empty or partial — by design, not an error**: the built-in default marketplaces register in the **background** (D-SDK-1 ①). The first `store/list` only kicks that off and then answers from whatever is registered *right now*; it never waits for the mirror.
-> Registration itself HTTP-mirrors each market source's whole tree (hundreds of skill dirs, thousands of assets), roughly **90s** on a fresh data dir — during which that call reports `items: 0`.
+> Registration runs **in the background** and `store/list` does not wait for it. Since `fp-7` the built-in default markets are **one `zip` archive per market** (a single request; it replaced the old per-file whole-tree mirror — measured at 14,714 requests / 611 MiB), so on a fresh data dir the first call returns `items: 0` almost **immediately** with `markets_pending: true` (§3.3), and the same call returns the catalogue once registration completes.
 > Measured (2026-09-10, fresh local data dir): `first store/list: 1ms items=0` → after 130s `store/list: 133ms items=438`, `market/list count=3`.
 > So **you do not need a larger `requestTimeoutMs` for the first call**; re-list after the warm-up for the full catalog (the WebUI has an explicit refresh). If a mirror is unreachable, that warm-up counts as incomplete and the next store/market call retries automatically.
 > To tell "no markets at all" from "still loading": `listStore()` (that is, `store/list`) now returns `markets_pending` — `true` means the builtin markets are still registering in the background and the catalog may be incomplete.
@@ -260,7 +260,7 @@ client.conversations.send(id, content, key, {
 ```ts
 await client.conversations.send(id, content, key, {
   model: { provider_id: "opencode", model: "mimo-v2.5" }, // a config.toml provider name works too
-  reasoningEffort: "high",                                 // low | medium | high | xhigh
+  reasoningEffort: "high",                                 // low | medium | high | xhigh | max (the server currently accepts only the first four)
 });
 ```
 
@@ -318,6 +318,7 @@ await sub.close(); // server side unsubscribe (closing the socket also works)
 client.runs.agent(input: AgentRunInput): Promise<RunReceipt>; // async receipt, not the final result
 client.runs.team(input: TeamRunInput): Promise<TeamRunReceipt>; // team run: Leader conversation + planned delegation
 client.runs.get(runId): Promise<RunView>;                     // authoritative state
+client.runs.plan(runId): Promise<RunPlan>;                    // plan view (run/plan, also HTTP-bound)
 client.runs.result(runId): Promise<RunResult>;                // resolves only at a terminal state
 client.runs.events({ runId, afterSequence, limit }): Promise<RunEvent[]>; // cursor replay
 client.runs.cancel({ runId, expectedVersion, commandId, idempotencyKey }): Promise<RunView>;
@@ -389,7 +390,7 @@ The fields `HarnessOptions` adds itself (`SpawnOptions` fields are in §4.2):
 | `client` | — | **Required**; identifies the caller in the handshake (server logs and audit) |
 | `capabilities` | omitted | `{ events?, approvals?, team_runtime?, artifacts? }` — which capabilities the client will consume |
 | `token` | omitted | Handed to `WebSocketTransport`; the WebSocket API cannot set headers, so it travels as `?token=…` on the loopback URL. Required when the host runs with `--auth`, optional in local mode (`auth: "disabled-local"`) |
-| `requestTimeoutMs` | `30000` | **Per-request** timeout, unrelated to startup; the first `store/list` on a cold data-dir mirrors the market tree, so raise it (see §12 of the examples page) |
+| `requestTimeoutMs` | `30000` | **Per-request** timeout, unrelated to startup. **Do not** raise it for the first `store/list` — that call does not wait for market registration (§3.3); poll `markets_pending` if you need registration to finish |
 
 What `Harness` carries:
 
@@ -398,7 +399,7 @@ What `Harness` carries:
 | (inherited) `conversations` / `agents` / `teams` / `skills` / `connectors` / `models` / `workspaces` / `runs` / `store` | The whole `AppServerClient` business surface | Every business call goes **directly** on the harness: `harness.conversations.create(...)` |
 | `handshake` | This launch's handshake response (**never null**) | Recording or asserting the protocol fingerprint |
 | `initializeInfo` | The **current** connection state (nullable; `null` after `close()`) | Deciding whether the connection is still ready |
-| `server.readiness` | The parsed readiness line: `{ host, port, url, protocol_version, version, auth }` | Logging; the `url` a hand-rolled `HttpTransport` needs; deciding from `auth` whether a `token` is required |
+| `server.readiness` | The parsed readiness line: `{ host, port, url, protocol_version, version, auth }` | Logging; deciding from `auth` whether a `token` is required. ⚠️ `url` is the **site root** (`http://{host}:{port}/`), **not** the API root — a hand-rolled transport needs `ws://{host}:{port}/api/app-server/ws` (§13 of the examples page) |
 | `server.dataDir` | The data-dir the child actually uses | Diagnosis and isolation assertions (an auto-created temp dir shows up here too) |
 | `server.exited` | A `Promise<{ code, signal }>` that never rejects | Observing crashes and exits (contract in §4.4) |
 | `close()` | Unsubscribe → close transport → kill child → remove an auto-created data-dir | Call it in `finally`; safe to repeat |
@@ -458,7 +459,7 @@ AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node your-app.mjs
 ### 4.5 Errors and cleanup
 
 - Spawn failure: the error appends the **last 50 stderr lines** (`stderr tail:` section).
-- Timeout: after the default 120s it throws `timed out waiting for the runtime readiness line`.
+- Timeout: after the default 120s it throws `timed out after ${timeoutMs}ms waiting for the runtime readiness line` (`timeoutMs` is `readyTimeoutMs`).
 - Every failure path runs `child.kill()` → 2s grace → `SIGKILL`, and removes the auto-created data dir.
 - After readiness the promise is already settled: a later `exit` / `error` from the child no longer takes the failure path (it is not reported as a startup failure); such exits (crashes included) surface only through `SpawnedServer.exited` and `onExit`. The SDK never restarts the runtime, and lifetime is owned by the caller via `close()`.
 - Correct usage: `close()` in a `try/finally`; without it the temp dir leaks on process exit (no exit hook installed).
@@ -509,11 +510,11 @@ How the three packages' real exports line up with the protocol methods. Method n
 | --- | --- | --- |
 | `agents` | `list()` / `get(agentId)` | `agent/list` / `agent/get` |
 | `teams` | `list()` / `get(teamId)` | `team/list` / `team/get` |
-| `skills` | `list()` / `get(skillId)` | `skill/list` / `skill/get` |
-| `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `logout(id)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` |
+| `skills` | `list()` / `get(skillId)` / `files(skillId)` / `readFile(skillId, path)` / `readFileWithType(skillId, path)` | `skill/list` / `skill/get` / `skill/files` / `skill/file` |
+| `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `logout(id)` / `call(id, tool, args?)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` · `call` |
 | `store` | `list()` / `search(query, filter?)` / `installed()` / `checkUpdates()` / `updateHint(item)` / `install(item, opts?)` / `setEnabled(item, enabled, opts?)` / `uninstall(item, opts?)` | composed methods, no wire method of their own: `store/list` · `store/install-entry` · `install/run` · `install/status` · `install/disable` · `install/enable` · `install/uninstall` |
 | `conversations` | `create(input)` / `update(id, input)` / `modelOptions()` / `list(limit?)` / `get(id)` / `messages(query)` / `send(id, content, idempotencyKey, options?)` / `cancel(id)` / `delete(id)` / `follow(id, options?)` | the same-named `conversation/*` methods |
-| `runs` | `agent(input)` / `team(input)` / `get(id)` / `result(id)` / `events(query)` / `cancel(input)` / `steer(input)` / `answerDecision(input)` / `follow(id, options?)` | `agent/run` · `team/run` · `run/get` · `run/result` · `run/events` · `run/cancel` · `run/steer` · `run/answer-decision` |
+| `runs` | `agent(input)` / `team(input)` / `get(id)` / `plan(id)` / `result(id)` / `events(query)` / `cancel(input)` / `steer(input)` / `answerDecision(input)` / `follow(id, options?)` | `agent/run` · `team/run` · `run/get` · `run/plan` · `run/result` · `run/events` · `run/cancel` · `run/steer` · `run/answer-decision` |
 | `workspaces` | `list()` / `create(path)` / `revoke(id)` | `workspace/list` / `workspace/create` / `workspace/revoke` |
 | `models` | `list()` | `models/list` |
 
@@ -529,7 +530,7 @@ const routes = httpRouteTable();
 ```
 
 - Covers **48 / 71** methods. The 23 outside the route table: `initialize`, `initialized`, `workspace/create`, `conversation/model-options`, `conversation/update`, `conversation/subscribe`, `conversation/unsubscribe`, `run/subscribe`, `run/unsubscribe`, `agent/list`, `agent/get`, `team/list`, `team/get`, `config/get`, `config/set`, `skill/create`, `skill/update`, `skill/delete`, `skill/copy`, `config/get-mcp`, `config/set-mcp`, `config/set-mcp-enabled`, `skill/file`.
-  - Of those, **only `skill/file` has an HTTP route on the server** (`GET /api/app-server/skills/{skill_id}/files/{path}`), but it answers with **raw bytes plus a `content-type`** rather than a JSON envelope, so it is not in the JSON transport's route table — use `client.skills.readFile()` (WebSocket, base64) or `fetch` the route directly.
+  - Those 23 methods do **not** mean the server has no HTTP route for them: `initialize` / `initialized` do have one (`POST /api/app-server/initialize`, `/initialized` — the HTTP transport's handshake goes through them), they are simply not business methods; `skill/file` has one too (`GET /api/app-server/skills/{skill_id}/files/{path}`), but it answers with **raw bytes plus a `content-type`** rather than a JSON envelope, so it is likewise absent from the JSON transport's route table — use `client.skills.readFile()` (WebSocket, base64) or `fetch` the route directly.
 - `config/get` / `config/set` (the host settings file `~/.agent-store/config.toml`) are **host management surface** (`16` §6): wire methods with no HTTP binding, and deliberately **not part of this package's client** — the Web UI calls them through its own transport helpers. Contract in `05` §4.10.
 - `config/get-mcp` / `config/set-mcp` / `config/set-mcp-enabled` (the MCP declaration file `~/.agent-store/mcp.json`) are host management surface by the same `16` §6 judgement: wire-only, no HTTP binding, and not in this package. The write face is **fail-closed** (an unparseable file, or an entry the parser rejects, leaves the file byte-identical) and the toggle is a **text-level minimal edit** (only that entry's `enabled` value moves; comments and indentation survive). Note that `config/get-mcp` is the **only** read that returns the file's own text (for the host's own editor, on demand, inside the loopback + owner gate); every other read (`config/get.mcp`) still carries no `env` / `headers` values. Contract in `05` §4.10.
 - `skill/create` / `skill/update` / `skill/delete` / `skill/copy` (the skill write face, `16` R17 / W12) are host management surface by the same `16` §6 judgement: a third-party consumer must not be able to write files into the host's skill tree, so they are wire-only, have no HTTP binding, and are not in this package. `skill/update` is a **field-level patch** (only the named fields move; `name` is not editable) and `skill/copy` derives a writable user skill from any origin. The read face's `SkillSummary` gains `origin` / `writable` (additive); contract in `05` §4.11.
@@ -588,7 +589,7 @@ A `message.activity` frame whose `kind === "turn_completed"` also carries **this
 
 ### 6.2 `sequence` semantics
 
-- `sequence` is a **per-conversation, monotonic and contiguous** counter (the server keeps one per conversation). It is not a global ordinal.
+- `sequence` is a **per-conversation, monotonic and contiguous** counter, not a global ordinal. The server keeps it **per connection**, bucketed by conversation (source comment: `Notification sequence is connection-local`), so **a reconnect starts the numbering over** — the durable record is `conversation/messages`, not this counter.
 - Unsubscribing destroys that counter; resubscribing starts at `1`, which is why `rearm()` resets the local cursor to `0`.
 - Gap detection: `sequence > lastSeen + 1` while `lastSeen > 0` means loss — the subscription emits `onResync("gap")` and triggers catch-up.
 - Duplicates and out-of-order frames (`sequence <= lastSeen`) are dropped and never re-delivered.
@@ -601,7 +602,7 @@ Conversations and runs catch up through different carriers:
 | Case | Server signal | Catch-up mechanism | Package entry point |
 | --- | --- | --- | --- |
 | Conversation | `conversation/resync-required` | re-fetch `conversation/messages` (V1 has no conversation event replay) | `follow(..., { fetchMessages })` → `onBackfill` |
-| Run | `run/resync-required` | replay `run/events` with `after_sequence` | `follow()` auto-resyncs; `resync()` / `catchUp()` for manual |
+| Run | `run/resync-required` | replay `run/events` with `after_sequence` | `follow()` auto-resyncs; manual replay is **`resync()` only** (`catchUp()` is *not* a catch-up — it marks persisted events as seen **without dispatching**, and `follow()` calls it once when it subscribes) |
 
 Conversation subscriptions auto-catch-up by default (`autoResync`) and run at most one fetch at a time (bursts coalesce); the fetched page is handed to `onBackfill`. If your layer owns the pagination cursor, pass `autoResync: false` and listen only to `onResync`, then reload authoritatively yourself.
 
@@ -623,7 +624,7 @@ All four error classes are exported from `@flowy-agent-store/protocol`; `retryab
 
 | Class | Raised when | `retryable` |
 | --- | --- | --- |
-| `AppServerError` | the server returned a business error; carries `code` / `request_id` / `details` | per the server hint |
+| `AppServerError` | the server returned a business error; carries `code` / `requestId` / `details` | per the server hint |
 | `TransportError` | connect / send / receive / close failed; carries `phase` | decided by `phase` and the caller |
 | `ProtocolError` | malformed message, version mismatch, unexpected response; carries `kind` | no |
 | `RequestTimeoutError` | request timed out; carries `method` / `timeoutMs` | no |
