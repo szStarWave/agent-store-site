@@ -8,7 +8,7 @@ Flowy Agent Store ships three companion TypeScript packages that let Node.js / E
 | `@flowy-agent-store/client` | `AppServerClient` + 7 sub-clients + `Transport` abstraction | Any — no HTTP, no DOM, no Node | `@flowy-agent-store/protocol` |
 | `@flowy-agent-store/sdk` | Spawn the `flowy-agent-store` binary → loopback WebSocket → ready client | Node.js (`node:child_process`, …) | `@flowy-agent-store/client`, `@flowy-agent-store/protocol` |
 
-Mix and match: **types only** → `protocol`; **connect to an already-running App Server** (e.g. a desktop app) → `client` with your own `WebSocketTransport`; **launch the whole runtime yourself** → `launchClient` from `sdk`.
+Mix and match: **types only** → `protocol`; **connect to an already-running App Server** (e.g. a desktop app) → `client` with your own `WebSocketTransport`; **launch the whole runtime yourself** → `launchHarness` from `sdk`.
 
 Runnable, copy-pasteable examples (Node / browser / Electron / Store / sessions / Runs) live in the [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
 
@@ -310,6 +310,8 @@ await sub.close(); // server side unsubscribe (closing the socket also works)
 
 > After `rearm()` you still have to backfill the outage window yourself: this subscription has no event-replay API, so re-fetch with `conversation/messages`. The reset cursor means later duplicates are the caller's to dedupe by `sequence`.
 
+**One client can drive several conversations at once**: `create()` has no cap, and each conversation owns its `conversation_id`, its identity (expert / team) and its own event stream; `list(limit?)` enumerates them, and a single WS connection can `follow()` many at once (events are routed by `conversation_id`). The busy check (`conflict`) is **per conversation**, so two conversations run their own turns without blocking each other. **Process-level** isolation means several `dataDir`s, not more conversations (one directory holds a single-instance lock). A runnable example is in the [cookbook](/en-US/docs/examples-sdk) §7.
+
 #### `runs` — run lifecycle and live events
 
 ```ts
@@ -361,27 +363,26 @@ client.workspaces.revoke(workspaceId: string): Promise<WorkspaceRevokeResult>; /
 
 ## 4. `@flowy-agent-store/sdk` — the Node host
 
-### 4.1 `launchClient(options): Promise<LaunchedClient>`
+### 4.1 `launchHarness(options): Promise<Harness>`
 
-One call does four things: locate and spawn the runtime → wait for the readiness line to learn the real port → connect over loopback → run the `initialize` / `initialized` handshake. The `client` it returns is ready to use.
+One call does four things: locate and spawn the runtime → wait for the readiness line to learn the real port → connect over loopback → run the `initialize` / `initialized` handshake. **The object it returns *is* that client** — the business surface hangs off it directly, with no `.client` hop (doc `31` §5, option B).
 
 ```ts
-interface LaunchOptions extends SpawnOptions {
+interface HarnessOptions extends SpawnOptions {
   client: ClientInfo;             // { name, version }
   capabilities?: ClientCapabilities;
   token?: string;                 // handed to WebSocketTransport
   requestTimeoutMs?: number;      // default 30s (not enough for the first store/list — see the §3.3 warning)
 }
 
-interface LaunchedClient {
+interface Harness extends AppServerClient {
   server: SpawnedServer;          // readiness / dataDir / exited / close
-  client: AppServerClient;        // already connected + initialized
-  initializeResult: InitializeResult;
+  handshake: InitializeResult;    // this launch's handshake response (never null)
   close(): Promise<void>;         // unsubscribe → close transport → kill child → remove temp data-dir
 }
 ```
 
-The fields `LaunchOptions` adds itself (`SpawnOptions` fields are in §4.2):
+The fields `HarnessOptions` adds itself (`SpawnOptions` fields are in §4.2):
 
 | Field | Default | Meaning |
 | --- | --- | --- |
@@ -390,16 +391,19 @@ The fields `LaunchOptions` adds itself (`SpawnOptions` fields are in §4.2):
 | `token` | omitted | Handed to `WebSocketTransport`; the WebSocket API cannot set headers, so it travels as `?token=…` on the loopback URL. Required when the host runs with `--auth`, optional in local mode (`auth: "disabled-local"`) |
 | `requestTimeoutMs` | `30000` | **Per-request** timeout, unrelated to startup; the first `store/list` on a cold data-dir mirrors the market tree, so raise it (see §12 of the examples page) |
 
-What `LaunchedClient` carries:
+What `Harness` carries:
 
 | Member | Content | Use it for |
 | --- | --- | --- |
-| `client` | A connected, initialized `AppServerClient` | Every business call |
-| `initializeResult` | The handshake response | Recording or asserting the protocol fingerprint |
+| (inherited) `conversations` / `agents` / `teams` / `skills` / `connectors` / `models` / `workspaces` / `runs` / `store` | The whole `AppServerClient` business surface | Every business call goes **directly** on the harness: `harness.conversations.create(...)` |
+| `handshake` | This launch's handshake response (**never null**) | Recording or asserting the protocol fingerprint |
+| `initializeInfo` | The **current** connection state (nullable; `null` after `close()`) | Deciding whether the connection is still ready |
 | `server.readiness` | The parsed readiness line: `{ host, port, url, protocol_version, version, auth }` | Logging; the `url` a hand-rolled `HttpTransport` needs; deciding from `auth` whether a `token` is required |
 | `server.dataDir` | The data-dir the child actually uses | Diagnosis and isolation assertions (an auto-created temp dir shows up here too) |
 | `server.exited` | A `Promise<{ code, signal }>` that never rejects | Observing crashes and exits (contract in §4.4) |
 | `close()` | Unsubscribe → close transport → kill child → remove an auto-created data-dir | Call it in `finally`; safe to repeat |
+
+> **Breaking change vs the published `0.1.0-beta.5`**: the entry point is renamed to `launchHarness` (types `LaunchedClient` → `Harness`, `LaunchOptions` → `HarnessOptions`), the return value lost its `.client` hop, and `initializeResult` is now `handshake`. In other words `const session = await launchClient({…})` + `session.client.conversations.create(…)` becomes `const harness = await launchHarness({…})` + `harness.conversations.create(…)`. Item-by-item migration is in the [Upgrade and migration guide](/en-US/docs/upgrade) §8.2.
 
 **What it does not do**: it does not configure models or providers (that is `config.toml` and the host's settings surface); it does not download the binary; without `dataDir` it does not persist anything (a one-shot sandbox); it does not restart the child or install process-exit hooks.
 
@@ -449,7 +453,7 @@ AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node your-app.mjs
 - **Readiness line**: a single stdout JSON line `{"agent_store":"listening","host":...,"port":...,"url":...,"protocol_version":...,"version":...,"auth":...}`; the SDK scans lines and ignores everything else (tracing shares stdout).
 - **stdout kept drained**: once the readiness line is parsed the SDK keeps reading and discarding the child's stdout (`readline.close()` pauses that stream, so reading must not stop there). Otherwise the runtime blocks forever once its logs fill the OS pipe buffer (~64KB) — long sessions (multi-turn runs, market-tree scans) then hang silently. Post-readiness output is only drained and dropped; this release exposes no log callback.
 - **`env` / `cwd` passthrough**: `env` is **merged over** the parent's `process.env` (not a replacement, so `PATH` etc. stay visible); omitting `cwd` inherits the parent working directory. Both go to `child_process.spawn` unchanged.
-- **Exit is observable**: `SpawnedServer.exited` (`{ code, signal }`) settles whenever the child ends, for **any** reason including a crash or a non-zero code, and `onExit` fires once alongside it. The SDK **never restarts** the runtime; restarting belongs to the caller of `launchClient`.
+- **Exit is observable**: `SpawnedServer.exited` (`{ code, signal }`) settles whenever the child ends, for **any** reason including a crash or a non-zero code, and `onExit` fires once alongside it. The SDK **never restarts** the runtime; restarting belongs to the caller of `launchHarness`.
 
 ### 4.5 Errors and cleanup
 
@@ -460,11 +464,11 @@ AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node your-app.mjs
 - Correct usage: `close()` in a `try/finally`; without it the temp dir leaks on process exit (no exit hook installed).
 
 ```ts
-const session = await launchClient({ client: { name: "x", version: "1" } });
+const harness = await launchHarness({ client: { name: "x", version: "1" } });
 try {
-  await session.client.connectors.list();
+  await harness.connectors.list();
 } finally {
-  await session.close();
+  await harness.close();
 }
 ```
 

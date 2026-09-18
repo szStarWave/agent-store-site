@@ -2,7 +2,7 @@
 
 本文是 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) 的配套**示例集**：类型、逐方法对照表与运行契约在那边，这里只放**可直接复制运行**的代码。
 
-> 三个包的分工：`@flowy-agent-store/protocol` 只有类型与错误模型；`@flowy-agent-store/client` 是传输无关的 `AppServerClient` + 子客户端；`@flowy-agent-store/sdk` 额外提供 `launchClient`（spawn 二进制 + 回环建连 + 握手）。**实时事件与订阅只能走 `WebSocketTransport`**，纯请求-响应可以用 `HttpTransport`。
+> 三个包的分工：`@flowy-agent-store/protocol` 只有类型与错误模型；`@flowy-agent-store/client` 是传输无关的 `AppServerClient` + 子客户端；`@flowy-agent-store/sdk` 额外提供 `launchHarness`（spawn 二进制 + 回环建连 + 握手）。**实时事件与订阅只能走 `WebSocketTransport`**，纯请求-响应可以用 `HttpTransport`。
 
 ## 1. 三个包与运行环境对照
 
@@ -27,16 +27,16 @@ export AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store
 最小用法——spawn 运行时、回环建连、握手都在一次调用里完成：
 
 ```ts
-import { launchClient } from "@flowy-agent-store/sdk";
+import { launchHarness } from "@flowy-agent-store/sdk";
 
-const session = await launchClient({
+const harness = await launchHarness({
   client: { name: "my-app", version: "0.1.0" },
 });
-const store = await session.client.listStore();
-await session.close();
+const store = await harness.listStore();
+await harness.close();
 ```
 
-`launchClient` 完成的事：
+`launchHarness` 完成的事：
 
 1. 按 `bin` → `AGENT_STORE_BIN` → 平台运行时包的 `vendor/` → `PATH` 定位 `flowy-agent-store` 可执行文件；
 2. 以 `--host 127.0.0.1 --port 0 --no-open` 并携带自动创建的临时 `--data-dir` 启动子进程；
@@ -49,49 +49,49 @@ await session.close();
 ### 3.1 装专家 → 跑一次 → 取结果
 
 ```ts
-import { launchClient } from "@flowy-agent-store/sdk";
+import { launchHarness } from "@flowy-agent-store/sdk";
 
-const session = await launchClient({ client: { name: "demo", version: "1.0.0" } });
+const harness = await launchHarness({ client: { name: "demo", version: "1.0.0" } });
 try {
   // 目录（Store）
-  const items = await session.client.listStore();
+  const items = await harness.listStore();
   console.log(`${items.items.length} items in the store`);
 
   // 安装并运行一个 Agent
-  await session.client.installStoreEntry("experts", "frontend-backend-experts");
-  const receipt = await session.client.runs.agent({
+  await harness.installStoreEntry("experts", "frontend-backend-experts");
+  const receipt = await harness.runs.agent({
     agentId: "frontend-backend-experts",
     goal: "Generate a todo REST API",
   });
-  const result = await session.client.runs.result(receipt.run_id);
+  const result = await harness.runs.result(receipt.run_id);
   console.log(result.status);
 } finally {
-  await session.close(); // 终止子进程 + 删除临时 data-dir
+  await harness.close(); // 终止子进程 + 删除临时 data-dir
 }
 ```
 
 ### 3.2 会话 + 实时事件
 
 ```ts
-import { launchClient } from "@flowy-agent-store/sdk";
+import { launchHarness } from "@flowy-agent-store/sdk";
 
-const launched = await launchClient({ client: { name: "my-tool", version: "1.0.0" } });
+const harness = await launchHarness({ client: { name: "my-tool", version: "1.0.0" } });
 try {
-  const conversation = await launched.client.conversations.create({ name: "demo" });
-  const subscription = await launched.client.conversations.follow(conversation.conversation_id);
+  const conversation = await harness.conversations.create({ name: "demo" });
+  const subscription = await harness.conversations.follow(conversation.conversation_id);
   subscription.onEvent((event) => console.log(event.event_type));
-  await launched.client.conversations.send(conversation.conversation_id, "你好", crypto.randomUUID());
+  await harness.conversations.send(conversation.conversation_id, "你好", crypto.randomUUID());
 } finally {
-  await launched.close(); // 终止子进程 + 删除临时 data-dir
+  await harness.close(); // 终止子进程 + 删除临时 data-dir
 }
 ```
 
 ### 3.3 固定二进制 + 自持 data-dir（CI / 多实例 / 复用库）
 
 ```ts
-import { launchClient } from "@flowy-agent-store/sdk";
+import { launchHarness } from "@flowy-agent-store/sdk";
 
-const session = await launchClient({
+const harness = await launchHarness({
   bin: "/opt/flowy-agent-store/flowy-agent-store", // 省略则按 §2 的四条途径自动查找
   dataDir: "/var/lib/my-app/agent-store",          // 自持目录 ⇒ 不删除，跨调用复用同一个库
   readyTimeoutMs: 180_000,                         // 冷启动要建库
@@ -101,10 +101,10 @@ const session = await launchClient({
   onExit: (info) => console.error("runtime exited", info.code, info.signal),
 });
 try {
-  const store = await session.client.listStore();
+  const store = await harness.listStore();
   console.log(store.items.length, store.markets_pending);
 } finally {
-  await session.close(); // 自持目录不会被删除
+  await harness.close(); // 自持目录不会被删除
 }
 ```
 
@@ -113,24 +113,24 @@ try {
 ### 3.4 带 token 的宿主与 capabilities
 
 ```ts
-const session = await launchClient({
+const harness = await launchHarness({
   client: { name: "internal-ui", version: "2.0.0" },
   // 宿主以 --auth 启动时必需；本地模式（server.readiness.auth === "disabled-local"）可省略
   token: process.env.AGENT_STORE_TOKEN ?? "",
   // 声明会消费哪些能力：events / approvals / team_runtime / artifacts
   capabilities: { events: true, approvals: true, team_runtime: true, artifacts: false },
 });
-console.log(session.server.readiness.url, session.initializeResult.protocol_version);
+console.log(harness.server.readiness.url, harness.handshake.protocol_version);
 ```
 
 ### 3.5 启动失败怎么兜
 
 ```ts
-import { launchClient } from "@flowy-agent-store/sdk";
+import { launchHarness } from "@flowy-agent-store/sdk";
 
 try {
-  const session = await launchClient({ client: { name: "my-app", version: "1.0.0" } });
-  // … 正常使用 session.client
+  const harness = await launchHarness({ client: { name: "my-app", version: "1.0.0" } });
+  // … 正常使用 harness（业务面直接挂在返回对象上）
 } catch (error) {
   // 三类启动失败都从这里抛出，message 已含可行动信息：
   // 1) 找不到二进制        → "cannot find the flowy-agent-store runtime binary: …"（逐条列出四条途径）
@@ -140,7 +140,7 @@ try {
 }
 ```
 
-失败路径由 SDK 自己兜底：先 `child.kill()`，2 秒宽限后 `SIGKILL`，并删除自动创建的 data-dir；子进程 stderr 的尾部 50 行会附在错误信息里。已就绪之后子进程再崩溃**不会**走这条路——那只能通过 `session.server.exited` / `onExit` 观察，SDK 不自动重启。
+失败路径由 SDK 自己兜底：先 `child.kill()`，2 秒宽限后 `SIGKILL`，并删除自动创建的 data-dir；子进程 stderr 的尾部 50 行会附在错误信息里。已就绪之后子进程再崩溃**不会**走这条路——那只能通过 `harness.server.exited` / `onExit` 观察，SDK 不自动重启。
 
 ### 3.6 只要进程、不要客户端：`spawnAppServer`
 
@@ -162,7 +162,7 @@ try {
 }
 ```
 
-> 这些配方都走 `launchClient` / `spawnAppServer`：省略 `dataDir` 时自动创建临时目录并在 `close()` 时删除；要跨调用复用同一个库（会话、已装组件都留着），显式传 `dataDir`——见 §12。
+> 这些配方都走 `launchHarness` / `spawnAppServer`：省略 `dataDir` 时自动创建临时目录并在 `close()` 时删除；要跨调用复用同一个库（会话、已装组件都留着），显式传 `dataDir`——见 §12。
 
 ## 4. 浏览器：只连已运行的服务端
 
@@ -323,7 +323,7 @@ await client.store.uninstall(items[0]);         // 真的释放运行时产物
 
 ## 7. 会话与 Run
 
-**会话：创建 → 发送 → 实时接收**
+### 7.1 会话：创建 → 发送 → 实时接收
 
 ```ts
 import { decodeConversationEvent } from "@flowy-agent-store/protocol";
@@ -344,7 +344,9 @@ const receipt = await client.conversations.send(
 );
 ```
 
-**给单独一轮挂技能**（`fp-3`）：技能只在这一轮生效，会话创建时的快照不受影响。
+### 7.2 给单独一轮挂技能（`fp-3`）
+
+技能只在这一轮生效，会话创建时的快照不受影响。
 
 ```ts
 const skills = await client.skills.list();
@@ -359,7 +361,9 @@ await client.conversations.send(conv.conversation_id, "按这个技能的步骤�
 
 > `mentions` 只认 `skill`：专家与连接器在 `conversation/send` 上没有载体（专家是会话身份、连接器是宿主级开关），传进去会得到 `invalid_request`，**不会**被静默忽略。
 
-**以专家开场**（`fp-4`）：专家的身份写在**创建**那一刻，之后不可改写。
+### 7.3 以专家开场（`fp-4`）
+
+专家的身份写在**创建**那一刻，之后不可改写。
 
 ```ts
 const experts = await client.agents.list();
@@ -375,7 +379,9 @@ await client.conversations.send(expertChat.conversation_id, "先看模块边界"
 
 > 想换专家只能**新建会话**——`conversation/update` 拒绝 preset / 技能 / 连接器三类键。这是刻意的：会话的 preset 快照是冻结的，否则「同一个会话里前后两轮是两个不同的人」。
 
-**以专家团开场**（`fp-5`）：走 `team/run` 的同一段编排，但不代你说第一句话。
+### 7.4 以专家团开场（`fp-5`）
+
+走 `team/run` 的同一段编排，但不代你说第一句话。
 
 ```ts
 const teams = await client.teams.list();
@@ -385,9 +391,50 @@ const leader = await client.conversations.create({ teamId: teams[0].id });
 await client.conversations.send(leader.conversation_id, "把这版需求拆成计划", crypto.randomUUID());
 ```
 
-> 想直接「给目标、拿 run_id」，还是用 `client.runs.team({ teamId, goal })`；`create({ teamId })` 给的是**可继续对话的 Leader 会话**。`teamId` 与 `agentId` 互斥。
+> 想直接「给目标、拿 run_id」，还是用 `client.runs.team({ teamId, goal })`；`create({ teamId })` 给的是**可继续对话的 Leader 会话**。`teamId` 与 `agentId` 互斥。**带 `teamId` 时不要传 `name`**——Leader 的名字由服务端定为「<团名> (leader)」，传了不起作用。
 
-**Run：发起 → 等待结果 → 处理审批**
+### 7.5 一个宿主里同时管多个会话
+
+`create()` 没有数量上限：**同一个宿主（同一个 `dataDir`）里可以并存任意多个会话**——§3 的 `launchHarness` 起一次就够，不必、也不能为每个会话再起一个宿主。下面沿用上面的 `client`（连的是同一个宿主），做四件事：
+
+1. **并存**：一次开三个普通会话，各有自己的 `conversation_id`；
+2. **一条连接全订上**：一条 WS 连接同时 `follow()` 三个，事件按 `conversation_id` 分流；
+3. **并发跑轮**：两个会话同时各跑一轮，互不阻塞；
+4. **枚举续聊**：`conversations.list()` 拿回这个宿主里的全部会话。
+
+```ts
+// ① 并存：三个普通会话（要用专家 / 团 Leader，给 create 加 agentId / teamId 即可，见 §7.3 / §7.4）
+const explain = await client.conversations.create({ name: "解释报错" });
+const review = await client.conversations.create({ name: "评审 A 分支" });
+const notes = await client.conversations.create({ name: "写发布说明" });
+const chats = [explain, review, notes];
+
+// ② 一条 WS 连接把它们全订上：服务端按连接维护订阅集合，事件按 conversation_id 分流
+for (const view of chats) {
+  const sub = await client.conversations.follow(view.conversation_id);
+  // 分流就是这一行：闭包记住是哪个会话，同一根连接上三个会话的事件不会串
+  sub.onEvent((event) => render(view.conversation_id, event));
+}
+
+// ③ 并发：两个会话同时各跑一轮，互不阻塞（忙判定按会话，没有宿主级并发闸）
+const receipts = await Promise.all([
+  client.conversations.send(explain.conversation_id, "解释一下这个报错", crypto.randomUUID()),
+  client.conversations.send(review.conversation_id, "评审 A 分支的改动", crypto.randomUUID()),
+]);
+// 回执是「已受理」不是「已跑完」（§14）：两轮在后台流式跑，终态从 ② 的事件里拿
+console.log(receipts.map((r) => ({ accepted: r.accepted, completed: r.completed })));
+
+// ④ 枚举续聊：list 默认 100，返回的都是这个宿主里的会话
+for (const view of await client.conversations.list()) {
+  console.log(view.conversation_id, view.name, view.is_processing);
+}
+```
+
+> 忙判定（`conflict`）**按会话**生效：两个会话能同时各跑一轮，同一个会话不能并发跑两轮。真正的**进程级**隔离不是「多开会话」，而是多个 `dataDir`（同一个目录有单实例锁，见 §14）。
+
+> 这段刻意**只用普通会话**：专家与团 Leader 都必须**先装**（否则创建时就是 `agent_not_installed`；团还要求它绑的连接器都可用，否则 `connector_unavailable`），把它们混进来会让例子在没装过的机器上直接失败。三种身份的会话**可以并存**，多会话的机制不变——身份的写法见 §7.3 / §7.4。
+
+### 7.6 Run：发起 → 等待结果 → 处理审批
 
 ```ts
 const run = await client.runs.agent({
@@ -528,10 +575,10 @@ if (client.initializeInfo?.capabilities.skill_files) {   // 宿主可以只接�
 
 ## 10. 工具面控制：`AGENT_STORE_TOOLS`
 
-宿主的工具面来自 `~/.agent-store/config.toml` 的 `[tools]` 表。**自己 spawn 宿主时不必改那份文件**——用环境变量 `AGENT_STORE_TOOLS` 传 JSON，`launchClient` 会把它合并进子进程环境：
+宿主的工具面来自 `~/.agent-store/config.toml` 的 `[tools]` 表。**自己 spawn 宿主时不必改那份文件**——用环境变量 `AGENT_STORE_TOOLS` 传 JSON，`launchHarness` 会把它合并进子进程环境：
 
 ```ts
-const session = await launchClient({
+const harness = await launchHarness({
   client: { name: "basic-only", version: "1.0.0" },
   env: {
     AGENT_STORE_TOOLS: JSON.stringify({
@@ -558,7 +605,7 @@ const session = await launchClient({
 | 优先级 | 环境变量**整份替换**文件里的 `[tools]`，不是合并 |
 | 生效范围 | 只有采纳 `[tools]` 的宿主（`apps/agent-store`）；桌面 / Web 宿主不采纳 |
 | 不可解析 | 打 warning 后回落文件；**空值 = 未设置**（不是「全禁」） |
-| 生效时机 | 宿主启动时读一次；`launchClient` 每次都是新进程，天然生效 |
+| 生效时机 | 宿主启动时读一次；`launchHarness` 每次都是新进程，天然生效 |
 
 > 环境变量一旦存在，文件里的 `[tools]` 就被忽略——包括宿主自己经设置写进去的值。字段与坑的完整口径见仓库 `docs/agent-store/20-tool-injection-policy.zh.md`。
 
@@ -597,7 +644,7 @@ try {
 ## 12. 在 CI / 测试里用
 
 ```ts
-const session = await launchClient({
+const harness = await launchHarness({
   bin: process.env.AGENT_STORE_BIN, // 预构建二进制；省略则按四条途径自动查找
   dataDir: process.env.CI_DATA_DIR, // 自持目录 → 不删除；省略 = 临时目录 + close 时删除
   readyTimeoutMs: 180_000,          // 冷启动建库
@@ -606,11 +653,11 @@ const session = await launchClient({
   onExit: (info) => console.error("runtime exited", info.code, info.signal),
 });
 try {
-  const store = await session.client.listStore();
+  const store = await harness.listStore();
   // 冷启动时目录可能是空的：markets_pending 为 true 表示内置市场仍在后台注册
   if (store.items.length === 0) console.warn("store still warming:", store.markets_pending);
 } finally {
-  await session.close();
+  await harness.close();
 }
 ```
 
@@ -636,7 +683,7 @@ const plain = new AppServerClient({ transport: http, client: { name: "cli", vers
 await plain.connect();
 await plain.listStore();
 
-// 有 22 个方法没有 HTTP 绑定：调用会抛 TransportError；路由表可自查
+// 有 23 个方法没有 HTTP 绑定：调用会抛 TransportError；路由表可自查
 console.log(Object.keys(httpRouteTable()).length);
 ```
 
@@ -648,8 +695,9 @@ console.log(Object.keys(httpRouteTable()).length);
 
 ## 14. 常见坑（实测结论）
 
-- **临时 data-dir**：省略 `dataDir` → 每次 `launchClient` 新建临时目录并在 `close()` 时删除；进程被强杀时目录会残留。
+- **临时 data-dir**：省略 `dataDir` → 每次 `launchHarness` 新建临时目录并在 `close()` 时删除；进程被强杀时目录会残留。
 - **单实例锁**：同一个 data-dir 不能并发跑两个宿主。
+- **`send()` 的回执是「已受理」不是「已跑完」**：`accepted: true` 只代表消息落库，`completed: false` 是常态——这一轮还有活要流式收。终态从 `follow()` 的事件拿，或读 `conversation/get` 的 `is_processing`；§7 那个把多个会话的轮次一起丢进 `Promise.all` 的例子，靠的就是这层异步。
 - **首个 `store/list` 慢**：默认 30s 的请求超时可能不够；返回空目录可能是 `markets_pending: true`（仍在后台注册），**不是错误**。
 - **连接器装完是 disabled**：`store.install` 会先 enable 再探针；用顶层 `installStoreEntry` 则要自己 `enableInstall`。
 - **没有更新动词**：`checkUpdates()` / `updateHint()` → `uninstall_reinstall`。

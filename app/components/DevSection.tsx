@@ -5,19 +5,19 @@ import type { CSSProperties } from "react";
 import { revealDelay } from "../lib/effects";
 import CopyButton from "./CopyButton";
 
-const SDK_SNIPPET = `import { launchClient } from "@flowy-agent-store/sdk";
+const SDK_SNIPPET = `import { launchHarness } from "@flowy-agent-store/sdk";
 
-const session = await launchClient({
+const harness = await launchHarness({
   client: { name: "my-app", version: "0.1.0" },
 });
 
-const items = await session.client.listStore();
-const receipt = await session.client.runs.agent({
+const items = await harness.listStore();
+const receipt = await harness.runs.agent({
   agentId: "frontend-backend-experts",
   goal: "Generate a todo REST API",
 });
 
-await session.close();`;
+await harness.close();`;
 
 const PACKAGES = ["pkgProtocol", "pkgClient", "pkgSdk"] as const;
 

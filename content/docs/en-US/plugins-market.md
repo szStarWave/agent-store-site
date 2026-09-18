@@ -157,28 +157,28 @@ The SDK's connector client is **catalog reads + OAuth pass-through + the call pr
 2. Import and install within the SDK session (the `import` / `install` methods have no sub-client wrapper yet — pass them through `transport.request`):
 
    ```ts
-   import { launchClient } from "@flowy-agent-store/sdk";
+   import { launchHarness } from "@flowy-agent-store/sdk";
 
-   const session = await launchClient({ client: { name: "my-app", version: "0.1.0" } });
+   const harness = await launchHarness({ client: { name: "my-app", version: "0.1.0" } });
 
    // 1. Import: produces an immutable PluginSnapshot (idempotent per digest, reused=true)
-   const snap = await session.client.transport.request("import/run", {
+   const snap = await harness.transport.request("import/run", {
      source_path: "/abs/path/to/my-market", // the market root (holds .codebuddy-connector/)
      source_kind: "workbuddy-connector-market",
    });
 
    // 2. Install: the connector component is registered into the runtime mcp_servers
-   await session.client.transport.request("install/run", { snapshot_id: snap.snapshot_id });
+   await harness.transport.request("install/run", { snapshot_id: snap.snapshot_id });
 
    // 3. Discover the catalog and inject in a run
-   const connectors = await session.client.connectors.list();
-   await session.client.runs.agent({
+   const connectors = await harness.connectors.list();
+   await harness.runs.agent({
      agentId: "<agent-id>",
      goal: "……",
      mentions: [{ kind: "connector", id: connectors[0].id }],
    });
 
-   await session.close();
+   await harness.close();
    ```
 
 3. For standard OAuth, start with the SDK's `connector.authStart(connectorId)` and poll `connector.authStatus` until `authenticated`;

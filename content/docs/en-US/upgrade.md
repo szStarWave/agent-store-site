@@ -115,7 +115,7 @@ If you point `AGENT_STORE_BIN` at a self-built binary, note that the SDK **check
 
 ### 6.2 From 0.1.0 back onto the beta line
 
-`0.1.0` was the first publish and carries no dist-tag; for all three packages its **code and type declarations are byte-identical to `0.1.0-beta.2`**, and the only difference is `package.json` — in particular the sdk at that time had **no** `optionalDependencies`, so it does not bring `@flowy-agent-store/runtime-win32-x64` or the other platform runtime packages, and `launchClient` may fail to find an executable.
+`0.1.0` was the first publish and carries no dist-tag; for all three packages its **code and type declarations are byte-identical to `0.1.0-beta.2`**, and the only difference is `package.json` — in particular the sdk at that time had **no** `optionalDependencies`, so it does not bring `@flowy-agent-store/runtime-win32-x64` or the other platform runtime packages, and `launchHarness` may fail to find an executable.
 
 ```bash
 # move off the untagged 0.1.0 onto the current beta line (current beta: see §3)
@@ -190,7 +190,7 @@ When the three disagree, trust the **lockfile and the installed `package.json`**
 
 ## 8. Published-artifact differences and how to check them
 
-As of `0.1.0-beta.5` (2026-09-17), **there is no unpublished protocol difference between the working tree and the published artifacts**: all six increments from `fp-1` to `fp-7` shipped with this version, listed one by one in §2.1 of the [Changelog](/en-US/docs/changelog); for what `0.1.0-beta.4` changed relative to `0.1.0-beta.3`, see §2.2 of the same page. The commands below are how you check that — fetch the published artifacts of any two versions and read them side by side.
+As of `0.1.0-beta.5` (2026-09-17), **there is no unpublished protocol difference between the working tree and the published artifacts**: all six increments from `fp-1` to `fp-7` shipped with this version, listed one by one in §2.1 of the [Changelog](/en-US/docs/changelog); for what `0.1.0-beta.4` changed relative to `0.1.0-beta.3`, see §2.2 of the same page. The commands below are how you check that — fetch the published artifacts of any two versions and read them side by side. (There is one **unpublished SDK shape change**; it is **not** a protocol difference — see §8.2.)
 
 ### 8.1 Migrating a config's marketplace sources
 
@@ -255,6 +255,25 @@ diff <(grep -o '^export [a-z]* [A-Za-z]*' b4/package/dist/index.d.mts) \
 ```
 
 The same works on the client side: install `@flowy-agent-store/client` into a throwaway directory and count the keys of `httpRouteTable()` — that is the mapped number quoted in §5.3 (`0.1.0-beta.5` reports 48). For the protocol side's "no types added or removed", the `diff` above that counts export names is enough — `0.1.0-beta.4` and `0.1.0-beta.5` are both **141**.
+
+### 8.2 Unpublished SDK entry rename and shape change (`launchClient` → `launchHarness`)
+
+The entry point of `@flowy-agent-store/sdk` was renamed and reshaped, and it has **not shipped with any version yet** — the newest published one, `0.1.0-beta.5`, still uses `launchClient` and `session.client.xxx`:
+
+```ts
+// 0.1.0-beta.5 (published)
+const session = await launchClient({ client: { name: "my-app", version: "1.0.0" } });
+await session.client.conversations.create({ name: "demo" });
+
+// Working tree / next pre-release counter
+const harness = await launchHarness({ client: { name: "my-app", version: "1.0.0" } });
+await harness.conversations.create({ name: "demo" });  // ← one hop fewer
+harness.handshake.protocol_version;                    // ← the non-null handshake response
+```
+
+Three things change together: the function `launchClient` → `launchHarness`, the types `LaunchedClient` → `Harness` (`LaunchOptions` → `HarnessOptions`), and the missing `.client` hop; the variable in the docs is uniformly `harness`.
+
+**Not a protocol difference**: the fingerprint (`fp-7`) is untouched, so the `0.1.0-beta.5` runtime interoperates with this working tree on the wire. This is a **purely TypeScript-side breaking change**, shipping with the next pre-release counter per §3 of the [Changelog](/en-US/docs/changelog); the motivation and the two implementation constraints it hit are in doc `31`.
 
 ## 9. Changelog and release notes boundary
 

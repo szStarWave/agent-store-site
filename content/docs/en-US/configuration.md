@@ -67,12 +67,25 @@ A table keyed by unique provider name. Agent Store reads credentials **from here
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `type` | `string` | no | Provider type (maps to the runtime platform), e.g. `openai`, `anthropic` |
+| `type` | `string` | no | Provider type (maps to the runtime platform), e.g. `openai`, `anthropic`; see "What `type` actually accepts" |
 | `api_key` | `string` | no | API key, written in plain text in the config file |
 | `base_url` | `string` | no | API base URL |
 | `enabled` | `boolean` | no | Enables auto-registration; treated as enabled when omitted |
 
 > Key safety: `api_key` is read only for the encrypted provider registration, then dropped — it never appears in logs or tracing payloads. Consider tightening file permissions yourself (`chmod 600`).
+
+### What `type` actually accepts
+
+**Omitting `type` and writing `type = ""` are exactly equivalent**: both fall through to `custom`, which is the OpenAI Chat Completions-compatible protocol. So only a **limited set of spellings** is recognized here; everything else is treated as OpenAI-compatible. If you copy a config from another tool (Kimi Code, say), the spellings in the last two rows below are silently taken as OpenAI rather than rejected:
+
+| What you write | Protocol actually used | Notes |
+| --- | --- | --- |
+| omitted / `""` / `custom` / `openai` / `kimi` | OpenAI Chat Completions | OpenAI-compatible services such as `kimi`, `mimo`, `deepseek` all land here |
+| `anthropic` | Anthropic Messages | See "Output ceiling" below — this protocol has a hard requirement on `max_output_size` |
+| `openai_responses` | **OpenAI Chat Completions** (not Responses) | For the Responses protocol write `protocol = "openai-responses"` (also accepts `openai.responses`) on the **model**; it is not a provider-level value |
+| `google-genai` / `vertexai` | **OpenAI Chat Completions** (wrong protocol) | The provider types recognized here are `gemini` and `gemini-vertex-ai` |
+
+A per-model protocol override (`protocol` under `[models]`) carries two different strengths: `"openai.responses"` / `"openai-responses"` takes effect on **any** platform (it is the only way in to the Responses protocol), while `"anthropic"` and friends only change protocol selection on a `new-api` platform and are stored without effect elsewhere (recorded verbatim, no error). So "switch the `type` to switch the protocol" holds only for the first two rows above.
 
 ## `models`
 
@@ -84,9 +97,57 @@ A table keyed by `"<provider>/<model>"`. `provider` must point to a key declared
 | `model` | `string` | Model name sent upstream (required) |
 | `display_name` | `string` | Display name in the UI |
 | `max_context_size` | `integer` | Context window limit (tokens) |
-| `max_output_size` | `integer` | Max output per response (tokens) |
-| `capabilities` | `array<string>` | Capability flags, e.g. `["thinking", "tool_use", "image_in"]` |
-| `reasoning_key` | `string` | Field name of the reasoning content in responses, e.g. `reasoning_content` |
+| `max_output_size` | `integer` | Max output per response (tokens). See "Output ceiling" below — **required** for the `anthropic` protocol, and the value actually sent is clamped to a quarter of the context window |
+| `protocol` | `string` | Per-model protocol override, e.g. `"openai-responses"`, `"anthropic"`; strength described at the end of "What `type` actually accepts" |
+| `capabilities` | `array<string>` | Capability flags, e.g. `["thinking", "tool_use", "image_in"]`. **Parsed but not yet in effect** (the key is kept so configs from other tools stay loadable) |
+| `reasoning_key` | `string` | Field name of the reasoning content in responses, e.g. `reasoning_content`. **Parsed but not yet in effect** |
+
+### Output ceiling (`max_output_size`)
+
+This key matters more than it looks: **the `anthropic` protocol must carry `max_tokens` on the wire**, so for that protocol a model without an output ceiling is not "let the provider pick a default" — it is a hard runtime build failure:
+
+```text
+Bad request: the anthropic protocol requires an explicit output ceiling;
+set Max output tokens on the <provider>/<model> model in Settings -> Models
+```
+
+| Protocol | When `max_output_size` is absent | Once you declare it |
+| --- | --- | --- |
+| `anthropic` | **Error**: the runtime build fails with `BAD_REQUEST` and the turn cannot be sent | Sent as `max_tokens` |
+| OpenAI Chat Completions | Omission allowed: the field is left out of the request and upstream decides | Sent as `max_tokens` (as `max_completion_tokens` on some gateways) |
+| OpenAI Responses | Omission allowed: same as above | Sent as `max_output_tokens` |
+
+**Both protocols honour the value you write** — the difference is only whether omitting it is an error. So when you point at an `anthropic`-compatible gateway (many third-party relays expose only `/v1/messages`), you **must** set it; a copied config that says `type = "anthropic"` but only sets `max_context_size` will hit the error above.
+
+### A declared value is not always what goes on the wire
+
+Writing `max_output_size` explicitly does not guarantee that exact number upstream: two mechanisms lower it, and neither reports anything.
+
+**1. A quarter of the context window (local clamp)**
+
+The effective request ceiling is `min(declared, context window / 4)`. With a large window this never bites (a 1M window and a declared 8000 sends 8000); with a small one it changes the number visibly, and **with no log line**:
+
+| Context window | Declared `max_output_size` | Actually sent |
+| --- | --- | --- |
+| 1,000,000 | 8000 | 8000 (1/4 = 250,000, not binding) |
+| 8,000 | 8192 | 2000 |
+
+So the answer to "I set 8192, why did 2000 go out?" lives in `max_context_size`: the model's context window is what caps the ceiling, not your declaration.
+
+**2. Negotiation after an upstream `supported range` rejection (OpenAI Chat Completions only)**
+
+If a gateway rejects the value with wording like `maxOutputTokens value of 128000 but the supported range is from 1 (inclusive) to 65537 (exclusive)`, the client parses the largest accepted value, **lowers the ceiling and resends once** — and then **remembers it per model**: every later request for that model is clamped to it and never retries your configured larger value.
+
+- Down only, never up. Raising `max_output_size` does not reclaim a remembered cap — that memory lives in the process, so only a **restart** tries the configured value again.
+- The wording must match `supported range is from L (inclusive|exclusive) to U (inclusive|exclusive)` exactly; any other rejection is reported as-is rather than guessed at.
+- OpenAI Responses has **no** such negotiation (it only negotiates stale `previous_response_id` values and tool schemas), so a rejection there stays a rejection.
+
+### Two registration behaviours attached to this key
+
+- **Fill-in only, never overwrite**: registration writes the config value only when the model does not already have an output ceiling. A value you later edit by hand in Settings → Models is not rewritten by the config — that same error is what sends you there to set it, so writing back would silently undo your edit.
+- **Existing rows are repaired**: a provider registered by an earlier build can be stuck with a context window but no output ceiling. The next model resolution for that same provider key fills the gap in place, so there is no need to delete and re-register it.
+
+> On the trade-off: when `max_output_size` is absent, **no** default is invented. The deliberate choice is to fail with an error naming the model for `anthropic` rather than guess a ceiling that might truncate long answers. A value `<= 0` is treated as "not declared".
 
 ## `default_marketplaces`
 
@@ -202,7 +263,7 @@ These are exactly the defaults `agent-store init` writes into a fresh config; `p
 
 ### Overriding it with an environment variable (`AGENT_STORE_TOOLS`)
 
-When you spawn the host yourself (the SDK's `launchClient`, for example) you do not have to edit this file: the `AGENT_STORE_TOOLS` environment variable takes a JSON document (the same shape as the `[tools]` table) that **replaces** the file's policy wholesale rather than merging with it.
+When you spawn the host yourself (the SDK's `launchHarness`, for example) you do not have to edit this file: the `AGENT_STORE_TOOLS` environment variable takes a JSON document (the same shape as the `[tools]` table) that **replaces** the file's policy wholesale rather than merging with it.
 
 | Fact | Behaviour |
 | --- | --- |
@@ -371,7 +432,8 @@ These methods travel over the host's own loopback WebSocket only, have no HTTP b
 | Dimension | Agent Store | Kimi Code etc. |
 | --- | --- | --- |
 | Location | `~/.agent-store/config.toml` | `~/.kimi-code/config.toml` etc. (per-tool directories) |
-| `[providers]` / `[models]` | Same shape: `type`/`api_key`/`base_url`, `provider`/`model`/`max_context_size`/`capabilities` | Same shape |
+| `[providers]` / `[models]` | Same shape: `type`/`api_key`/`base_url`, `provider`/`model`/`max_context_size`/`capabilities` | Same shape, but the two recognize a different set of `type` spellings (see "What `type` actually accepts") |
+| `max_output_size` | Honoured by both protocols, but the value sent is ≤ a quarter of the context window; **required for `anthropic`** | Tools infer a default per model, so omitting it usually works; Kimi Code uses the declared value as the cap directly, with no window-ratio clamp |
 | `default_model` | `"<provider>/<model>"` alias | Same |
 | Unknown keys | Tolerated, no error | Tolerated |
 | Env fallback | **None** — credentials come from the file only | Some tools support `env`-subtables / env fallbacks |
@@ -379,3 +441,8 @@ These methods travel over the host's own loopback WebSocket only, have no HTTP b
 | MCP declarations | `~/.agent-store/mcp.json` (sibling of `config.toml`, **user level only**) | `~/.kimi-code/mcp.json` plus a project-level `.kimi-code/mcp.json` (project overrides user) |
 
 If your config already has `[providers]` / `[models]` sections from Kimi Code or another tool, you can **copy them directly** into `~/.agent-store/config.toml` (as long as the provider speaks an OpenAI/Anthropic-compatible protocol); unrelated sections (`thinking`, `permission`, `hooks`, …) can stay or go — Agent Store ignores them.
+
+Two things a straight copy will handle **silently**, so check them first:
+
+- **A different set of `type` spellings.** `google-genai` / `vertexai` / `openai_responses`, all valid in other tools, are not recognized here and degrade to the OpenAI-compatible protocol (wrong protocol, but no config error). See "What `type` actually accepts".
+- **`anthropic` needs an explicit output ceiling.** Other tools infer a default `max_tokens` per model, so omitting `max_output_size` usually runs there; Agent Store does not guess, and fails to build without it. See "Output ceiling".

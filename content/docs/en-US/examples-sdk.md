@@ -2,7 +2,7 @@
 
 This page is the example companion to the [TypeScript SDK reference](/en-US/docs/typescript-sdk): types, the per-method table and the runtime contract live there, while everything here is code you can copy and run.
 
-> How the three packages split: `@flowy-agent-store/protocol` is types and the error model only; `@flowy-agent-store/client` is the transport-agnostic `AppServerClient` plus its sub-clients; `@flowy-agent-store/sdk` adds `launchClient` (spawn the binary, connect over loopback, handshake). **Live events and subscriptions only work over `WebSocketTransport`**; pure request-response can use `HttpTransport`.
+> How the three packages split: `@flowy-agent-store/protocol` is types and the error model only; `@flowy-agent-store/client` is the transport-agnostic `AppServerClient` plus its sub-clients; `@flowy-agent-store/sdk` adds `launchHarness` (spawn the binary, connect over loopback, handshake). **Live events and subscriptions only work over `WebSocketTransport`**; pure request-response can use `HttpTransport`.
 
 ## 1. Which package for which job
 
@@ -27,16 +27,16 @@ export AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store
 The smallest useful call — spawn, loopback connect and handshake all happen inside it:
 
 ```ts
-import { launchClient } from "@flowy-agent-store/sdk";
+import { launchHarness } from "@flowy-agent-store/sdk";
 
-const session = await launchClient({
+const harness = await launchHarness({
   client: { name: "my-app", version: "0.1.0" },
 });
-const store = await session.client.listStore();
-await session.close();
+const store = await harness.listStore();
+await harness.close();
 ```
 
-What `launchClient` does:
+What `launchHarness` does:
 
 1. Locates the `flowy-agent-store` binary via `bin` → `AGENT_STORE_BIN` → the platform runtime package's `vendor/` → `PATH`;
 2. Spawns it with `--host 127.0.0.1 --port 0 --no-open` and an auto-created temp `--data-dir`;
@@ -49,49 +49,49 @@ What `launchClient` does:
 ### 3.1 Install an expert → run it once → read the result
 
 ```ts
-import { launchClient } from "@flowy-agent-store/sdk";
+import { launchHarness } from "@flowy-agent-store/sdk";
 
-const session = await launchClient({ client: { name: "demo", version: "1.0.0" } });
+const harness = await launchHarness({ client: { name: "demo", version: "1.0.0" } });
 try {
   // Catalog (Store)
-  const items = await session.client.listStore();
+  const items = await harness.listStore();
   console.log(`${items.items.length} items in the store`);
 
   // Install and run an agent
-  await session.client.installStoreEntry("experts", "frontend-backend-experts");
-  const receipt = await session.client.runs.agent({
+  await harness.installStoreEntry("experts", "frontend-backend-experts");
+  const receipt = await harness.runs.agent({
     agentId: "frontend-backend-experts",
     goal: "Generate a todo REST API",
   });
-  const result = await session.client.runs.result(receipt.run_id);
+  const result = await harness.runs.result(receipt.run_id);
   console.log(result.status);
 } finally {
-  await session.close(); // terminate child + remove temp data-dir
+  await harness.close(); // terminate child + remove temp data-dir
 }
 ```
 
 ### 3.2 Sessions + live events
 
 ```ts
-import { launchClient } from "@flowy-agent-store/sdk";
+import { launchHarness } from "@flowy-agent-store/sdk";
 
-const launched = await launchClient({ client: { name: "my-tool", version: "1.0.0" } });
+const harness = await launchHarness({ client: { name: "my-tool", version: "1.0.0" } });
 try {
-  const conversation = await launched.client.conversations.create({ name: "demo" });
-  const subscription = await launched.client.conversations.follow(conversation.conversation_id);
+  const conversation = await harness.conversations.create({ name: "demo" });
+  const subscription = await harness.conversations.follow(conversation.conversation_id);
   subscription.onEvent((event) => console.log(event.event_type));
-  await launched.client.conversations.send(conversation.conversation_id, "hello", crypto.randomUUID());
+  await harness.conversations.send(conversation.conversation_id, "hello", crypto.randomUUID());
 } finally {
-  await launched.close(); // terminate the child process + remove the temp data-dir
+  await harness.close(); // terminate the child process + remove the temp data-dir
 }
 ```
 
 ### 3.3 A fixed binary plus your own data-dir (CI / parallel instances / a reusable store)
 
 ```ts
-import { launchClient } from "@flowy-agent-store/sdk";
+import { launchHarness } from "@flowy-agent-store/sdk";
 
-const session = await launchClient({
+const harness = await launchHarness({
   bin: "/opt/flowy-agent-store/flowy-agent-store", // omitted ⇒ §2's four routes are searched
   dataDir: "/var/lib/my-app/agent-store",          // you own it ⇒ never deleted; the store survives across calls
   readyTimeoutMs: 180_000,                         // cold start builds the database
@@ -101,10 +101,10 @@ const session = await launchClient({
   onExit: (info) => console.error("runtime exited", info.code, info.signal),
 });
 try {
-  const store = await session.client.listStore();
+  const store = await harness.listStore();
   console.log(store.items.length, store.markets_pending);
 } finally {
-  await session.close(); // your own directory is left in place
+  await harness.close(); // your own directory is left in place
 }
 ```
 
@@ -113,24 +113,24 @@ try {
 ### 3.4 A host behind a token, plus capabilities
 
 ```ts
-const session = await launchClient({
+const harness = await launchHarness({
   client: { name: "internal-ui", version: "2.0.0" },
   // required when the host runs with --auth; optional in local mode (server.readiness.auth === "disabled-local")
   token: process.env.AGENT_STORE_TOKEN ?? "",
   // declare what you will consume: events / approvals / team_runtime / artifacts
   capabilities: { events: true, approvals: true, team_runtime: true, artifacts: false },
 });
-console.log(session.server.readiness.url, session.initializeResult.protocol_version);
+console.log(harness.server.readiness.url, harness.handshake.protocol_version);
 ```
 
 ### 3.5 Catching a failed launch
 
 ```ts
-import { launchClient } from "@flowy-agent-store/sdk";
+import { launchHarness } from "@flowy-agent-store/sdk";
 
 try {
-  const session = await launchClient({ client: { name: "my-app", version: "1.0.0" } });
-  // … use session.client normally
+  const harness = await launchHarness({ client: { name: "my-app", version: "1.0.0" } });
+  // … use harness normally (the business surface hangs off the returned object)
 } catch (error) {
   // All three launch failures surface here, and the message is actionable:
   // 1) binary not found      → "cannot find the flowy-agent-store runtime binary: …" (names all four routes)
@@ -140,7 +140,7 @@ try {
 }
 ```
 
-The SDK cleans up after itself on every failure path: `child.kill()`, a 2-second grace period, then `SIGKILL`, plus removal of an auto-created data-dir; the child's last 50 stderr lines are attached to the error. A crash **after** readiness does not take that path — observe it through `session.server.exited` / `onExit`, and note the SDK never restarts the child.
+The SDK cleans up after itself on every failure path: `child.kill()`, a 2-second grace period, then `SIGKILL`, plus removal of an auto-created data-dir; the child's last 50 stderr lines are attached to the error. A crash **after** readiness does not take that path — observe it through `harness.server.exited` / `onExit`, and note the SDK never restarts the child.
 
 ### 3.6 Process only, no client: `spawnAppServer`
 
@@ -162,7 +162,7 @@ try {
 }
 ```
 
-> These recipes all go through `launchClient` / `spawnAppServer`: without `dataDir` a temporary directory is created and removed on `close()`; to reuse one store across calls (conversations and installed components survive), pass `dataDir` explicitly — see §12.
+> These recipes all go through `launchHarness` / `spawnAppServer`: without `dataDir` a temporary directory is created and removed on `close()`; to reuse one store across calls (conversations and installed components survive), pass `dataDir` explicitly — see §12.
 
 ## 4. Browser: connect to an already-running server
 
@@ -323,7 +323,7 @@ Facts verified against the runtime:
 
 ## 7. Sessions and Runs
 
-**Session: create → send → receive in real time**
+### 7.1 Session: create → send → receive in real time
 
 ```ts
 import { decodeConversationEvent } from "@flowy-agent-store/protocol";
@@ -344,7 +344,9 @@ const receipt = await client.conversations.send(
 );
 ```
 
-**Mount a Skill for one turn** (`fp-3`): the Skill applies to that turn only; the conversation's create-time snapshot is untouched.
+### 7.2 Mount a Skill for one turn (`fp-3`)
+
+The Skill applies to that turn only; the conversation's create-time snapshot is untouched.
 
 ```ts
 const skills = await client.skills.list();
@@ -359,7 +361,9 @@ await client.conversations.send(conv.conversation_id, "ship it following this Sk
 
 > `mentions` honours `skill` only: experts and connectors have no carrier on `conversation/send` (an expert is the conversation's identity, a connector is a host-level switch), so sending them answers `invalid_request` — they are **not** silently ignored.
 
-**Open a conversation as an expert** (`fp-4`): an expert's identity is decided at **creation** and cannot be rewritten afterwards.
+### 7.3 Open a conversation as an expert (`fp-4`)
+
+An expert's identity is decided at **creation** and cannot be rewritten afterwards.
 
 ```ts
 const experts = await client.agents.list();
@@ -375,7 +379,9 @@ await client.conversations.send(expertChat.conversation_id, "start with the modu
 
 > Switching experts means **creating another conversation** — `conversation/update` refuses preset / Skill / connector keys. That is deliberate: the conversation's preset snapshot is frozen, otherwise two consecutive turns of one conversation would be two different people.
 
-**Open a team's Leader conversation** (`fp-5`): the same orchestration `team/run` runs, minus the first turn it would otherwise send for you.
+### 7.4 Open a team's Leader conversation (`fp-5`)
+
+The same orchestration `team/run` runs, minus the first turn it would otherwise send for you.
 
 ```ts
 const teams = await client.teams.list();
@@ -385,9 +391,55 @@ const leader = await client.conversations.create({ teamId: teams[0].id });
 await client.conversations.send(leader.conversation_id, "break this release into a plan", crypto.randomUUID());
 ```
 
-> To hand over a goal and get a `run_id` back, keep using `client.runs.team({ teamId, goal })`; `create({ teamId })` is the **continuable** Leader conversation. `teamId` and `agentId` are mutually exclusive.
+> To hand over a goal and get a `run_id` back, keep using `client.runs.team({ teamId, goal })`; `create({ teamId })` is the **continuable** Leader conversation. `teamId` and `agentId` are mutually exclusive. **Do not pass `name` together with `teamId`** — the server names the Leader "<team> (leader)", so yours has no effect.
 
-**Run: start → await result → handle approval**
+### 7.5 Several conversations in one host
+
+`create()` has no cap: **any number of conversations can coexist inside one host (one `dataDir`)** — a single `launchHarness` from §3 is enough, and you neither need nor can start a second host per conversation. The snippet below reuses the `client` from above (the same host) and does four things:
+
+1. **Side by side**: three plain conversations at once, each with its own `conversation_id`;
+2. **One connection for all**: a single WS connection `follow()`s all three, with events routed by `conversation_id`;
+3. **Concurrent turns**: two conversations each run a turn at the same time, without blocking each other;
+4. **Enumerate and continue**: `conversations.list()` returns every conversation in this host.
+
+```ts
+// ① Side by side: three plain conversations (for an expert / team Leader, pass agentId /
+//    teamId to create — see §7.3 / §7.4)
+const explain = await client.conversations.create({ name: "explain the error" });
+const review = await client.conversations.create({ name: "review branch A" });
+const notes = await client.conversations.create({ name: "write the release notes" });
+const chats = [explain, review, notes];
+
+// ② One WS connection follows all of them: the server keeps a per-connection subscription
+//    set, so events are routed by conversation_id
+for (const view of chats) {
+  const sub = await client.conversations.follow(view.conversation_id);
+  // Routing is exactly this line: the closure remembers which conversation it is, so
+  // three conversations on one socket never cross wires
+  sub.onEvent((event) => render(view.conversation_id, event));
+}
+
+// ③ Concurrent turns: two conversations each run a turn at the same time
+//    (the busy check is per conversation; there is no host-wide concurrency gate)
+const receipts = await Promise.all([
+  client.conversations.send(explain.conversation_id, "explain this error", crypto.randomUUID()),
+  client.conversations.send(review.conversation_id, "review branch A's changes", crypto.randomUUID()),
+]);
+// The receipt means accepted, not finished (§14): both turns stream in the background,
+// so the terminal state comes from the events in ②
+console.log(receipts.map((r) => ({ accepted: r.accepted, completed: r.completed })));
+
+// ④ Enumerate and continue: list defaults to 100, all of it this host's conversations
+for (const view of await client.conversations.list()) {
+  console.log(view.conversation_id, view.name, view.is_processing);
+}
+```
+
+> The busy check (`conflict`) is **per conversation**: two conversations can each run a turn at once, while one conversation cannot run two. Real **process-level** isolation is not "more conversations" but several `dataDir`s (one directory holds a single-instance lock — see §14).
+
+> This snippet deliberately uses **plain conversations only**: an expert and a team Leader both have to be **installed first** (otherwise creation fails with `agent_not_installed`, and a team additionally needs every Connector it binds to be available or you get `connector_unavailable`), which would make the example break on a machine that has not installed them. Conversations of all three identities **can coexist**; the multi-conversation mechanics do not change — the identity forms are in §7.3 / §7.4.
+
+### 7.6 Run: start → await result → handle approval
 
 ```ts
 const run = await client.runs.agent({
@@ -531,10 +583,10 @@ if (client.initializeInfo?.capabilities.skill_files) {   // a host may wire the 
 
 ## 10. Controlling the tool surface: `AGENT_STORE_TOOLS`
 
-A host's tool surface comes from the `[tools]` table of `~/.agent-store/config.toml`. When you **spawn the host yourself** you do not have to edit that file — pass the `AGENT_STORE_TOOLS` environment variable as JSON and `launchClient` merges it into the child environment:
+A host's tool surface comes from the `[tools]` table of `~/.agent-store/config.toml`. When you **spawn the host yourself** you do not have to edit that file — pass the `AGENT_STORE_TOOLS` environment variable as JSON and `launchHarness` merges it into the child environment:
 
 ```ts
-const session = await launchClient({
+const harness = await launchHarness({
   client: { name: "basic-only", version: "1.0.0" },
   env: {
     AGENT_STORE_TOOLS: JSON.stringify({
@@ -561,7 +613,7 @@ const session = await launchClient({
 | Precedence | The environment variable **replaces** the file's `[tools]` wholesale, it does not merge |
 | Scope | Only hosts that adopt `[tools]` (`apps/agent-store`); the desktop and web hosts do not |
 | Unparseable | Warns and falls back to the file; **an empty value means "unset"** (not "deny everything") |
-| When it applies | Read once at host startup; `launchClient` always spawns a fresh process, so it always applies |
+| When it applies | Read once at host startup; `launchHarness` always spawns a fresh process, so it always applies |
 
 > While the variable is set, the file's `[tools]` is ignored — including values the host itself wrote from its settings UI. For the full field list and the traps, see `docs/agent-store/20-tool-injection-policy.zh.md` in the repository.
 
@@ -600,7 +652,7 @@ Write operations carrying an `idempotency_key` / `command_id` can be safely repl
 ## 12. Using it in CI and tests
 
 ```ts
-const session = await launchClient({
+const harness = await launchHarness({
   bin: process.env.AGENT_STORE_BIN, // a prebuilt binary; omit to search the four routes
   dataDir: process.env.CI_DATA_DIR, // your own dir → never removed; omit for a temp dir that close() removes
   readyTimeoutMs: 180_000,          // cold start creates the database
@@ -609,11 +661,11 @@ const session = await launchClient({
   onExit: (info) => console.error("runtime exited", info.code, info.signal),
 });
 try {
-  const store = await session.client.listStore();
+  const store = await harness.listStore();
   // A cold store may be empty: markets_pending === true means the builtin markets are still registering
   if (store.items.length === 0) console.warn("store still warming:", store.markets_pending);
 } finally {
-  await session.close();
+  await harness.close();
 }
 ```
 
@@ -639,7 +691,7 @@ const plain = new AppServerClient({ transport: http, client: { name: "cli", vers
 await plain.connect();
 await plain.listStore();
 
-// 22 methods have no HTTP binding: calling one throws TransportError; the route table is the source of truth
+// 23 methods have no HTTP binding: calling one throws TransportError; the route table is the source of truth
 console.log(Object.keys(httpRouteTable()).length);
 ```
 
@@ -651,8 +703,9 @@ console.log(Object.keys(httpRouteTable()).length);
 
 ## 14. Traps (verified against the runtime)
 
-- **Temporary data-dir**: without `dataDir`, every `launchClient` creates a temp directory and `close()` removes it; a hard-killed process leaves the directory behind.
+- **Temporary data-dir**: without `dataDir`, every `launchHarness` creates a temp directory and `close()` removes it; a hard-killed process leaves the directory behind.
 - **Single-instance lock**: one data-dir cannot host two runtimes at once.
+- **A `send()` receipt means accepted, not finished**: `accepted: true` only says the message is on disk, and `completed: false` is the normal case — that turn still has work to stream. Take the terminal state from `follow()` events, or read `is_processing` from `conversation/get`; the §7 example that throws several conversations' turns into one `Promise.all` leans on exactly that asynchrony.
 - **The first `store/list` is slow**: the default 30s request timeout may not be enough, and an empty catalogue can mean `markets_pending: true` (still registering) — **not an error**.
 - **A freshly installed connector is disabled**: `store.install` enables it and probes; the flat `installStoreEntry` leaves that to you (`enableInstall`).
 - **No update verb**: `checkUpdates()` / `updateHint()` → `uninstall_reinstall`.
