@@ -28,8 +28,8 @@ bun add @flowy-agent-store/protocol
 
 包均发布为 ESM + CJS 双格式（`exports` 提供 `import` / `require` / `types`），Node 与打包器开箱即用。
 
-> **版本状态**：三个包当前均为 `0.1.0-beta.*` 预发布（API 尚未冻结，beta 期间**不承诺向后兼容**）。生产接入请固定**确切版本**——本文与仓库当前对应 `0.1.0-beta.6`（`beta` tag）。注意不要依赖裸 `bun add`：注册表 `latest` 当前指向 `0.1.0-beta.2`，**不是**最新的 `0.1.0-beta.6`。dist-tag 语义、逐版本升级步骤与自查命令见[升级与迁移指引](/zh-CN/docs/upgrade)。
-> **协议面口径**：§2 的 `APP_SERVER_PROTOCOL_VERSION` 示例与 §5.3 的方法计数（`48 / 73`）取自**仓库工作区**，而工作区当前**与已发布产物一致**（自 `0.1.0-beta.5` 起；此前几版工作区曾领先于产物，那批差异随本版发布，登记在[升级与迁移指引](/zh-CN/docs/upgrade) §8，自查命令也在那一节）。指纹按**严格相等**校验（按旧值编出来的客户端连不上新运行时），所以自己拉二进制或改协议时，请以 §2 常量为准，不要从本文正文里抄值。
+> **版本状态**：三个包当前均为 `0.1.0-beta.*` 预发布（API 尚未冻结，beta 期间**不承诺向后兼容**）。生产接入请固定**确切版本**——本文与仓库当前对应 `0.1.0-beta.7`（`beta` tag）。注意不要依赖裸 `bun add`：注册表 `latest` 当前指向 `0.1.0-beta.2`，**不是**最新的 `0.1.0-beta.7`。dist-tag 语义、逐版本升级步骤与自查命令见[升级与迁移指引](/zh-CN/docs/upgrade)。
+> **协议面口径**：§2 的 `APP_SERVER_PROTOCOL_VERSION` 示例与 §5.3 的方法计数（`48 / 73`）取自**仓库工作区**，而工作区当前**与已发布产物一致**（自 `0.1.0-beta.7` 起；此前几版工作区曾领先于产物，那批差异已随本版发布，登记在[升级与迁移指引](/zh-CN/docs/upgrade) §8，自查命令也在那一节）。指纹按**严格相等**校验（按旧值编出来的客户端连不上新运行时），所以自己拉二进制或改协议时，请以 §2 常量为准，不要从本文正文里抄值。
 > **运行环境**：Node.js **≥ 22**（依赖全局 `WebSocket`）或 Bun；版本下限由各包 `engines.node` 声明。
 
 ---
@@ -172,6 +172,7 @@ await client.connect(); // initialize 握手 + 版本校验
 ```ts
 client.agents.list(): Promise<AgentSummary[]>;
 client.agents.get(agentId: string): Promise<AgentDetail>;
+client.agents.export(agentId: string): Promise<ExpertPack>;
 ```
 
 #### `teams` — AgentTeamDefinition 目录
@@ -179,6 +180,7 @@ client.agents.get(agentId: string): Promise<AgentDetail>;
 ```ts
 client.teams.list(): Promise<TeamSummary[]>;
 client.teams.get(teamId: string): Promise<TeamDetail>;
+client.teams.export(teamId: string, teamVersion?: string): Promise<ExpertPack>;
 ```
 
 #### `skills` — Skill 目录 / 文件树
@@ -403,7 +405,7 @@ interface Harness extends AppServerClient {
 | `server.exited` | 永不 reject 的 `Promise<{ code, signal }>` | 观察崩溃与退出（契约见 §4.4） |
 | `close()` | 退订 → 关传输 → 终止子进程 → 删除自动创建的 data-dir | 在 `finally` 中调用；可重复调用 |
 
-> **破坏性变更（相对已发布的 `0.1.0-beta.5`）**：入口改名为 `launchHarness`（类型 `LaunchedClient` → `Harness`，`LaunchOptions` → `HarnessOptions`），返回值不再有 `.client` 一跳，`initializeResult` 改叫 `handshake`。也就是 `const session = await launchClient({…})` + `session.client.conversations.create(…)` 变成 `const harness = await launchHarness({…})` + `harness.conversations.create(…)`。逐项迁移见[升级与迁移指引](/zh-CN/docs/upgrade) §8.2。
+> **破坏性变更（相对已发布的 `0.1.0-beta.5`）**：入口改名为 `launchHarness`（类型 `LaunchedClient` → `Harness`，`LaunchOptions` → `HarnessOptions`），返回值不再有 `.client` 一跳，`initializeResult` 改叫 `handshake`。也就是 `const session = await launchClient({…})` + `session.client.conversations.create(…)` 变成 `const harness = await launchHarness({…})` + `harness.conversations.create(…)`。逐项迁移见[升级与迁移指引](/zh-CN/docs/upgrade) §6.5。
 
 **它不做什么**：不配置模型与供应商（那是 `config.toml` 与宿主设置面的事）；不下载二进制；不给 `dataDir` 就不持久化（一次性沙箱）；不自动重启子进程，也不注册进程退出钩子。
 
@@ -507,8 +509,8 @@ try {
 
 | 子客户端 | 方法 | 协议方法 |
 | --- | --- | --- |
-| `agents` | `list()` / `get(agentId)` | `agent/list` / `agent/get` |
-| `teams` | `list()` / `get(teamId)` | `team/list` / `team/get` |
+| `agents` | `list()` / `get(agentId)` / `export(agentId)` | `agent/list` / `agent/get` / `agent/export` |
+| `teams` | `list()` / `get(teamId)` / `export(teamId, teamVersion?)` | `team/list` / `team/get` / `team/export` |
 | `skills` | `list()` / `get(skillId)` / `files(skillId)` / `readFile(skillId, path)` / `readFileWithType(skillId, path)` | `skill/list` / `skill/get` / `skill/files` / `skill/file` |
 | `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `logout(id)` / `call(id, tool, args?)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` · `call` |
 | `store` | `list()` / `search(query, filter?)` / `installed()` / `checkUpdates()` / `updateHint(item)` / `install(item, opts?)` / `setEnabled(item, enabled, opts?)` / `uninstall(item, opts?)` | 组合方法，无独立 wire 方法：`store/list` · `store/install-entry` · `install/run` · `install/status` · `install/disable` · `install/enable` · `install/uninstall` |

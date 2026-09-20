@@ -29,7 +29,10 @@
 | `0.1.0-beta.3` | 2026-09-10T04:44:34Z | — | 为 client / sdk 新增公开声明（重连生命周期、退出观测，见 §6.1）；`package.json` 补 `engines.node >= 22`、`repository`、`sideEffects`；protocol 声明逐字节未变 |
 | `0.1.0-beta.5` | 2026-09-17T11:41:10Z | — | **破坏性**：协议指纹从 `fp-1` 跳到 `fp-7`（旧客户端连不上新运行时）；其余为加法项——连接器工具的 `input_schema` / `tools_truncated`、按轮挂载技能（`mentions` 只认 `kind: "skill"`）、`agent_id` / `team_id`、`model` / `reasoning_effort`，以及市场源新增 `zip` 类型。方法面无增删，仍是 `48 / 71`（升级步骤见 §6.4） |
 | `0.1.0-beta.4` | 2026-09-16T10:24:02Z | — | **破坏性**：协议指纹改为严格相等的 `fp-1`（旧客户端连不上新运行时）、`event_type` 收窄为封闭联合 `ConversationEventType`；同时带上技能文件树读面、`connector/call` 调用代理与 `conversation/list-changed` 等加法项，客户端映射到 HTTP 的方法数现为 `48 / 71`（升级步骤见 §6.3） |
-| `0.1.0-beta.6` | 2026-09-18T11:08:21Z | `beta` | **破坏性**：`@flowy-agent-store/sdk` 入口**改名并改了形状**（`launchClient` → `launchHarness`、返回值不再有 `.client` 一跳、`initializeResult` → `handshake`），**必须改代码**；wire 面未动——指纹仍 `fp-7`、方法仍 `48 / 71`（升级步骤见 §6.5） |
+| `0.1.0-beta.7` | 2026-09-20T10:33:48Z | `beta` | **破坏性**：协议指纹改为严格相等的 `fp-8`（旧客户端连不上本版运行时）——新增两个 WebSocket-only 方法 `agent/export` / `team/export`，返回可移植的 `ExpertPack`；方法计数 `48 / 71` → `48 / 73`，映射数不变。**没有类型收窄或改名**，所以代码通常无需改动（升级步骤见 §6.6） |
+| `0.1.0-beta.6` | 2026-09-18T11:08:21Z | — | **破坏性**：`@flowy-agent-store/sdk` 入口**改名并改了形状**（`launchClient` → `launchHarness`、返回值不再有 `.client` 一跳、`initializeResult` → `handshake`），**必须改代码**；wire 面未动——指纹仍 `fp-7`、方法仍 `48 / 71`（升级步骤见 §6.5） |
+| `0.1.0-beta.5` | 2026-09-17T11:41:10Z | — | **破坏性**：协议指纹从 `fp-1` 跳到 `fp-7`（旧客户端连不上新运行时）；其余为加法项——连接器工具的 `input_schema` / `tools_truncated`、按轮挂载技能（`mentions` 只认 `kind: "skill"`）、`agent_id` / `team_id`、`model` / `reasoning_effort`，以及市场源新增 `zip` 类型。方法面无增删，仍是 `48 / 71`（升级步骤见 §6.4） |
+| `0.1.0-beta.4` | 2026-09-16T10:24:02Z | — | **破坏性**：协议指纹改为严格相等的 `fp-1`（旧客户端连不上新运行时）、`event_type` 收窄为封闭联合 `ConversationEventType`；同时带上技能文件树读面、`connector/call` 调用代理与 `conversation/list-changed` 等加法项，客户端映射到 HTTP 的方法数现为 `48 / 71`（升级步骤见 §6.3） |
 
 注意 `0.1.0` 是**时间最早**的一次发布（比 beta.2 早约 18 分钟），却没有任何 dist-tag 指向它；它既不是稳定版，也不比 beta 线新。
 
@@ -40,7 +43,7 @@
 | dist-tag | 当前指向 |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.6` |
+| `beta` | `0.1.0-beta.7` |
 
 `0.1.0` 不带任何 tag。三个包与 `@flowy-agent-store/runtime-*` 两个 tag 的指向一致（已实测）。
 
@@ -50,14 +53,14 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.6", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.7", "latest": "0.1.0-beta.2" }
 }
 ```
 
 两个陷阱：
 
-1. `latest` **不是**最新版——它指向 `0.1.0-beta.2`；最新的 beta 是 `beta` tag 指向的 `0.1.0-beta.6`。
+1. `latest` **不是**最新版——它指向 `0.1.0-beta.2`；最新的 beta 是 `beta` tag 指向的 `0.1.0-beta.7`。
 2. `0.1.0` 虽然没有 tag，但版本范围仍可能解析到它（见 §4）。
 
 另外，`versions` 数组的**排列顺序不是时间顺序**：`0.1.0` 排在最后，却是最早发布的。
@@ -70,7 +73,7 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```bash
 bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2（latest）
-bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.6
+bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.7
 bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → bun 解析到 0.1.0-beta.2
 npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → npm 解析到 0.1.0（那个无 tag 的早期发布）
 ```
@@ -81,14 +84,14 @@ npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → npm 解析到 0.
 
 ```bash
 # 明确写出确切版本；不要用 ^ 或 ~
-bun add @flowy-agent-store/sdk@0.1.0-beta.6
-bun add @flowy-agent-store/protocol@0.1.0-beta.6   # 需要协议类型时
+bun add @flowy-agent-store/sdk@0.1.0-beta.7
+bun add @flowy-agent-store/protocol@0.1.0-beta.7   # 需要协议类型时
 
 # npm / pnpm 同理
-npm install @flowy-agent-store/sdk@0.1.0-beta.6
+npm install @flowy-agent-store/sdk@0.1.0-beta.7
 ```
 
-`package.json` 里应当落到 `"@flowy-agent-store/sdk": "0.1.0-beta.6"`（**不带** `^`）。sdk 的平台运行时包由它的 `optionalDependencies` 按同一版本号钉住，不需要单独声明。
+`package.json` 里应当落到 `"@flowy-agent-store/sdk": "0.1.0-beta.7"`（**不带** `^`）。sdk 的平台运行时包由它的 `optionalDependencies` 按同一版本号钉住，不需要单独声明。
 
 锁文件也要提交进版本库：`bun.lock` / `package-lock.json` / `pnpm-lock.yaml` 是「这次到底装了什么」的唯一权威记录。
 
@@ -120,11 +123,11 @@ bun run typecheck && bun run test
 
 ```bash
 # 从无 tag 的 0.1.0 切到当前 beta 线（当前 beta 见 §3）
-bun add @flowy-agent-store/sdk@0.1.0-beta.6
+bun add @flowy-agent-store/sdk@0.1.0-beta.7
 bun pm ls | grep '@flowy-agent-store'   # 确认 0.1.0 已经不在了
 ```
 
-`0.1.0` 升到 `beta.3` 是纯加法：公开声明面只增不减（`beta.2` 补的运行时包、`beta.3` 补的重连与退出观测），没有删除或改名；**再往上的 `beta.4` 不是纯加法**——它带类型收窄与严格相等的协议指纹，见 §6.3；**`beta.5` 也不是纯加法**（指纹再次严格相等），但**不需要改代码**，见 §6.4；**`beta.6` 也不是纯加法**——SDK 入口改名且形状变了，是**必须改代码**的一版，见 §6.5。
+`0.1.0` 升到 `beta.3` 是纯加法：公开声明面只增不减（`beta.2` 补的运行时包、`beta.3` 补的重连与退出观测），没有删除或改名；**再往上的 `beta.4` 不是纯加法**——它带类型收窄与严格相等的协议指纹，见 §6.3；**`beta.5` 也不是纯加法**（指纹再次严格相等），但**不需要改代码**，见 §6.4；**`beta.6` 也不是纯加法**——SDK 入口改名且形状变了，是**必须改代码**的一版，见 §6.5；**`beta.7` 也不是纯加法**（指纹 `fp-7` → `fp-8`），但**不需要改代码**，见 §6.6。
 
 ### 6.3 从 0.1.0-beta.3 升到 0.1.0-beta.4
 
@@ -212,6 +215,38 @@ harness.handshake.protocol_version;
 
 **不需要改的**：wire 面。指纹仍是 `fp-7`、方法计数仍是 `48 / 71`，所以 `0.1.0-beta.5` 的运行时与本版 SDK 可以混用（改名本身跨版本类型不兼容）。`client` 选项（自报身份）与直传 `transport.request(...)` 的用法都不变。
 
+### 6.6 从 0.1.0-beta.6 升到 0.1.0-beta.7
+
+**必须升级，但不需要改代码**：指纹从 `fp-7` 跳到 `fp-8`，握手与 SDK 按**严格相等**校验——`beta.6` 及更早版本的客户端**连不上**本版运行时，必须一并升级。除此之外，本版**只新增方法、没有类型收窄或改名**，SDK 入口仍是 `launchHarness`，所以调用方代码通常一行都不用动。
+
+```bash
+# 1) 先看当前实际装的是什么
+bun pm ls | grep '@flowy-agent-store'          # npm 项目：npm ls @flowy-agent-store/sdk
+# 2) 固定到 0.1.0-beta.7（需要几个包就升几个，版本号保持一致）
+bun add @flowy-agent-store/sdk@0.1.0-beta.7
+bun add @flowy-agent-store/protocol@0.1.0-beta.7
+# 3) 确认解析结果
+node -p "require('@flowy-agent-store/sdk/package.json').version"
+# 4) 重跑类型检查与测试——应当是零改动通过
+bun run typecheck
+```
+
+**要确认的两件事**：
+
+```ts
+// 指纹变了：手写断言过旧值的代码要放宽或改掉
+harness.handshake.protocol_version;   // 现在是 "fp-8"，beta.6 的运行时是 "fp-7"
+
+// 新增能力（可选）：把专家 / 专家团导出给外部 runtime
+const pack = await harness.agents.export(agentId);
+const team = await harness.teams.export(teamId);          // 团的定义，逐成员展开
+```
+
+1. **如果你断言过指纹的具体值**（例如拿 `handshake.protocol_version === "fp-7"` 当判据），它现在会**失败**——请改为与 `APP_SERVER_PROTOCOL_VERSION` 常量比较，或干脆不写死值。正常经 SDK 连接不受影响：SDK 自己会用新常量去校验，旧运行时会被直接拒绝。
+2. **`AGENT_STORE_BIN` 注入自建二进制的**：SDK 与二进制必须**同批**升级，否则握手直接失败。
+
+**顺带说明（不影响 SDK 用法）**：`~/.agent-store/config.toml` 的 `[memory]` 表新增 `enabled`（内置记忆总开关，默认**开**，不写即沿用上游默认，所以升级后行为不变），见[配置文件](/zh-CN/docs/configuration)的 `memory` 一节；`[models.*]` 的 `max_output_size` / `protocol` 此前**声明了却没有消费者**（会导致 anthropic / bedrock / vertex 协议的运行时以 `BAD_REQUEST` 失败），本版补齐了这条接线，并且**只填空、不覆盖**。这两项都**不进指纹**，只影响宿主读配置的行为——所以只升级 npm 包、不换运行时的，看不到它们。
+
 ## 7. 自查当前安装的版本
 
 ```bash
@@ -229,9 +264,14 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. 已发布产物的差异与自查方法
 
-截至 `0.1.0-beta.6`（2026-09-18），**工作区领先于已发布产物**：`beta.6` 之后工作区又积累了一项**零 wire 变更**的宿主配置增量——`~/.agent-store/config.toml` 的 `[memory]` 表新增 `enabled`（内置记忆系统总开关，`false` 时四面同停：提示词记忆段落 / `remember` 工具 / 轮后蒸馏 / 引用回写），与既有的 `distill_enabled` **独立**。它**不改变协议面**（指纹仍 `fp-7`、方法计数仍 `48 / 71`），所以**已发布的 SDK 与运行时无需更新**，也就无法通过「对读两版产物」观察到——它只改变宿主读配置的行为，见[配置文件](/zh-CN/docs/configuration)的 `memory` 一节。本版（`beta.6`）的 SDK 入口改名与形状变更见[变更日志](/zh-CN/docs/changelog) §2.1（迁移步骤见本文 §6.5），`0.1.0-beta.5` 的六次指纹递增见同页 §2.2，`0.1.0-beta.4` 相对 `0.1.0-beta.3` 的改动见同页 §2.3。下面的命令用来核对**协议面**差异——把任意两版已发布产物取回来对读。
+截至 `0.1.0-beta.7`（2026-09-20），**工作区与已发布产物一致**——`beta.7` 之后工作区**没有**新的未发布增量。`beta.6` 之后积累的两批内容都随本版发布：
 
-> 口径：本节的自查命令只能证明**wire 面**是否一致。宿主配置类的增量（如上面的 `[memory] enabled`）不进指纹，因此对读产物**看不出**它；判断这类改动要看[配置文件](/zh-CN/docs/configuration)而不看本文。
+1. **专家 / 专家团定义导出 —— `fp-7` → `fp-8`（破坏性）**：新增两个 WebSocket-only 方法 `agent/export` / `team/export`，方法计数 `48 / 71` → `48 / 73`（映射数不变）。完整条目见[变更日志](/zh-CN/docs/changelog) §2.1，迁移步骤见本文 §6.6。
+2. **宿主配置增量 —— 零 wire 变更**：`~/.agent-store/config.toml` 的 `[memory]` 表新增 `enabled`（内置记忆总开关，与既有的 `distill_enabled` **独立**）；同批补齐了 `[models.*]` 的 `max_output_size` / `protocol` 接线。两者都**不进指纹**，所以**无法通过「对读两版产物」观察到**——它们只改变宿主读配置的行为，见[配置文件](/zh-CN/docs/configuration)。
+
+`0.1.0-beta.6` 的 SDK 入口改名与形状变更见[变更日志](/zh-CN/docs/changelog) §2.2（迁移步骤见本文 §6.5），`0.1.0-beta.5` 的六次指纹递增见同页 §2.3，`0.1.0-beta.4` 相对 `0.1.0-beta.3` 的改动见同页 §2.4。下面的命令用来核对**协议面**差异——把任意两版已发布产物取回来对读。
+
+> 口径：本节的自查命令只能证明**wire 面**是否一致。宿主配置类的增量（如上面的 `[memory] enabled` 与 `max_output_size`）不进指纹，因此对读产物**看不出**它们；判断这类改动要看[配置文件](/zh-CN/docs/configuration)而不看本文。
 
 ### 8.1 迁移已有配置里的市场源
 

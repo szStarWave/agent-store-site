@@ -9,7 +9,7 @@ Release facts (publish times, dist-tag targets, how artifact differences were ve
 - **Published npm versions only**: `@flowy-agent-store/protocol`, `client`, `sdk`, plus the `@flowy-agent-store/runtime-*` platform packages shipped alongside the sdk.
 - **Unpublished work never becomes an entry here**: differences that exist in the working tree but have not shipped in any release are recorded only in §8 of the [Upgrade and migration guide](/en-US/docs/upgrade) and in §4 below.
 - **No dates are promised**: this page never says "coming soon" or "planned for"; entries are appended only **after** a release.
-- Version-number semantics and the compatibility stance (no backward compatibility during beta, breaking changes take a minor number) are in §1 of the [Upgrade and migration guide](/en-US/docs/upgrade) and in §3 below.
+- Version-number semantics and the compatibility stance (no backward compatibility during beta, breaking changes take **the next pre-release counter**) are in §1 of the [Upgrade and migration guide](/en-US/docs/upgrade) and in §3 below.
 
 ## 2. Published versions (facts)
 
@@ -21,22 +21,24 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.6", "latest": "0.1.0-beta.2" },
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.7", "latest": "0.1.0-beta.2" },
   "time": {
     "0.1.0": "2026-09-09T09:09:04.795Z",
     "0.1.0-beta.2": "2026-09-09T09:27:36.122Z",
     "0.1.0-beta.3": "2026-09-10T04:44:34.609Z",
     "0.1.0-beta.4": "2026-09-16T10:24:02.588Z",
     "0.1.0-beta.5": "2026-09-17T11:41:10.171Z",
-    "0.1.0-beta.6": "2026-09-18T11:08:21.813Z"
+    "0.1.0-beta.6": "2026-09-18T11:08:21.813Z",
+    "0.1.0-beta.7": "2026-09-20T10:33:48.685Z"
   }
 }
 ```
 
 | Version | Released (UTC) | Change type | Current dist-tag |
 | --- | --- | --- | --- |
-| `0.1.0-beta.6` | 2026-09-18 | Breaking (SDK entry renamed + return shape changed; **code changes required**) | `beta` |
+| `0.1.0-beta.7` | 2026-09-20 | Breaking (strict-equality protocol fingerprint: `fp-7` → `fp-8`; **upgrade required**) | `beta` |
+| `0.1.0-beta.6` | 2026-09-18 | Breaking (SDK entry renamed + return shape changed; **code changes required**) | — |
 | `0.1.0-beta.5` | 2026-09-17 | Breaking (strict-equality protocol fingerprint: `fp-1` → `fp-7`) | — |
 | `0.1.0-beta.4` | 2026-09-16 | Breaking (strict-equality protocol fingerprint + type narrowing) | — |
 | `0.1.0-beta.3` | 2026-09-10 | Additive (no breaking change) | — |
@@ -45,7 +47,27 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 The `versions` array is **not** in chronological order: `0.1.0` is listed last but was the **earliest** release (about 18 minutes before `beta.2`), and it carries no dist-tag. It is not a stable release and it is not newer than the beta line — for dist-tag semantics see §3 of the [Upgrade and migration guide](/en-US/docs/upgrade).
 
-### 2.1 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
+### 2.1 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
+
+> **This release contains breaking changes**: the protocol fingerprint moved from `fp-7` to `fp-8`, and the handshake and SDK compare it with **strict equality** — a client built against `fp-7` **cannot connect** to this runtime, so it must be upgraded alongside it (steps in §6.6 of the [Upgrade and migration guide](/en-US/docs/upgrade)).
+
+#### Breaking
+
+- Protocol fingerprint `fp-7` → **`fp-8`**: two new **WebSocket-only** methods, `agent/export` / `team/export` (returning a portable `ExpertPack`). The method count moves from `48 / 71` to **`48 / 73`**, with **the mapped count unchanged** (both new methods are in the same family as `agent/list` · `agent/get` · `team/list` · `team/get` and have no HTTP route).
+
+#### New
+
+- **Expert / team definition export**: `agent/export` · `team/export` return an `ExpertPack` — the persona body, model hints, a **by-reference** skill list, and (for a team) the fixed roster plus every member expanded. This is the first time this project puts an Agent Markdown body on the protocol surface; the catalog faces (`agent/list` / `agent/get`) deliberately **never** carry it, which is why export is its own method behind its own gate `[expert_export]` (a default-on **subtractive** table, same family as `[tools]`). `pack_format` (=1) is **independent of** `fp-n`: the fingerprint covers wire compatibility, this covers the artifact contract handed to third parties. **There is no timestamp** — the same snapshot exports byte-identically twice, so a consumer can use `content_digest` as a cache key.
+- SDK: `agents.export(agentId)` and `teams.export(teamId, teamVersion?)` on the `agents` / `teams` sub-clients of `@flowy-agent-store/client`.
+- **Host configuration**: the `[memory]` table in `~/.agent-store/config.toml` gained `enabled` (the built-in file-backed memory system's master switch; `false` stops all four of its faces at once — the system prompt's memory section / the `remember` tool / session-end distillation / citation write-back; it is **independent of** the existing `distill_enabled`, which covers distillation alone). It defaults to **on**: omitting the key keeps the upstream default, so behavior is unchanged after upgrading.
+
+#### Fixed
+
+- **`[models.*]`'s `max_output_size` / `protocol` were declared but had no consumer at all**: the provider DTO had no matching column, so `provider_models.output_limit` stayed `NULL` — and the anthropic / bedrock / vertex protocols **must** send `max_tokens`, so the runtime build failed outright with `BAD_REQUEST` (`the anthropic protocol requires an explicit output ceiling`). They are now filled in through the **row-level** write path (the same one the settings UI uses), and **only when empty, never overwriting** — the value is written only while the row is `NULL`, which makes it idempotent and prevents silently overriding a value the user typed in the settings UI; the same provider key is backfilled on reuse, so earlier `NULL` rows are repaired in place on the next resolution. `protocol` was wired in the same batch.
+
+**Upgrade impact**: if you use `@flowy-agent-store/sdk` you **must upgrade** — the fingerprint is compared for strict equality, so an `fp-7` client cannot connect to this runtime. **Only the fingerprint moved and methods were added; nothing was narrowed or renamed**, so `launchHarness` usage is unchanged (the `beta.6` entry rename is in §2.2) and your code needs **no changes** in the overwhelming majority of cases; the `[memory] enabled` and `max_output_size` items only change how the host reads its config and **never enter the fingerprint**.
+
+### 2.2 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
 
 > **This release contains breaking changes**: the entry point of `@flowy-agent-store/sdk` was **renamed and reshaped**, so code that uses it must change too (the wire is untouched, and runtimes can be mixed); migration steps are in §6.5 of the [Upgrade and migration guide](/en-US/docs/upgrade).
 
@@ -58,7 +80,7 @@ The `versions` array is **not** in chronological order: `0.1.0` is listed last b
 
 **Upgrade impact**: if you use `@flowy-agent-store/sdk` you **must upgrade and change code** (the four items above); if you only use `protocol` / `client`, or only the runtime binary, you are **unaffected** — the fingerprint is still `fp-7`, the method count is still `48 / 71`, and the wire interoperates with `0.1.0-beta.5`.
 
-### 2.2 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
+### 2.3 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
 
 > **This release contains breaking changes**: clients on `0.1.0-beta.4` or earlier **cannot connect** to this runtime and must be upgraded along with it — steps in §6.4 of the [Upgrade and migration guide](/en-US/docs/upgrade).
 
@@ -86,7 +108,7 @@ The `versions` array is **not** in chronological order: `0.1.0` is listed last b
 
 **Upgrade impact**: upgrading is **mandatory**, but **no code changes are required** — both published artifacts expose the same **141** export names; the only additions are optional fields.
 
-### 2.3 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
+### 2.4 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
 
 > **This release contains breaking changes**: clients on `0.1.0-beta.3` or earlier **cannot connect** to this runtime and must be upgraded along with it — steps in §6.3 of the [Upgrade and migration guide](/en-US/docs/upgrade).
 
@@ -110,7 +132,7 @@ The `versions` array is **not** in chronological order: `0.1.0` is listed last b
 
 **Upgrade impact**: upgrading is **mandatory**, and **code changes are required** — `event_type` is now checked as a closed union.
 
-### 2.4 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
+### 2.5 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
 
 #### Added
 
@@ -123,7 +145,7 @@ The `versions` array is **not** in chronological order: `0.1.0` is listed last b
 
 **Upgrade impact**: moving up from `0.1.0-beta.2` requires **no code changes** (the protocol declarations are unchanged, byte for byte); steps are in §6.1 of the [Upgrade and migration guide](/en-US/docs/upgrade).
 
-### 2.5 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
+### 2.6 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
 
 #### Added
 
@@ -135,7 +157,7 @@ The `versions` array is **not** in chronological order: `0.1.0` is listed last b
 
 This is the version `latest` currently points at — **it is not the newest one**; upgrading requires no code changes.
 
-### 2.6 `0.1.0` — 2026-09-09T09:09:04Z
+### 2.7 `0.1.0` — 2026-09-09T09:09:04Z
 
 #### Added
 
@@ -170,21 +192,11 @@ Rules for adding and correcting entries:
 
 ## 4. Unpublished changes and release cadence
 
-As of 2026-09-24, **the working tree leads the published artifact `0.1.0-beta.6` by two batches**.
+As of 2026-09-20, **the working tree matches the published artifact `0.1.0-beta.7`** — `fp-8` and `48 / 73` shipped with this release, and the `[memory] enabled` and `max_output_size` / `protocol` wiring are in the same working tree (they never enter the fingerprint, so reading artifacts side by side cannot reveal them; see §8 of the [Upgrade and migration guide](/en-US/docs/upgrade)). **This section currently has no pending entries.**
 
-**(1) Expert / team definition export — `fp-7` → `fp-8` (breaking).** Two **WebSocket-only** methods, `agent/export` and `team/export`, return a portable `ExpertPack`: the persona body, model hints, a **by-reference** skill list, and (for a team) the fixed roster plus every member expanded. This is the first time this project puts an Agent Markdown body on the protocol surface — the catalog faces (`agent/list` / `agent/get`) deliberately **never** carry it, which is exactly why export is its own method behind its own gate.
+The previous batch (expert / team definition export plus the host-configuration increment accumulated after `0.1.0-beta.6`) shipped with `0.1.0-beta.7` — listed one by one in §2.1; `beta.6`'s SDK entry rename and return-shape change are in §2.2, and `0.1.0-beta.4` and earlier batches are in §2.4–§2.5.
 
-**Upgrade impact**: if you use `@flowy-agent-store/sdk` you **must upgrade** — the handshake and the SDK compare the fingerprint with **strict equality**, so a client built against `fp-7` cannot connect to the new runtime. The method count moves from `48 / 71` to **`48 / 73`** (**the mapped count is unchanged**: both new methods are WebSocket-only with no HTTP route, in the same family as `agent/list` · `agent/get` · `team/list` · `team/get`). The contract, and the R1–R11 list of what an external runtime must implement itself, live in the repository's `docs/agent-store/32-expert-pack-export.zh.md`; the interface shape is in §5.3 of the [TypeScript SDK reference](/en-US/docs/typescript-sdk) and in the [worked examples](/en-US/docs/examples-sdk).
-
-**(2) Host-configuration increment — zero wire change.** The `[memory]` table in `~/.agent-store/config.toml` gained `enabled` (the built-in memory system's master switch; `false` stops all four of its faces at once — the system prompt's memory section, the `remember` tool, session-end distillation and citation write-back — and it is **independent of** the existing `distill_enabled`, which covers distillation alone).
-
-**This increment does not move the protocol surface itself**: no new methods, no new DTO fields, no new error codes, and **on its own** it does not bump the fingerprint. But as noted above the working tree's fingerprint is **now** `fp-8` and the method count **now** `48 / 73`, so take those from the working tree. It only changes **how the host reads its config**, covered by the `memory` section of the [Configuration file](/en-US/docs/configuration). See §8 of the [Upgrade and migration guide](/en-US/docs/upgrade) for the read-two-artifacts-side-by-side check.
-
-Landing order was (2) then (1), and the two are unrelated; this page lists **newest first**.
-
-The earlier batch (the SDK entry rename and return-shape change accumulated after `0.1.0-beta.5`) shipped with this version — listed one by one in §2.1; `0.1.0-beta.4` and earlier batches are in §2.2–§2.3.
-
-One correction (2026-09-17): the previous ledger recorded `mentions` as a field **added** in `fp-2` → `fp-3`. Reading the two published artifacts side by side shows that `MentionKind` / `MentionRef` and the two `mentions` fields **already existed in `0.1.0-beta.4`'s `index.d.mts`**, so §2.2 describes it as a host-side **semantics** change and does not claim it as a field added in beta.5. The version number and publish date of any published entry are unaffected by this correction.
+One correction (2026-09-17): the previous ledger recorded `mentions` as a field **added** in `fp-2` → `fp-3`. Reading the two published artifacts side by side shows that `MentionKind` / `MentionRef` and the two `mentions` fields **already existed in `0.1.0-beta.4`'s `index.d.mts`**, so §2.3 describes it as a host-side **semantics** change and does not claim it as a field added in beta.5. The version number and publish date of any published entry are unaffected by this correction.
 
 Release cadence: entries are appended **after** a version is published (the "Adding" rule in §3); no dates are announced here.
 
