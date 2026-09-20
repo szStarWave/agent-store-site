@@ -55,7 +55,7 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 | `providers` | `table` | API provider table → `providers` |
 | `models` | `table` | Model alias table → `models` |
 | `default_marketplaces` | `table` | Marketplace sources auto-registered on startup → `default_marketplaces` |
-| `memory` | `table` | Post-session memory policy → `memory` (below) |
+| `memory` | `table` | Policy for the built-in (file-based) memory system: `enabled` is the master switch, `distill_enabled` covers session-end distillation only → `memory` (below) |
 | `marketplace` | `table` | Background auto-update cadence → `marketplace` (below) |
 | `tools` | `table` | Host-level tool policy (subtractive only) → `tools` (below) |
 | `connector_proxy` | `table` | Authorization for the connector call proxy: which MCP tools a third party may run over the host's connections. Off unless declared → `connector_proxy` (below) |
@@ -176,7 +176,39 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 
 ## `memory`
 
-Post-session memory policy. **Distillation** makes one extra model call after every normal turn to distil the session into file-based memory; that call happens **before** the turn's terminal signal, so clients see the answer fully rendered while the conversation still reports "processing" for roughly **6–15 s** (it tracks model latency).
+Policy for the built-in (file-based) memory system. This table holds **two independent switches**, both scoped to this host: `enabled` governs the whole system, while `distill_enabled` governs only the session-end distillation half of it.
+
+### `enabled`: the built-in memory master switch
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `enabled` | `boolean` | `false` turns this host's **built-in memory system** off; `true` or an absent key keeps the upstream default (**on**) |
+
+With `false`, all four of the following stop at once — they are four faces of one system, and it never turns off only half:
+
+| Face | Behaviour when off |
+| --- | --- |
+| Memory section of the system prompt | not injected (the model does not even see the `MEMORY.md` index) |
+| `remember` tool | not registered, so the model cannot write new memories |
+| Session-end distillation | the extra model call is not made (same effect as `distill_enabled = false`) |
+| Citation write-back | `<nomi-mem-citation>` is not parsed and memory-file usage counters are not bumped |
+
+```toml
+# Turn the built-in memory system off entirely
+[memory]
+enabled = false
+```
+
+- **The default is on.** An absent `[memory]`, an empty `[memory]`, and `enabled = true` all mean on, so upgrading changes nothing; turning it off must be written out explicitly.
+- **It neither deletes nor hides memories on disk.** Existing memory files stay exactly where they are, so setting `enabled` back to `true` restores the previous state — this is not a delete switch.
+- **Independent of `distill_enabled`.** The two combine freely: to keep memory readable and `remember` available while dropping only the extra per-turn call, set just `distill_enabled = false`; to take the whole system offline, use `enabled = false` (at which point `distill_enabled` no longer matters).
+- **Only the host that adopts it is affected.** Even when the desktop and web hosts read the same file (the web host does point at it for `[providers]` / `[default_marketplaces]`), they do **not** adopt `[memory]` — only the Agent Store host does. This is exactly the adoption rule `[tools]` follows.
+- **Read once at startup**, like `distill_enabled` in the same table and like `[tools]`: restart the host for a change to take effect.
+- **Hand-edit only.** `enabled` is currently **not** on the `config/set` write whitelist and has no settings-dialog toggle (`distill_enabled` does) — to turn it off, edit this file and restart. That is deliberate: the master switch has a far wider blast radius than distillation, so programmatic writes are not exposed for it yet.
+
+### `distill_enabled`: session-end distillation only
+
+**Distillation** makes one extra model call after every normal turn to distil the session into file-based memory; that call happens **before** the turn's terminal signal, so clients see the answer fully rendered while the conversation still reports "processing" for roughly **6–15 s** (it tracks model latency).
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -189,7 +221,9 @@ Post-session memory policy. **Distillation** makes one extra model call after ev
 distill_enabled = false
 ```
 
-> Precedence: the `NOMIFUN_MEMORY_DISTILL` environment variable (`0`/`false` off, `1`/`true` on) > this file's `[memory].distill_enabled` > the upstream default (on). Without a `[memory]` section the behaviour is exactly what it was before.
+> Precedence: the `NOMIFUN_MEMORY_DISTILL` environment variable (`0`/`false` off, `1`/`true` on) > this file's `[memory].distill_enabled` > the upstream default (on). Without a `[memory]` section the behaviour is exactly what it was before. Note that this variable covers **distillation** only — it cannot switch back on a system that `enabled = false` turned off.
+
+> **Do not confuse this with the engine's own `~/.nomi/config.toml`**: that is a separate file, and its `[memory] distill_enabled` likewise covers distillation only. The built-in memory master switch lives **in this file** for now.
 
 ## `marketplace`
 

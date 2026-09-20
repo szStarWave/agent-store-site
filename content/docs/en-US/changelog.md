@@ -170,7 +170,11 @@ Rules for adding and correcting entries:
 
 ## 4. Unpublished changes and release cadence
 
-As of `0.1.0-beta.6` (2026-09-18), **there is no unpublished difference between the working tree and the published artifacts**: the SDK entry rename and return-shape change accumulated after `0.1.0-beta.5` shipped with this version (listed one by one in §2.1), and the protocol surface never moved — the fingerprint is still `fp-7` and the method count is still `48 / 71`. The ledger left behind by the previous version is therefore cleared.
+As of `0.1.0-beta.6` (2026-09-18), **the working tree leads the published artifacts**: after `beta.6` it accumulated one further **zero-wire-change** host-configuration increment — the `[memory]` table in `~/.agent-store/config.toml` gained `enabled` (the built-in memory system's master switch; `false` stops all four of its faces at once — the system prompt's memory section, the `remember` tool, session-end distillation and citation write-back — and it is **independent of** the existing `distill_enabled`, which covers distillation alone).
+
+**This increment does not move the protocol surface**: no new methods, no new DTO fields, no new error codes; the fingerprint is still `fp-7` and the method count is still `48 / 71`, so published SDK and runtime artifacts **need no update**. It is therefore not a breaking change and produces no new version entry — it only changes **how the host reads its config**, covered by the `memory` section of the [Configuration file](/en-US/docs/configuration). See §8 of the [Upgrade and migration guide](/en-US/docs/upgrade) for the read-two-artifacts-side-by-side check.
+
+The earlier batch (the SDK entry rename and return-shape change accumulated after `0.1.0-beta.5`) shipped with this version — listed one by one in §2.1; `0.1.0-beta.4` and earlier batches are in §2.2–§2.3.
 
 One correction (2026-09-17): the previous ledger recorded `mentions` as a field **added** in `fp-2` → `fp-3`. Reading the two published artifacts side by side shows that `MentionKind` / `MentionRef` and the two `mentions` fields **already existed in `0.1.0-beta.4`'s `index.d.mts`**, so §2.2 describes it as a host-side **semantics** change and does not claim it as a field added in beta.5. The version number and publish date of any published entry are unaffected by this correction.
 

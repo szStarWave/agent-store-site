@@ -55,7 +55,7 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 | `providers` | `table` | API 供应商表 → `providers` |
 | `models` | `table` | 模型别名表 → `models` |
 | `default_marketplaces` | `table` | 启动自动注册的市场源表 → `default_marketplaces` |
-| `memory` | `table` | 会话结束后的记忆策略 → `memory`（见下） |
+| `memory` | `table` | 内置（文件型）记忆系统的策略：`enabled` 是总开关，`distill_enabled` 只管轮后蒸馏 → `memory`（见下） |
 | `marketplace` | `table` | 后台自动更新节奏 → `marketplace`（见下） |
 | `tools` | `table` | 宿主级工具策略（只做减法） → `tools`（见下） |
 | `connector_proxy` | `table` | 连接器调用代理的授权：第三方能经宿主的连接执行哪些 MCP 工具。缺省关 → `connector_proxy`（见下） |
@@ -176,7 +176,39 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 
 ## `memory`
 
-会话结束后的记忆策略。**记忆蒸馏**（distillation）会在每个正常对话轮次结束后额外调用一次模型，把本轮会话蒸馏进基于文件的记忆；这次调用发生在该轮**终止信号之前**，所以客户端会看到「回答已经完整，但会话仍显示正在处理」约 **6~15 秒**（随模型响应时间波动）。
+内置（文件型）记忆系统的策略。这张表有**两个互相独立的开关**，都只在这台宿主上生效：`enabled` 管整个系统，`distill_enabled` 只管其中的「轮后蒸馏」一半。
+
+### `enabled`：内置记忆总开关
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `enabled` | `boolean` | `false` 关闭整台宿主的**内置记忆系统**；`true` 或不写该键 = 沿用上游默认（**开**） |
+
+`false` 时以下四件事同时停止——它们是一个系统的四个面，不会只关一半：
+
+| 面 | 关闭后的行为 |
+| --- | --- |
+| 系统提示词里的记忆段落 | 不注入（连 `MEMORY.md` 索引也不给模型看） |
+| `remember` 工具 | 不注册，模型无法写入新记忆 |
+| 轮后记忆蒸馏 | 不发起那次额外模型调用（与 `distill_enabled = false` 同效） |
+| 引用回写 | 不解析 `<nomi-mem-citation>`、不累加记忆文件的使用计数 |
+
+```toml
+# 完全关闭内置记忆系统
+[memory]
+enabled = false
+```
+
+- **默认是开**。不写 `[memory]`、写空的 `[memory]`、或写 `enabled = true`，三者都表示开启，所以升级后行为不变；关闭必须显式写出来。
+- **不删也不隐藏磁盘上的记忆**。已有的记忆文件原样留着，把 `enabled` 改回 `true` 就恢复原状——这不是删除开关。
+- **与 `distill_enabled` 独立**。两者可以任意组合：想保留记忆的读取与 `remember`、只去掉每轮那次额外调用，就只写 `distill_enabled = false`；想整套下线，才用 `enabled = false`（此时 `distill_enabled` 写什么都不再起作用）。
+- **只影响采纳它的宿主**。桌面端与 Web 宿主即便读到同一个文件（Web 宿主确实指向它拿 `[providers]` / `[default_marketplaces]`），也**不采纳** `[memory]`——只有 Agent Store 宿主采纳。这与 `[tools]` 的采纳规则完全一致。
+- **启动时读一次**，与同一张表的 `distill_enabled`、以及 `[tools]` 相同：改完要重启宿主才生效。
+- **只能手改文件**。`enabled` 目前**不在** `config/set` 的写入白名单里，设置界面也没有对应开关（`distill_enabled` 有）——想关就编辑本文件再重启。这一点是刻意的：总开关影响面比蒸馏大得多，先不开放程序化写入。
+
+### `distill_enabled`：只关掉轮后蒸馏
+
+**记忆蒸馏**（distillation）会在每个正常对话轮次结束后额外调用一次模型，把本轮会话蒸馏进基于文件的记忆；这次调用发生在该轮**终止信号之前**，所以客户端会看到「回答已经完整，但会话仍显示正在处理」约 **6~15 秒**（随模型响应时间波动）。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -188,7 +220,9 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 distill_enabled = false
 ```
 
-> 优先级：环境变量 `NOMIFUN_MEMORY_DISTILL`（`0`/`false` 关、`1`/`true` 开）> 本文件的 `[memory].distill_enabled` > 上游默认（开）。不写 `[memory]` 段落时行为与以前完全一致。
+> 优先级：环境变量 `NOMIFUN_MEMORY_DISTILL`（`0`/`false` 关、`1`/`true` 开）> 本文件的 `[memory].distill_enabled` > 上游默认（开）。不写 `[memory]` 段落时行为与以前完全一致。注意该环境变量只覆盖**蒸馏**这一半，不能重新打开被 `enabled = false` 关掉的系统。
+
+> **不要和引擎自己的 `~/.nomi/config.toml` 混起来**：那是独立的一份配置，它的 `[memory] distill_enabled` 同样只管蒸馏；内置记忆的总开关目前只在**本文件**里。
 
 ## `marketplace`
 
