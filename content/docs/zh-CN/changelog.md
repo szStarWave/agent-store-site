@@ -170,9 +170,17 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-截至 `0.1.0-beta.6`（2026-09-18），**工作区领先于已发布产物**：`beta.6` 之后工作区又积累了一项**零 wire 变更**的宿主配置增量——`~/.agent-store/config.toml` 的 `[memory]` 表新增 `enabled`（内置记忆系统的总开关，`false` 时同时停掉系统提示词的记忆段落、`remember` 工具、轮后蒸馏与引用回写四面；与既有的 `distill_enabled` **独立**，后者只管蒸馏一半）。
+截至 2026-09-24，**工作区领先于已发布产物 `0.1.0-beta.6` 两批**。
 
-**这一项不动协议面**：无新方法、无新 DTO 字段、无新错误码，指纹仍是 `fp-7`、方法计数仍是 `48 / 71`，已发布的 SDK 与运行时**无需更新**。因此它不构成破坏性变更，也不产生新的版本条目——它只改变**宿主如何读配置**，见[配置文件](/zh-CN/docs/configuration)的 `memory` 一节。对读两版已发布产物的自查方法见[升级与迁移指引](/zh-CN/docs/upgrade) §8。
+**（一）专家 / 专家团定义导出 —— `fp-7` → `fp-8`（破坏性）**。新增两个 **WebSocket-only** 方法 `agent/export` / `team/export`，返回一份可移植的 `ExpertPack`：persona 正文、模型提示、**按引用**的技能清单、以及（团的）固定名单加逐成员展开。这是本仓**第一次把 Agent Markdown 正文放上协议面**——目录面（`agent/list` / `agent/get`）**刻意永远不带**它，导出因此是独立方法、独立闸门。
+
+**升级影响**：用 `@flowy-agent-store/sdk` 的**必须升级**——握手与 SDK 对指纹做**严格相等**校验，按 `fp-7` 编出来的客户端连不上新运行时。方法计数 `48 / 71` → **`48 / 73`**（**映射数不变**：两个新方法与 `agent/list` · `agent/get` · `team/list` · `team/get` 同族，都是 WebSocket-only、没有 HTTP 路由）。契约与「外部 runtime 必须自己实现什么」的责任清单（R1–R11）见仓库 `docs/agent-store/32-expert-pack-export.zh.md`，接口形状见[TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §5.3 与[实战示例](/zh-CN/docs/examples-sdk)。
+
+**（二）宿主配置增量 —— 零 wire 变更**。`~/.agent-store/config.toml` 的 `[memory]` 表新增 `enabled`（内置记忆系统的总开关，`false` 时同时停掉系统提示词的记忆段落、`remember` 工具、轮后蒸馏与引用回写四面；与既有的 `distill_enabled` **独立**，后者只管蒸馏一半）。
+
+**这一项自己不动协议面**：无新方法、无新 DTO 字段、无新错误码，**它本身**不 bump 指纹。但如上，工作区**当前**指纹已是 `fp-8`、方法计数已是 `48 / 73`，所以自查时请以工作区现值为准——它只改变**宿主如何读配置**，见[配置文件](/zh-CN/docs/configuration)的 `memory` 一节。对读两版已发布产物的自查方法见[升级与迁移指引](/zh-CN/docs/upgrade) §8。
+
+开工顺序上（二）在前、（一）在后，两者互不相干；本页按**最新在前**排列。
 
 此前那一批（`0.1.0-beta.5` 之后积累的 SDK 入口改名与返回形状变更）已随本版发布，逐条见 §2.1；`0.1.0-beta.4` 及更早的批次见 §2.2–§2.3。
 

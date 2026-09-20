@@ -573,6 +573,51 @@ if (client.initializeInfo?.capabilities.skill_files) {   // 宿主可以只接�
 }
 ```
 
+### 9.1 导出专家 / 专家团给外部 runtime（`fp-8`）
+
+`agents.get()` / `teams.get()` 是**目录面**：结构化字段，**永远不带 persona 正文**。要拿到专家**定义本身**
+（在你自己的 runtime 里跑它），用 `export()`：
+
+```ts
+if (client.initializeInfo?.capabilities.expert_export) {  // 报的是「这个面接没接」，不是「这个 id 能不能导」
+  const pack = await client.agents.export("wb-…");         // ExpertPack
+  console.log(pack.pack_format, pack.kind, pack.persona.instructions);
+  console.log(pack.model, pack.skills, pack.provenance.content_digest);
+
+  const team = await client.teams.export("wb-…", "1.0.0"); // 第二参是可选的版本钉；不匹配即 version_mismatch
+  for (const member of team.team!.members) console.log(member.id, member.name); // 团长在首位
+}
+```
+
+**一个包是「定义」，不是「执行语义」。** 团的编排、步骤调度、工具与凭据策略、事件形状都由运行时执行，
+**不在包里**。接入前请逐条回答方案 §5 的 **R1–R11 责任清单**——一张标了 N/A 的清单本身就是答案，
+比让某个语义在沉默中失效好。
+
+**物化成一个目录**。pack 里的技能是**引用**（正文走既有的技能文件面），所以这一步是消费方自己的代码，
+不是我们的 API——公开原语拼起来 11 行：
+
+```ts
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+
+const pack = await client.agents.export(agentId);
+await mkdir(dir, { recursive: true });
+await writeFile(join(dir, "expert-pack.json"), JSON.stringify(pack, null, 2));
+await writeFile(join(dir, "persona.md"), pack.persona.instructions);
+for (const skill of pack.skills) {
+  for (const file of (await client.skills.files(skill.id)).files) {
+    const target = join(dir, "skills", skill.name, file.path); // path 是技能目录内的 POSIX 相对路径
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, await client.skills.readFile(skill.id, file.path));
+  }
+}
+```
+
+**三个错误码要分得清**：`policy_denied`（宿主 `[expert_export]` 关了、或这个 id 在 `deny` 里）、
+`agent_not_installed` / `agent_disabled`（没装 / 装了就关；**团成员缺任一个即整包失败**并指名该成员）、
+`not_found`（没有这个 id）。`capabilities.expert_export` 只说明方法存在，**不要只靠它灰按钮**。
+两个方法都是 **WebSocket-only**（与 `agent/*` · `team/*` 整族一致），`HttpTransport` 上没有绑定。
+
 ## 10. 工具面控制：`AGENT_STORE_TOOLS`
 
 宿主的工具面来自 `~/.agent-store/config.toml` 的 `[tools]` 表。**自己 spawn 宿主时不必改那份文件**——用环境变量 `AGENT_STORE_TOOLS` 传 JSON，`launchHarness` 会把它合并进子进程环境：

@@ -170,9 +170,17 @@ Rules for adding and correcting entries:
 
 ## 4. Unpublished changes and release cadence
 
-As of `0.1.0-beta.6` (2026-09-18), **the working tree leads the published artifacts**: after `beta.6` it accumulated one further **zero-wire-change** host-configuration increment — the `[memory]` table in `~/.agent-store/config.toml` gained `enabled` (the built-in memory system's master switch; `false` stops all four of its faces at once — the system prompt's memory section, the `remember` tool, session-end distillation and citation write-back — and it is **independent of** the existing `distill_enabled`, which covers distillation alone).
+As of 2026-09-24, **the working tree leads the published artifact `0.1.0-beta.6` by two batches**.
 
-**This increment does not move the protocol surface**: no new methods, no new DTO fields, no new error codes; the fingerprint is still `fp-7` and the method count is still `48 / 71`, so published SDK and runtime artifacts **need no update**. It is therefore not a breaking change and produces no new version entry — it only changes **how the host reads its config**, covered by the `memory` section of the [Configuration file](/en-US/docs/configuration). See §8 of the [Upgrade and migration guide](/en-US/docs/upgrade) for the read-two-artifacts-side-by-side check.
+**(1) Expert / team definition export — `fp-7` → `fp-8` (breaking).** Two **WebSocket-only** methods, `agent/export` and `team/export`, return a portable `ExpertPack`: the persona body, model hints, a **by-reference** skill list, and (for a team) the fixed roster plus every member expanded. This is the first time this project puts an Agent Markdown body on the protocol surface — the catalog faces (`agent/list` / `agent/get`) deliberately **never** carry it, which is exactly why export is its own method behind its own gate.
+
+**Upgrade impact**: if you use `@flowy-agent-store/sdk` you **must upgrade** — the handshake and the SDK compare the fingerprint with **strict equality**, so a client built against `fp-7` cannot connect to the new runtime. The method count moves from `48 / 71` to **`48 / 73`** (**the mapped count is unchanged**: both new methods are WebSocket-only with no HTTP route, in the same family as `agent/list` · `agent/get` · `team/list` · `team/get`). The contract, and the R1–R11 list of what an external runtime must implement itself, live in the repository's `docs/agent-store/32-expert-pack-export.zh.md`; the interface shape is in §5.3 of the [TypeScript SDK reference](/en-US/docs/typescript-sdk) and in the [worked examples](/en-US/docs/examples-sdk).
+
+**(2) Host-configuration increment — zero wire change.** The `[memory]` table in `~/.agent-store/config.toml` gained `enabled` (the built-in memory system's master switch; `false` stops all four of its faces at once — the system prompt's memory section, the `remember` tool, session-end distillation and citation write-back — and it is **independent of** the existing `distill_enabled`, which covers distillation alone).
+
+**This increment does not move the protocol surface itself**: no new methods, no new DTO fields, no new error codes, and **on its own** it does not bump the fingerprint. But as noted above the working tree's fingerprint is **now** `fp-8` and the method count **now** `48 / 73`, so take those from the working tree. It only changes **how the host reads its config**, covered by the `memory` section of the [Configuration file](/en-US/docs/configuration). See §8 of the [Upgrade and migration guide](/en-US/docs/upgrade) for the read-two-artifacts-side-by-side check.
+
+Landing order was (2) then (1), and the two are unrelated; this page lists **newest first**.
 
 The earlier batch (the SDK entry rename and return-shape change accumulated after `0.1.0-beta.5`) shipped with this version — listed one by one in §2.1; `0.1.0-beta.4` and earlier batches are in §2.2–§2.3.
 

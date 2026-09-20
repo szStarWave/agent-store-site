@@ -581,6 +581,55 @@ if (client.initializeInfo?.capabilities.skill_files) {   // a host may wire the 
 }
 ```
 
+### 9.1 Exporting an expert / team to an external runtime (`fp-8`)
+
+`agents.get()` / `teams.get()` are the **catalog** faces: structured fields, and **never** the persona body. To
+obtain the expert **definition** itself — so your own runtime can run it — use `export()`:
+
+```ts
+if (client.initializeInfo?.capabilities.expert_export) {  // the *seam* is wired, not "this id is exportable"
+  const pack = await client.agents.export("wb-…");         // ExpertPack
+  console.log(pack.pack_format, pack.kind, pack.persona.instructions);
+  console.log(pack.model, pack.skills, pack.provenance.content_digest);
+
+  const team = await client.teams.export("wb-…", "1.0.0"); // 2nd arg is an optional version pin; a mismatch is `version_mismatch`
+  for (const member of team.team!.members) console.log(member.id, member.name); // leader first
+}
+```
+
+**A pack is a definition, not execution semantics.** How a team plans and schedules its steps, how tool and
+credential policy is applied, and the shape of its events are all enforced by the runtime and are **not** in the
+pack. Before integrating, answer the **R1–R11 responsibility list** in §5 of the design document — a list with
+N/A written against an item *is* the answer, and it beats letting a semantic fail silently.
+
+**Materialising it into a directory.** Skills travel **by reference** in the pack (the bodies come from the
+existing skill file face), so this step is the consumer's own code rather than our API — 11 lines of public
+primitives:
+
+```ts
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+
+const pack = await client.agents.export(agentId);
+await mkdir(dir, { recursive: true });
+await writeFile(join(dir, "expert-pack.json"), JSON.stringify(pack, null, 2));
+await writeFile(join(dir, "persona.md"), pack.persona.instructions);
+for (const skill of pack.skills) {
+  for (const file of (await client.skills.files(skill.id)).files) {
+    const target = join(dir, "skills", skill.name, file.path); // `path` is skill-relative, POSIX
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, await client.skills.readFile(skill.id, file.path));
+  }
+}
+```
+
+**Three error codes worth telling apart**: `policy_denied` (the host's `[expert_export]` is off, or the id is in
+its `deny`), `agent_not_installed` / `agent_disabled` (never installed / installed then switched off; **a team
+fails as a whole** when any member is missing, naming that member), and `not_found` (no such id).
+`capabilities.expert_export` only says the methods exist — **do not use it alone to grey out a button**. Both
+methods are **WebSocket-only** (like the whole `agent/*` · `team/*` family); there is no binding on
+`HttpTransport`.
+
 ## 10. Controlling the tool surface: `AGENT_STORE_TOOLS`
 
 A host's tool surface comes from the `[tools]` table of `~/.agent-store/config.toml`. When you **spawn the host yourself** you do not have to edit that file — pass the `AGENT_STORE_TOOLS` environment variable as JSON and `launchHarness` merges it into the child environment:
