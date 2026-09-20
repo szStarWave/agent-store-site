@@ -28,8 +28,8 @@ bun add @flowy-agent-store/protocol
 
 All packages ship ESM + CJS (`exports` maps `import` / `require` / `types`); they work out of the box in Node and bundlers.
 
-> **Version status**: all three packages are `0.1.0-beta.*` pre-releases (the API is not frozen, and **no backward compatibility is promised during beta**). Pin an **exact** version in production — this page and the repo currently correspond to `0.1.0-beta.6` (the `beta` tag). Do not rely on a bare `bun add`: the registry's `latest` currently points at `0.1.0-beta.2`, **not** the newest `0.1.0-beta.6`. For dist-tag semantics, per-version upgrade steps and self-check commands see the [Upgrade and migration guide](/en-US/docs/upgrade).
-> **Protocol surface scope**: the `APP_SERVER_PROTOCOL_VERSION` example in §2 and the method counts in §5.3 (`48 / 73`) are taken from the **working tree**, which currently **matches the published artifacts** (since `0.1.0-beta.5`; earlier versions led them, and that batch shipped with this one — it is recorded in §8 of the [Upgrade and migration guide](/en-US/docs/upgrade), together with the self-check commands). The fingerprint is compared for **strict equality** (a client built against an old value cannot connect to a new runtime), so when you build your own binary or touch the protocol, read the constant in §2 rather than copying a value out of this page's prose.
+> **Version status**: all three packages are `0.1.0-beta.*` pre-releases (the API is not frozen, and **no backward compatibility is promised during beta**). Pin an **exact** version in production — this page and the repo currently correspond to `0.1.0-beta.7` (the `beta` tag). Do not rely on a bare `bun add`: the registry's `latest` currently points at `0.1.0-beta.2`, **not** the newest `0.1.0-beta.7`. For dist-tag semantics, per-version upgrade steps and self-check commands see the [Upgrade and migration guide](/en-US/docs/upgrade).
+> **Protocol surface scope**: the `APP_SERVER_PROTOCOL_VERSION` example in §2 and the method counts in §5.3 (`48 / 73`) are taken from the **working tree**, which currently **matches the published artifacts** (since `0.1.0-beta.7`; earlier versions led them, and that batch shipped with this release — it is recorded in §8 of the [Upgrade and migration guide](/en-US/docs/upgrade), together with the self-check commands). The fingerprint is compared for **strict equality** (a client built against an old value cannot connect to a new runtime), so when you build your own binary or touch the protocol, read the constant in §2 rather than copying a value out of this page's prose.
 > **Runtime**: Node.js **≥ 22** (relies on the global `WebSocket`) or Bun; the lower bound is declared by each package's `engines.node`.
 
 ---
@@ -172,6 +172,7 @@ All constructed on the same transport; every method returns `Promise<T>`.
 ```ts
 client.agents.list(): Promise<AgentSummary[]>;
 client.agents.get(agentId: string): Promise<AgentDetail>;
+client.agents.export(agentId: string): Promise<ExpertPack>;
 ```
 
 #### `teams` — AgentTeamDefinition catalog
@@ -179,6 +180,7 @@ client.agents.get(agentId: string): Promise<AgentDetail>;
 ```ts
 client.teams.list(): Promise<TeamSummary[]>;
 client.teams.get(teamId: string): Promise<TeamDetail>;
+client.teams.export(teamId: string, teamVersion?: string): Promise<ExpertPack>;
 ```
 
 #### `skills` — catalog / file tree
@@ -404,7 +406,7 @@ What `Harness` carries:
 | `server.exited` | A `Promise<{ code, signal }>` that never rejects | Observing crashes and exits (contract in §4.4) |
 | `close()` | Unsubscribe → close transport → kill child → remove an auto-created data-dir | Call it in `finally`; safe to repeat |
 
-> **Breaking change vs the published `0.1.0-beta.5`**: the entry point is renamed to `launchHarness` (types `LaunchedClient` → `Harness`, `LaunchOptions` → `HarnessOptions`), the return value lost its `.client` hop, and `initializeResult` is now `handshake`. In other words `const session = await launchClient({…})` + `session.client.conversations.create(…)` becomes `const harness = await launchHarness({…})` + `harness.conversations.create(…)`. Item-by-item migration is in the [Upgrade and migration guide](/en-US/docs/upgrade) §8.2.
+> **Breaking change vs the published `0.1.0-beta.5`**: the entry point is renamed to `launchHarness` (types `LaunchedClient` → `Harness`, `LaunchOptions` → `HarnessOptions`), the return value lost its `.client` hop, and `initializeResult` is now `handshake`. In other words `const session = await launchClient({…})` + `session.client.conversations.create(…)` becomes `const harness = await launchHarness({…})` + `harness.conversations.create(…)`. Item-by-item migration is in the [Upgrade and migration guide](/en-US/docs/upgrade) §6.5.
 
 **What it does not do**: it does not configure models or providers (that is `config.toml` and the host's settings surface); it does not download the binary; without `dataDir` it does not persist anything (a one-shot sandbox); it does not restart the child or install process-exit hooks.
 
@@ -508,8 +510,8 @@ How the three packages' real exports line up with the protocol methods. Method n
 
 | Sub-client | Methods | Protocol methods |
 | --- | --- | --- |
-| `agents` | `list()` / `get(agentId)` | `agent/list` / `agent/get` |
-| `teams` | `list()` / `get(teamId)` | `team/list` / `team/get` |
+| `agents` | `list()` / `get(agentId)` / `export(agentId)` | `agent/list` / `agent/get` / `agent/export` |
+| `teams` | `list()` / `get(teamId)` / `export(teamId, teamVersion?)` | `team/list` / `team/get` / `team/export` |
 | `skills` | `list()` / `get(skillId)` / `files(skillId)` / `readFile(skillId, path)` / `readFileWithType(skillId, path)` | `skill/list` / `skill/get` / `skill/files` / `skill/file` |
 | `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `logout(id)` / `call(id, tool, args?)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` · `call` |
 | `store` | `list()` / `search(query, filter?)` / `installed()` / `checkUpdates()` / `updateHint(item)` / `install(item, opts?)` / `setEnabled(item, enabled, opts?)` / `uninstall(item, opts?)` | composed methods, no wire method of their own: `store/list` · `store/install-entry` · `install/run` · `install/status` · `install/disable` · `install/enable` · `install/uninstall` |

@@ -740,7 +740,7 @@ const plain = new AppServerClient({ transport: http, client: { name: "cli", vers
 await plain.connect();
 await plain.listStore();
 
-// 23 methods have no HTTP binding: calling one throws TransportError; the route table is the source of truth
+// 25 methods have no HTTP binding: calling one throws TransportError; the route table is the source of truth
 console.log(Object.keys(httpRouteTable()).length);
 ```
 

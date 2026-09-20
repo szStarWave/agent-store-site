@@ -728,7 +728,7 @@ const plain = new AppServerClient({ transport: http, client: { name: "cli", vers
 await plain.connect();
 await plain.listStore();
 
-// 有 23 个方法没有 HTTP 绑定：调用会抛 TransportError；路由表可自查
+// 有 25 个方法没有 HTTP 绑定：调用会抛 TransportError；路由表可自查
 console.log(Object.keys(httpRouteTable()).length);
 ```
 

@@ -27,7 +27,9 @@ The table is derived from registry metadata and from the published artifacts (co
 | `0.1.0` | 2026-09-09T09:09:04Z | none | first publish; for all three packages the **code and type declarations are byte-identical to beta.2**, only `package.json` differs: the sdk had no `optionalDependencies` then (no platform runtime packages attached) |
 | `0.1.0-beta.2` | 2026-09-09T09:27:36Z | `latest` | adds the sdk `optionalDependencies` (five platform runtime packages for darwin / linux / win32, same version) |
 | `0.1.0-beta.3` | 2026-09-10T04:44:34Z | — | adds public declarations to client / sdk (reconnect lifecycle, exit observation, see §6.1); `package.json` gains `engines.node >= 22`, `repository` and `sideEffects`; the protocol declarations are unchanged byte for byte |
-| `0.1.0-beta.5` | 2026-09-17T11:41:10Z | `beta` | **breaking**: the protocol fingerprint jumped from `fp-1` to `fp-7` (older clients cannot connect to the new runtime); everything else is additive — the connector tool's `input_schema` / `tools_truncated`, per-turn Skill mounting (`mentions` honours `kind: "skill"` only), `agent_id` / `team_id`, `model` / `reasoning_effort`, and the new `zip` marketplace source kind. No methods added or removed, still `48 / 71` (steps in §6.4) |
+| `0.1.0-beta.7` | 2026-09-20T10:33:48Z | `beta` | **breaking**: the protocol fingerprint moved to `fp-8` (older clients cannot connect to this runtime) — two WebSocket-only methods, `agent/export` / `team/export`, now return a portable `ExpertPack`; the method count moves `48 / 71` → `48 / 73` with the mapped count unchanged. **No type narrowing or renames**, so code usually needs no changes (steps in §6.6) |
+| `0.1.0-beta.6` | 2026-09-18T11:08:21Z | — | **breaking**: the entry point of `@flowy-agent-store/sdk` was **renamed and reshaped** (`launchClient` → `launchHarness`, no more `.client` hop, `initializeResult` → `handshake`), so **code changes are required**; the wire is untouched — fingerprint still `fp-7` and still `48 / 71` (steps in §6.5) |
+| `0.1.0-beta.5` | 2026-09-17T11:41:10Z | — | **breaking**: the protocol fingerprint jumped from `fp-1` to `fp-7` (older clients cannot connect to the new runtime); everything else is additive — the connector tool's `input_schema` / `tools_truncated`, per-turn Skill mounting (`mentions` honours `kind: "skill"` only), `agent_id` / `team_id`, `model` / `reasoning_effort`, and the new `zip` marketplace source kind. No methods added or removed, still `48 / 71` (steps in §6.4) |
 | `0.1.0-beta.4` | 2026-09-16T10:24:02Z | — | **breaking**: the protocol fingerprint became the strict-equality `fp-1` (older clients cannot connect to this runtime) and `event_type` was narrowed to the closed union `ConversationEventType`; it also carries the Skill file-tree read face, the `connector/call` proxy and `conversation/list-changed` (steps in §6.3); the client now maps `48 / 71` methods over HTTP |
 
 Note that `0.1.0` is the **earliest** publish (about 18 minutes before beta.2) and yet no dist-tag points at it; it is neither a stable release nor newer than the beta line.
@@ -39,7 +41,7 @@ A `dist-tag` is a label the publisher can move; it says nothing about version or
 | dist-tag | Points at today |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.5` |
+| `beta` | `0.1.0-beta.7` |
 
 `0.1.0` carries no tag at all. The three packages and `@flowy-agent-store/runtime-*` agree on both tags (verified).
 
@@ -49,14 +51,14 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.5", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.7", "latest": "0.1.0-beta.2" }
 }
 ```
 
 Two traps:
 
-1. `latest` is **not** the newest version — it points at `0.1.0-beta.2`, while the newest beta is `0.1.0-beta.6` under the `beta` tag.
+1. `latest` is **not** the newest version — it points at `0.1.0-beta.2`, while the newest beta is `0.1.0-beta.7` under the `beta` tag.
 2. `0.1.0` has no tag, but a version range can still resolve to it (see §4).
 
 Also note that the `versions` array is **not** in chronological order: `0.1.0` is listed last and was published first.
@@ -69,7 +71,7 @@ Measured in throwaway directories with an empty `node_modules`:
 
 ```bash
 bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2 (latest)
-bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.6
+bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.7
 bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → bun resolves 0.1.0-beta.2
 npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → npm resolves 0.1.0 (the untagged early publish)
 ```
@@ -80,14 +82,14 @@ Conclusion: **do not rely on range resolution**. A tag alias is no safer — `la
 
 ```bash
 # Write the exact version; avoid ^ and ~
-bun add @flowy-agent-store/sdk@0.1.0-beta.6
-bun add @flowy-agent-store/protocol@0.1.0-beta.6   # when you import wire types
+bun add @flowy-agent-store/sdk@0.1.0-beta.7
+bun add @flowy-agent-store/protocol@0.1.0-beta.7   # when you import wire types
 
 # same for npm / pnpm
-npm install @flowy-agent-store/sdk@0.1.0-beta.6
+npm install @flowy-agent-store/sdk@0.1.0-beta.7
 ```
 
-`package.json` should end up with `"@flowy-agent-store/sdk": "0.1.0-beta.6"` (**no** `^`). The sdk's platform runtime packages are pinned to the same version by its `optionalDependencies`, so they need no separate entry.
+`package.json` should end up with `"@flowy-agent-store/sdk": "0.1.0-beta.7"` (**no** `^`). The sdk's platform runtime packages are pinned to the same version by its `optionalDependencies`, so they need no separate entry.
 
 Commit the lockfile too: `bun.lock` / `package-lock.json` / `pnpm-lock.yaml` is the only authoritative record of what an install actually pulled.
 
@@ -119,11 +121,11 @@ If you point `AGENT_STORE_BIN` at a self-built binary, note that the SDK **check
 
 ```bash
 # move off the untagged 0.1.0 onto the current beta line (current beta: see §3)
-bun add @flowy-agent-store/sdk@0.1.0-beta.6
+bun add @flowy-agent-store/sdk@0.1.0-beta.7
 bun pm ls | grep '@flowy-agent-store'   # confirm 0.1.0 is gone
 ```
 
-The move from `0.1.0` to `beta.3` is additive: the public declaration surface only grew (the runtime packages added in `beta.2`, the reconnect and exit observation added in `beta.3`) — nothing was removed or renamed. **`beta.4` is not additive** — it carries type narrowing and a strict-equality protocol fingerprint, see §6.3; **`beta.5` is not additive either** (the fingerprint is compared for strict equality again), but it needs **no code changes**, see §6.4. **`beta.6` is not additive either** — the SDK entry point was renamed and reshaped, and it **does** require code changes, see §6.5.
+The move from `0.1.0` to `beta.3` is additive: the public declaration surface only grew (the runtime packages added in `beta.2`, the reconnect and exit observation added in `beta.3`) — nothing was removed or renamed. **`beta.4` is not additive** — it carries type narrowing and a strict-equality protocol fingerprint, see §6.3; **`beta.5` is not additive either** (the fingerprint is compared for strict equality again), but it needs **no code changes**, see §6.4. **`beta.6` is not additive either** — the SDK entry point was renamed and reshaped, and it **does** require code changes, see §6.5; **`beta.7` is not additive either** (the fingerprint moves `fp-7` → `fp-8`), but it needs **no code changes**, see §6.6.
 
 ### 6.3 From 0.1.0-beta.3 to 0.1.0-beta.4
 
@@ -211,6 +213,38 @@ harness.handshake.protocol_version;
 
 **What does not change**: the wire. The fingerprint is still `fp-7` and the method count is still `48 / 71`, so a `0.1.0-beta.5` runtime and this SDK interoperate (the rename itself is not type-compatible across versions). The `client` option (self-reported identity) and direct `transport.request(...)` calls are unchanged.
 
+### 6.6 From 0.1.0-beta.6 to 0.1.0-beta.7
+
+**Upgrading is mandatory, but no code changes are needed**: the fingerprint moves from `fp-7` to `fp-8`, and the handshake and SDK compare it with **strict equality** — a client built against `beta.6` or earlier **cannot connect** to this runtime, so it must be upgraded alongside it. Beyond that this release **only adds methods; nothing was narrowed or renamed**, the SDK entry point is still `launchHarness`, and caller code usually needs no edits at all.
+
+```bash
+# 1) see what is actually installed
+bun pm ls | grep '@flowy-agent-store'          # npm projects: npm ls @flowy-agent-store/sdk
+# 2) pin 0.1.0-beta.7 (upgrade the packages you use, on one version)
+bun add @flowy-agent-store/sdk@0.1.0-beta.7
+bun add @flowy-agent-store/protocol@0.1.0-beta.7
+# 3) confirm what got resolved
+node -p "require('@flowy-agent-store/sdk/package.json').version"
+# 4) re-run your type check and tests — this should pass with zero changes
+bun run typecheck
+```
+
+**Two things to check**:
+
+```ts
+// the fingerprint moved: code asserting the old value must be relaxed or updated
+harness.handshake.protocol_version;   // now "fp-8"; a beta.6 runtime reports "fp-7"
+
+// new capability (optional): export an expert / team to an external runtime
+const pack = await harness.agents.export(agentId);
+const team = await harness.teams.export(teamId);          // a team definition, every member expanded
+```
+
+1. **If you asserted the fingerprint's literal value** (for example using `handshake.protocol_version === "fp-7"` as a check), it will now **fail** — compare against the `APP_SERVER_PROTOCOL_VERSION` constant instead, or drop the hard-coded value. Ordinary connections through the SDK are unaffected: the SDK validates with the new constant, and an old runtime is rejected outright.
+2. **If you inject your own binary via `AGENT_STORE_BIN`**: the SDK and the binary must be upgraded **in the same batch**, or the handshake fails immediately.
+
+**Also worth knowing (it does not affect SDK usage)**: the `[memory]` table in `~/.agent-store/config.toml` gained `enabled` (the built-in memory master switch; it defaults to **on**, and omitting the key keeps the upstream default, so behavior is unchanged after upgrading) — see the `memory` section of the [Configuration file](/en-US/docs/configuration). And `[models.*]`'s `max_output_size` / `protocol` were previously **declared but had no consumer** (which made anthropic / bedrock / vertex runtime builds fail with `BAD_REQUEST`); this release wires them up, and does so **only when empty, never overwriting**. Neither item **enters the fingerprint** — they only change how the host reads its config, so upgrading the npm packages without swapping the runtime will not reveal them.
+
 ## 7. Check which version you actually have
 
 ```bash
@@ -228,9 +262,14 @@ When the three disagree, trust the **lockfile and the installed `package.json`**
 
 ## 8. Published-artifact differences and how to check them
 
-As of `0.1.0-beta.6` (2026-09-18), **the working tree leads the published artifacts**: after `beta.6` it accumulated one further **zero-wire-change** host-configuration increment — the `[memory]` table in `~/.agent-store/config.toml` gained `enabled` (the built-in memory system's master switch; `false` stops all four faces at once: the prompt's memory section / the `remember` tool / session-end distillation / citation write-back), **independent of** the existing `distill_enabled`. It **does not change the protocol surface** (fingerprint still `fp-7`, method count still `48 / 71`), so published SDK and runtime artifacts **need no update** — and it is invisible to the read-two-artifacts-side-by-side check, because it only changes how the host reads its config; see the `memory` section of the [Configuration file](/en-US/docs/configuration). This release's SDK entry rename and shape change are in §2.1 of the [Changelog](/en-US/docs/changelog) (migration steps in §6.5 below), the six fingerprint increments of `0.1.0-beta.5` are in §2.2 of the same page, and what `0.1.0-beta.4` changed relative to `0.1.0-beta.3` is in §2.3. The commands below are how you check the **protocol surface** — fetch the published artifacts of any two versions and read them side by side.
+As of `0.1.0-beta.7` (2026-09-20), **the working tree matches the published artifacts** — there is **no** new unpublished increment after `beta.7`. Both batches accumulated after `beta.6` shipped with this release:
 
-> A caveat on scope: the self-check commands in this section can only prove whether the **wire surface** agrees. Host-configuration increments (like `[memory] enabled` above) never enter the fingerprint, so reading two artifacts side by side **cannot** reveal them; judge those by the [Configuration file](/en-US/docs/configuration), not by this page.
+1. **Expert / team definition export — `fp-7` → `fp-8` (breaking)**: two WebSocket-only methods, `agent/export` / `team/export`, with the method count moving `48 / 71` → `48 / 73` (the mapped count unchanged). The full entry is in §2.1 of the [Changelog](/en-US/docs/changelog); migration steps are in §6.6 below.
+2. **Host-configuration increment — zero wire change**: the `[memory]` table in `~/.agent-store/config.toml` gained `enabled` (the built-in memory master switch, **independent of** the existing `distill_enabled`); the same batch wired up `[models.*]`'s `max_output_size` / `protocol`. Neither **enters the fingerprint**, so reading two artifacts side by side **cannot** reveal them — they only change how the host reads its config; see the [Configuration file](/en-US/docs/configuration).
+
+The SDK entry rename and shape change of `0.1.0-beta.6` are in §2.2 of the [Changelog](/en-US/docs/changelog) (migration steps in §6.5 below), the six fingerprint increments of `0.1.0-beta.5` are in §2.3 of the same page, and what `0.1.0-beta.4` changed relative to `0.1.0-beta.3` is in §2.4. The commands below are how you check the **protocol surface** — fetch the published artifacts of any two versions and read them side by side.
+
+> A caveat on scope: the self-check commands in this section can only prove whether the **wire surface** agrees. Host-configuration increments (like `[memory] enabled` and `max_output_size` above) never enter the fingerprint, so reading two artifacts side by side **cannot** reveal them; judge those by the [Configuration file](/en-US/docs/configuration), not by this page.
 
 ### 8.1 Migrating a config's marketplace sources
 
