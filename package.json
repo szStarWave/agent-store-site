@@ -2,15 +2,16 @@
   "name": "@flowy-agent-store/site",
   "private": true,
   "version": "0.1.0",
-  "type": "module",
-  "scripts": {
-    "dev": "react-router dev",
-    "build": "react-router build && node scripts/copy-market-tree.mjs",
+    "scripts": {
+    "dev": "docusaurus start --host 127.0.0.1 --port 5173",
+    "build": "docusaurus build && node scripts/copy-market-tree.mjs",
+    "clear": "docusaurus clear",
     "sync": "node scripts/sync-market-tree.mjs && node scripts/sync-market-data.mjs",
     "sync:tree": "node scripts/sync-market-tree.mjs",
     "sync:market": "node scripts/sync-market-data.mjs",
     "import:experts": "node scripts/import-expert-bundles.mjs",
-    "preview": "react-router preview",
+    "preview": "node scripts/preview.mjs",
+    "serve": "docusaurus serve",
     "typecheck": "tsc --noEmit",
     "check:docs-sync": "node scripts/check-docs-sync.mjs",
     "test:docs-sync": "bun test scripts/check-docs-sync.test.mjs",
@@ -25,27 +26,26 @@
     "release:status": "node scripts/release.mjs status"
   },
   "dependencies": {
+    "@docusaurus/core": "^3.10.2",
+    "@docusaurus/plugin-content-docs": "^3.10.2",
+    "@docusaurus/preset-classic": "^3.10.2",
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/geist-mono": "^5.3.0",
     "@fontsource-variable/inter": "^5.3.0",
-    "i18next": "^26.4.2",
-    "isbot": "^5.2.2",
+    "@mdx-js/react": "^3.1.1",
+    "clsx": "^2.1.1",
     "lucide-react": "^1.46.0",
+    "prism-react-renderer": "^2.4.1",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "react-i18next": "^17.0.14",
-    "react-markdown": "^10.1.0",
-    "react-router": "^8.3.1",
-    "rehype-highlight": "^7.0.2",
-    "remark-gfm": "^4.0.1"
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
-    "@react-router/dev": "^8.3.1",
-    "@react-router/node": "^8.3.1",
+    "@docusaurus/module-type-aliases": "^3.10.2",
+    "@docusaurus/tsconfig": "^3.10.2",
+    "@docusaurus/types": "^3.10.2",
     "@types/bun": "^1.4.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.0"
+    "typescript": "^7.0.2"
   }
 }

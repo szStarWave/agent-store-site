@@ -41,14 +41,14 @@
 
 ## 发版时最容易踩的三条硬约束
 
-1. **用 `bun run build`，不要直接 `react-router build`**——后者漏掉 `copy-market-tree.mjs`，线上 `/source/**` 全部 404。
-2. **新页必须进 `react-router.config.ts` 的 `prerender()`**，否则线上只拿到 SPA 空壳，SEO 与社交预览都是空的。
+1. **用 `bun run build`，不要直接 `docusaurus build`**——后者漏掉 `copy-market-tree.mjs`，目录页头像会全部退化成字母徽标（`bun run preview` 刻意不做兜底，用来暴露这种情况）。
+2. **新增文档要同时在 `src/lib/docOrder.ts` 登记**。与旧站不同，页面不再需要手写预渲染清单——`src/pages/` 下的文件与两个 docs 插件 `path` 下的 Markdown 都会自动生成静态 HTML；但「侧边栏顺序表」与「磁盘上的文档集合」由 `docusaurus.config.ts` 在构建期核对，漏登记直接构建失败。
 3. **市场树与 `content/market.json` 是生成物，必须成对提交**，且只由 `bun run sync` 写；不要在仓里手工改市场条目。发布流程**不含**市场刷新（源仓库 `16` R6② 已延后），只有本次发布确实改了市场树才做。
-4. **产物规模有硬上限**：EdgeOne Makers 只接受 **≤ 20,000 个文件**、**单文件 ≤ 25 MiB** 的产物（官方排障指南给的三个限制之一，无提额入口）。专家市场单独就是 14,714 个文件且含一个 45.8 MiB 的数据集，与站点一起部署必然被拒（现象：日志停在 `Checking output`，随后 `File count exceeds project limit.` / `Build error`）。所以站点只**整树**托管 `copy-market-tree.mjs` 里 `HOSTED_DEFAULT` 指定的市场（`SITE_HOSTED_MARKETS` 只是本地覆盖）；`bun run build` 末尾那行 `[copy-market-tree] → build/client/source (N files…)` 就是部署前该看的数字。
+4. **产物规模有硬上限**：EdgeOne Makers 只接受 **≤ 20,000 个文件**、**单文件 ≤ 25 MiB** 的产物（官方排障指南给的三个限制之一，无提额入口）。三个市场整树合计 22,612 个文件且专家市场含一个 45.8 MiB 的数据集，与站点一起部署必然被拒（现象：日志停在 `Checking output`，随后 `File count exceeds project limit.` / `Build error`）。**现状：三个市场都已迁到 ModelScope 的 zip 归档，本站一个都不整树托管**，产物里只留目录页头像。`bun run build` 末尾那行 `[copy-market-tree] → build/source (N files…)` 就是部署前该看的数字。
 
 ## 已知缺口
 
 - **本仓无 CI**：`check:release` 与部署后自检都是人工执行；**EdgeOne 的 GitHub 自动构建自 2026-09-17 起失效**，
   需要手动触发（见 [`deploy-trigger.md`](deploy-trigger.md)）。
 - **域名与 HTTPS 未定**：EdgeOne 预览域名带签名的 `eo_token` 会过期，不能长期对外公布为市场源地址（见 `README.md` §部署「待定」）。
-- **平台清单是两处字面量**：`app/lib/platform.ts` 的 `RELEASED_PLATFORMS` 与 `scripts/release.mjs` 的 `PLATFORM = "windows-x86_64"` 必须人工保持一致（跨仓的 `check:release-sync` 只守版本号与文档计数，不守这个）。
+- **平台清单是两处字面量**：`src/lib/platform.ts` 的 `RELEASED_PLATFORMS` 与 `scripts/release.mjs` 的 `PLATFORM = "windows-x86_64"` 必须人工保持一致（跨仓的 `check:release-sync` 只守版本号与文档计数，不守这个）。

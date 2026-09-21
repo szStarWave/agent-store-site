@@ -9,11 +9,14 @@
 
 ## 技术栈
 
-- React Router v8（framework 模式，内置 SSG，无需额外 prerender 插件）
-- Vite 8 + React 19 + TypeScript
-- `i18next` / `react-i18next`，支持 `zh-CN` / `en-US`
-- `react-markdown` + `remark-gfm` + `rehype-highlight`，用于渲染文档
+- Docusaurus 3.10（SSG，纯静态产物 → `build/`）
+- React 19 + TypeScript
+- 站点内建双语层（`src/i18n/`，上下文驱动；`zh-CN` / `en-US` 两套 URL 前缀）
+- 文档由 docs 插件在构建期解析（按纯 Markdown，非 MDX），围栏代码由 Prism 高亮
 - `lucide-react` 图标 + 自定义 CSS 设计变量（不使用 Tailwind/UnoCSS）
+
+> 本站原先基于 React Router v8 + Vite 8，已整站迁移到 Docusaurus；迁移的取舍与踩过的坑见
+> [`docs/docusaurus-migration.md`](docs/docusaurus-migration.md)。
 
 ## 快速开始
 
@@ -22,8 +25,7 @@ bun install
 bun run dev      # 启动开发服务器 → http://127.0.0.1:5173
 ```
 
-> 若启动时报 safe-delete / trash 操作失败，先 `$env:NODE_OPTIONS=""` 再启动：注入的
-> `node-language-shim` 会让 `react-router dev` 清理 `.react-router/types` 时失败并退出。
+> 若启动时报 safe-delete / trash 操作失败，先 `$env:NODE_OPTIONS=""` 再启动。
 
 ## 构建与预览
 
@@ -32,8 +34,8 @@ bun run dev      # 启动开发服务器 → http://127.0.0.1:5173
 | `bun run sync` | 同步市场树（`sync:tree` + `sync:market`），见下一节 |
 | `bun run sync:tree` | 把本地三个市场工作目录镜像进 `market-source/`，并生成 `_files.txt` |
 | `bun run sync:market` | 由 `market-source/` 生成 `content/market.json`（纯本地读取，无网络） |
-| `bun run build` | 预渲染静态 HTML → `build/client/`，随后把 `market-source/` 拷为 `build/client/source/`（可用 `SITE_HOSTED_MARKETS` 只托管部分市场，见「市场源」） |
-| `bun run preview` | 本地托管生产构建产物 |
+| `bun run build` | SSG 生成静态站点 → `build/`，随后把目录页头像拷为 `build/source/` |
+| `bun run preview` | 本地托管 `build/`（**刻意不做 SPA 兜底**，缺失路径如实 404） |
 | `bun run typecheck` | 类型检查（`tsc --noEmit`） |
 | `bun run check:market` | 市场门禁：查清单内重复，并核对 `market-source/` 与 `content/market.json` 是否一致 |
 | `bun run check:docs-sync` | 双语文档结构门禁，改过 `content/docs/` 后必跑 |
@@ -42,12 +44,14 @@ bun run dev      # 启动开发服务器 → http://127.0.0.1:5173
 
 ### 关于 `market-source/`
 
-市场树（experts / skills / connectors，约 22.6k 个文件）**刻意不放在 `public/`**：
-Vite 会在构建期拷贝 `publicDir`，而位于项目根目录的这棵树会让 React Router 的
-prerender 请求失败（构建卡在准备输出目录阶段）。因此由
-`scripts/copy-market-tree.mjs` 在 `react-router build` 之后拷贝进产物，公开 URL
-仍是 `/source/<market>/…`；`vite.config.ts` 里同时把该目录排除出 watcher，
-以免拖慢开发态。
+市场树（experts / skills / connectors，约 22.6k 个文件）**刻意不放在 `static/`**：
+Docusaurus 会在构建期拷贝整个静态目录，而这棵树让构建卡在拷贝阶段。因此由
+`scripts/copy-market-tree.mjs` 在 `docusaurus build` 之后拷贝，公开 URL 仍是
+`/source/<market>/…`；开发态则由 `src/plugins/market-source-dev.ts` 直接把
+`/source/**` 映射到 `market-source/`（仅 dev，不进产物）。
+
+> 注意：**本站不再整树托管任何市场**。三个市场已迁到 ModelScope 的 zip 归档
+> （`pack:market` / `publish:market`），产物里只留目录页引用的头像（约 648 个文件）。
 
 ## 市场源
 
@@ -98,28 +102,26 @@ $env:SITE_HOSTED_MARKETS="skills,connectors"   # 未列出的市场只留目录�
 | 配置项 | 值 |
 | --- | --- |
 | `installCommand` | `bun install` |
-| `buildCommand` | `bun run build`（含拷贝 `market-source/` → `build/client/source/`） |
-| `outputDirectory` | `build/client` |
+| `buildCommand` | `bun run build`（含拷贝目录页头像 → `build/source/`） |
+| `outputDirectory` | `build` |
 
-`edgeone.json` 里还固化了两件静态托管必需的事：
+`edgeone.json` 里固化了两条缓存策略：
 
-1. **`headers`** —— 三个 `_files.txt` 显式 `no-cache`。Makers 默认按文件名是否带
-   hash 分流浏览器缓存（带 hash → 一年，`index.html` 等 → `max-age=0`），而清单
-   必须在每次部署后立刻可见。边缘缓存本身会在每次部署后自动失效。
-2. **`rewrites`** —— `/zh-CN/_.data` → `/zh-CN.data`（`en-US` 同理）。SSG 的布局
-   数据落在 `zh-CN.data`，而客户端导航到 `/zh-CN/` 时请求的是 `zh-CN/_.data`，
-   缺这条重写会出现回首页白屏。
+1. **`headers` → `/assets/**`** —— Docusaurus 产出的 JS / CSS 文件名带内容 hash，
+   可以放心长缓存（`max-age=31536000, immutable`）。
+2. **`headers` → `/source/**`** —— 头像与市场清单路径**不带 hash**，必须
+   `max-age=0, must-revalidate`，否则替换图标后客户端会一直拿旧图。
 
-> **不要**加「未命中一律回退 `index.html`」的兜底重写：缺失的 `.data`/`.js` 必须
-> 老老实实返回 404，否则客户端会把 HTML 当 JSON 解析并抛
-> `Unexpected token '<'`。
+`rewrites` 现在是**空的**：旧站需要把 `/zh-CN/_.data` 重写到 `/zh-CN.data`（React Router
+的 SSG 布局数据），Docusaurus 的客户端路由不产出 `.data` 请求，那两条重写已无对象。
 
-> **注意：预渲染列表必须覆盖全部对外页面。** 站点只部署 `build/client/`
-> （静态文件），不存在运行时服务端。只有 `react-router.config.ts` 中
-> `prerender()` 枚举到的路由才会生成带内容的静态 HTML；未被覆盖的页面
-> 线上只会拿到 SPA 空壳，对 SEO 与社交分享预览不友好。新增文档/页面后，
-> 务必保证 `prerender()`（目前通过 `docSlugs(lang)` 遍历所有文档 slug）能
-> 枚举到它。
+> **不要**加「未命中一律回退 `index.html`」的兜底重写：缺失的 `.js` 必须老老实实返回
+> 404，否则客户端会把 HTML 当 JSON 解析并抛 `Unexpected token '<'`。
+
+**每个对外页面都会进产物。** 与旧站不同，Docusaurus 不需要手写预渲染清单：
+`src/pages/` 下的每个文件、以及两个 docs 插件 `path` 下的每篇 Markdown 都会生成静态 HTML。
+新增文档时**必须同时在 `src/lib/docOrder.ts` 登记**——`docusaurus.config.ts` 会在构建期
+核对「侧边栏顺序表」与「磁盘上的文档集合」是否一致，不一致直接构建失败。
 
 **发布方式：** 推送到 `main` **本应**触发 EdgeOne Makers 构建并上线；但自 2026-09-17 起
 **GitHub 自动触发失效**（最后一次平台产生的部署是当日 07:38 的 `47bcdff5`，其后的推送都没有
@@ -139,14 +141,16 @@ $env:SITE_HOSTED_MARKETS="skills,connectors"   # 未列出的市场只留目录�
 ## 目录结构
 
 ```
-app/                     React Router 应用（根、路由、布局、页面、组件、i18n、lib）
+docusaurus.config.ts     站点配置（两个 docs 实例、markdown.format、Prism、静态目录）
+src/                     应用代码（pages 路由 / views 页面 / components / theme 外壳 / i18n / lib / plugins / remark / css）
+static/                  Docusaurus 静态目录（install.ps1、favicon）
 content/docs/            Markdown 文档，含 zh-CN 与 en-US（与上游源仓库 Michael-Lfx/allo 的 docs/agent-store 保持同步）
 content/market.json      由市场树生成的目录页快照（bun run sync:market）
 market-source/           市场树（experts / skills / connectors + _files.txt），提交进仓库
-scripts/                 市场同步、市场/文档门禁、构建期拷贝、发版
+scripts/                 市场同步、市场/文档门禁、构建期拷贝、本地预览、发版
 docs/                    面向维护者的中文文档（不进站点）
-edgeone.json             EdgeOne Makers 构建/缓存/重写配置
-react-router.config.ts   ssr 默认开启 + prerender()
-vite.config.ts           base = BASE_PATH；watcher 忽略 market-source/
+edgeone.json             EdgeOne Makers 构建/缓存配置
 ```
+
+目录内部划分与迁移取舍见 [`docs/docusaurus-migration.md`](docs/docusaurus-migration.md) §8。
 

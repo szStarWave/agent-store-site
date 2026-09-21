@@ -57,7 +57,7 @@ Only projects with Provider 'Upload' are supported.
 
 | Name | ProjectId | Provider | RepoBranch | OutputDir | CustomDomains |
 |---|---|---|---|---|---|
-| `agent-store-site` | `makers-yjnkgelxhduo` | Github | `main` | `build/client` | `agent-store.flowyaipc.cn` |
+| `agent-store-site` | `makers-yjnkgelxhduo` | Github | `main` | `build` | `agent-store.flowyaipc.cn` |
 | `agent-store-market` | `makers-cl4lnfggoyim` | — | — | — | — |
 
 ### 2.2 列部署 `DescribePagesDeployments`
@@ -100,7 +100,7 @@ https://dpl-edgeone.cloud.tencent.com/<APPID>/<ProjectId>/<DeploymentId>/build.l
 ```
 
 返回 `{"Data":{"Response":{"DeploymentId":"dp…"}}}`。平台随后按该提交拉仓库、跑 `edgeone.json` 的
-安装/构建命令（本站是 `bun install` / `bun run build`，产物 `build/client`），成功即自动切到生产。
+安装/构建命令（本站是 `bun install` / `bun run build`，产物 `build`），成功即自动切到生产。
 
 > ⚠️ **该请求形状未见于官方文档**。CLI 包内只实现了 `ViaMeta:"Upload"` 那条路（
 > `CreatePagesDeployment` + `Provider:"Upload"` + `DistType` + `TempBucketPath` + `BuildFrom:"CLI"`），
