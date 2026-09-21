@@ -1,0 +1,68 @@
+/**
+ * Docusaurus 覆盖样式。
+ *
+ * `src/css/style.css` 是站点自己的设计系统（58 KB 手写 CSS，含设计变量与全部页面类名），
+ * **原样保留**，以便迁移后页面与旧站视觉一致。这个文件只处理「Docusaurus 骨架与站点的接缝」：
+ *
+ * 1. Infima（theme-classic 的默认主题）自带 `body` / `h1` / 链接 / 按钮等基础样式，
+ *    会与站点的排版规则打架。把站点需要的部分还原成「由 style.css 掌控」。
+ * 2. theme-classic 的布局容器会给内容加 `container` / `row` / `col` 一类的栅格类，
+ *    而本站的两栏文档布局是自己实现的（`.docs-sidebar` + `.docs-content`）。
+ */
+
+/* ── 让站点自己的排版重新掌权 ─────────────────────────────────────────────
+   Infima（theme-classic 的默认主题）会在 `:root` 上写 `--ifm-*` 变量，并把 `body` 的字体、
+   行高、颜色写死。这里按 style.css 的设计变量还原——customCss 数组里 style.css 在前，
+   因此用同等特异性把它覆盖回来。 */
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  line-height: 1.6;
+}
+
+/* 文档正文里的标题不应继承 Infima 的大边距，交给 `.markdown-body` 的规则。 */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin-top: revert;
+}
+
+/* ── 文档两栏布局 ────────────────────────────────────────────────────────
+   theme-classic 的 `DocItem/Layout` 用 `row`/`col` 栅格；本站的 `DocItem/Layout`
+   已替换成自己的两栏结构，这里只需保证外层不额外加内边距。 */
+.docs-detail {
+  margin: 0;
+}
+
+/* theme-classic 的 markdown 容器会加自己的宽度与居中，站点的 `.docs-content` 已处理。 */
+.theme-doc-markdown {
+  max-width: none;
+}
+
+/* ── 目录（TOC）──────────────────────────────────────────────────────────
+   theme-classic 的 `table-of-contents` 样式与站点自绘的目录无关，避免误命中。 */
+.docs-page-toc-list ul,
+.docs-page-toc-list ol {
+  list-style: none;
+}
+
+/* ── Docusaurus 自带元素 ─────────────────────────────────────────────────
+   站点不用 theme-classic 的 Navbar / Footer（`Layout` 已替换），但 SkipToContent
+   与 ErrorBoundary 仍可能渲染，给它们一个不与固定导航重叠的位置。 */
+.skip-to-content {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+}
+.skip-to-content:focus {
+  left: 8px;
+  top: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}

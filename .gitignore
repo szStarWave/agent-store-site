@@ -9,10 +9,11 @@
 # `bun run check:market` guards this with probes; that is what `ignore.market-tree`
 # reports. Never add an unanchored directory name or a bare `*.ext` glob.
 
-# React Router generated types/cache
-/.react-router/
+# Docusaurus generated caches (types, routes, generated config). Anchored to the
+# root on purpose — see the header rule about unanchored names.
+/.docusaurus/
 
-# Build output (React Router SSG → static files)
+# Build output (Docusaurus SSG → static files). Anchored, and only this repo's own.
 /build/
 
 # Dependencies
@@ -22,8 +23,8 @@ node_modules/
 # input**, not what the site serves: the three markets ship as zip archives on
 # ModelScope (`scripts/pack-market-zips.mjs` packs them, `scripts/publish-market-zips.mjs`
 # uploads them), and only the catalog-page icons still reach the build output.
-# It lives outside `public/` (Vite would copy it during the build and stall
-# prerender) and is copied into the output by scripts/copy-market-tree.mjs —
+# It lives outside `static/` (Docusaurus would copy the whole dir during the build
+# and stall it) and is copied into the output by scripts/copy-market-tree.mjs —
 # see scripts/sync-market-tree.mjs.
 
 # Release artifacts (zips are built per release by scripts/release.mjs and
