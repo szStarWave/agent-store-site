@@ -6,10 +6,11 @@ import Landing from "../views/Landing";
  * 站点根 `/` —— 与旧站一致，直接渲染**中文**落地页，而不是跳转到 `/zh-CN`。
  *
  * 旧站 `app/routes.ts` 的注释说明了同样的选择：`/` 上渲出内容，dev 预览与 SSG 才都有东西，
- * 且省掉一次客户端重定向。`Layout` 按 URL 判定语言，`/` 不属于 `/en-US`，因此即为 zh-CN。
+ * 且省掉一次客户端重定向。`Root` 按 URL 判定语言，`/` 不属于 `/en-US`，因此即为 zh-CN。
  *
- * `src/pages/*` 的路由**不会**被自动套上 `Layout`（只有 docs 路由经 `DocsRoot` 拿到），
- * 所以每个页面显式包一层——这与 Docusaurus 对普通页面的惯例一致。
+ * 样式说明：站点设计系统 `src/css/style.css` 由 `theme.customCss` **全局**加载，
+ * 其规则被 `src/plugins/scope-site-css.ts` 加了 `html:not(.docs-wrapper)` 守卫，
+ * 因此只在非文档页生效。这里不需要单独 import。
  */
 export default function Home() {
   return (
