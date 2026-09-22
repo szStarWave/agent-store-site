@@ -536,7 +536,12 @@ if (call.is_error) {
 
 > **参数不做客户端校验**：`input_schema` 是任意 JSON Schema，客户端只负责把它交给你。传错参数得到的是 `is_error: true` 与服务器自己的报错，**而不是 promise 拒绝**——只有「根本没够着工具」才 reject。`policy_denied` 表示宿主**没开代理**，或这一对被 `allow` 收窄出局 / 被 `deny` 明确排除，不再是「你漏写了白名单」。
 
-## 9. 目录类短例：agents / teams / skills / models / workspaces
+## 9. 目录面速查
+
+五个资源面（agents / teams / skills / models / workspaces）的 `list` / `get` 只返回结构化摘要，
+不含 persona 正文；workspaces 另有创建与吊销两个写操作。下面按读与写分开列。
+
+### 9.1 目录面：list / get
 
 ```ts
 const agents = await client.agents.list();          // AgentSummary[]
@@ -550,14 +555,20 @@ const skills = await client.skills.list();          // SkillSummary[]
 console.log(skills.filter((s) => s.writable).map((s) => s.name)); // 可写的用户技能
 
 const models = await client.models.list();          // ModelSummary[]：当前宿主可用模型
+```
 
+### 9.2 workspaces：创建与吊销
+
+```ts
 const workspaces = await client.workspaces.list();  // WorkspaceView[]
 const created = await client.workspaces.create("/abs/path/to/project"); // 服务端 canonicalize
 await client.workspaces.revoke(created.workspace_id); // 软删除，既有会话保留
 ```
 
-**读技能的全部文件**（技能是目录：`SKILL.md` 之外还有 `references/` / `scripts/` 等；
-`skills.get()` 的正文摘要约 1200 字截断，所以附属文件只能这样读）：
+### 9.3 读技能目录下的文件
+
+技能是目录：`SKILL.md` 之外还有 `references/` / `scripts/` 等；`skills.get()` 的正文摘要
+约 1200 字截断，所以附属文件只能这样读：
 
 ```ts
 if (client.initializeInfo?.capabilities.skill_files) {   // 宿主可以只接目录不接文件面
@@ -573,7 +584,7 @@ if (client.initializeInfo?.capabilities.skill_files) {   // 宿主可以只接�
 }
 ```
 
-### 9.1 导出专家 / 专家团给外部 runtime（`fp-8`）
+### 9.4 导出专家 / 专家团给外部 runtime（`fp-8`）
 
 `agents.get()` / `teams.get()` 是**目录面**：结构化字段，**永远不带 persona 正文**。要拿到专家**定义本身**
 （在你自己的 runtime 里跑它），用 `export()`：
