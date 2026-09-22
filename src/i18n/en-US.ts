@@ -34,11 +34,26 @@ const enUS = {
       subtitle:
         "Real screens, not mockups: import experts, skills and connectors, then run and watch — all on your machine.",
       views: {
-        chat: { label: "Chat", desc: "Reasoning, tool calls and replies on one timeline" },
-        experts: { label: "Experts", desc: "Pick experts and expert teams by scenario, add in one click" },
-        skills: { label: "Skills", desc: "Search by name or source, manage what is installed" },
-        connectors: { label: "Connectors", desc: "External systems and credential status at a glance" },
-        settings: { label: "Settings", desc: "Theme, language and the App Server connection" },
+        chat: {
+          label: "Chat",
+          desc: "Reasoning, tool calls and replies share a single timeline. Every step keeps the reason it took, so you can replay a whole session afterwards instead of seeing only the final answer.",
+        },
+        experts: {
+          label: "Experts",
+          desc: "Pick experts and expert teams by scenario, check the summary and fit before you decide, then add them to your machine in one click. Usable right away — no restart, no extra configuration.",
+        },
+        skills: {
+          label: "Skills",
+          desc: "Search skills by name or source, and tell installed apart from available. Installing, enabling and removing all happen locally, with source and version within reach.",
+        },
+        connectors: {
+          label: "Connectors",
+          desc: "Browse the external systems you can connect, and see at a glance whether credentials are ready. Once connected they are callable from a conversation, while the credentials themselves never leave your machine.",
+        },
+        settings: {
+          label: "Settings",
+          desc: "Manage light and dark theme, interface language and the App Server connection in one place. Port and connection state stay visible, with version and update entry points alongside.",
+        },
       },
       zoom: "Click to enlarge",
       close: "Close",

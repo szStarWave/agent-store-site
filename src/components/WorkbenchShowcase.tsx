@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useTranslation } from "../i18n";
 import { Boxes, Maximize2, MessageSquare, Plug, Settings, Sparkles, X } from "lucide-react";
 
@@ -12,9 +12,8 @@ import skillsShot from "../assets/webui/skills.webp";
 type ViewKey = "chat" | "experts" | "skills" | "connectors" | "settings";
 
 /**
- * Real screenshots of the shipped Web UI, one per catalog surface plus the
- * conversation view. Every shot is 1080×52x, so the stage pins the same aspect
- * ratio and switching views never reflows the page.
+ * 已发布 Web UI 的真实截屏，每张对应一个界面。截屏都是 1080×522，
+ * 所以每行的图位固定同一宽高比，切换视图不会引起回流。
  */
 const VIEWS: { key: ViewKey; icon: typeof Boxes; src: string }[] = [
   { key: "chat", icon: MessageSquare, src: chatShot },
@@ -24,21 +23,27 @@ const VIEWS: { key: ViewKey; icon: typeof Boxes; src: string }[] = [
   { key: "settings", icon: Settings, src: settingsShot },
 ];
 
+/**
+ * 产品预览：**图文交替的多行**，每行一张截屏配一段「编号 + 标题 + 说明」，左右依次交替。
+ *
+ * 布局从「左侧标签栏 + 右侧单张大图」改成多行，是因为标签栏把五个视图压成一屏，
+ * 每张截屏都只能缩得很小；拆成多行后每张图都能占到半屏宽，细节看得清，
+ * 编号列表也让「有哪些界面、各自解决什么」更容易扫读。
+ *
+ * 交互保留两点：
+ * - 点击任意截屏打开 lightbox 放大（原实现只有当前标签那张能点）。
+ * - 每行带 `data-reveal`，进入视口时交错浮现（`revealDelay()` 给出逐行延迟）。
+ */
 export default function WorkbenchShowcase() {
   const { t } = useTranslation();
-  const [active, setActive] = useState<ViewKey>("chat");
-  const [zoomed, setZoomed] = useState(false);
-  const tabs = useRef<(HTMLButtonElement | null)[]>([]);
+  /** 当前放大的视图；`null` 表示 lightbox 关闭。 */
+  const [zoomed, setZoomed] = useState<ViewKey | null>(null);
   const lightbox = useRef<HTMLDialogElement>(null);
 
-  const index = VIEWS.findIndex((view) => view.key === active);
-  const current = VIEWS[index];
-  const label = t(`landing.showcase.views.${current.key}.label`);
-  const desc = t(`landing.showcase.views.${current.key}.desc`);
-  const shotAlt = `${label} — ${desc}`;
+  const current = VIEWS.find((view) => view.key === zoomed);
 
-  // Warm the remaining shots shortly after mount (all five together are ~148 KB):
-  // switching a view then paints instantly instead of flashing an empty stage.
+  // Warm the shots shortly after mount (all five together are ~148 KB): opening the
+  // lightbox then paints instantly instead of flashing an empty stage.
   useEffect(() => {
     const timer = setTimeout(() => {
       for (const view of VIEWS) new Image().src = view.src;
@@ -46,8 +51,8 @@ export default function WorkbenchShowcase() {
     return () => clearTimeout(timer);
   }, []);
 
-  // `showModal` makes the page inert but still lets the document scroll behind
-  // the backdrop, so lock the root while the lightbox is up.
+  // `showModal` makes the page inert but still lets the document scroll behind the
+  // backdrop, so lock the root while the lightbox is up.
   useEffect(() => {
     if (!zoomed) return;
     const root = document.documentElement;
@@ -58,34 +63,24 @@ export default function WorkbenchShowcase() {
     };
   }, [zoomed]);
 
-  const openLightbox = () => {
-    if (lightbox.current && !lightbox.current.open) lightbox.current.showModal();
-    setZoomed(true);
-  };
-  const closeLightbox = () => lightbox.current?.close();
+  /**
+   * 由状态驱动 `<dialog>` 的开关，而不是在点击回调里直接调 `showModal()`。
+   *
+   * 后者会先弹出面板、再让 React 渲染内容，中间有一帧是空面板；
+   * 放在 effect 里则是「内容先渲染、再打开」，不会闪。
+   */
+  useEffect(() => {
+    const dialog = lightbox.current;
+    if (!dialog) return;
+    if (zoomed && !dialog.open) dialog.showModal();
+    if (!zoomed && dialog.open) dialog.close();
+  }, [zoomed]);
+
+  const openLightbox = (key: ViewKey) => setZoomed(key);
 
   /** Clicks that land on the dialog itself are backdrop clicks. */
   const onBackdropClick = (event: MouseEvent<HTMLDialogElement>) => {
     if (event.target === lightbox.current) lightbox.current.close();
-  };
-
-  /** Arrow/Home/End roving focus, matching the vertical tablist convention. */
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step =
-      event.key === "ArrowDown" || event.key === "ArrowRight"
-        ? 1
-        : event.key === "ArrowUp" || event.key === "ArrowLeft"
-          ? -1
-          : 0;
-    let next = -1;
-    if (step !== 0) next = (index + step + VIEWS.length) % VIEWS.length;
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = VIEWS.length - 1;
-    else return;
-
-    event.preventDefault();
-    setActive(VIEWS[next].key);
-    tabs.current[next]?.focus();
   };
 
   return (
@@ -99,100 +94,91 @@ export default function WorkbenchShowcase() {
           {t("landing.showcase.subtitle")}
         </p>
 
-        <div className="showcase-layout">
-          <div
-            className="ui-views"
-            role="tablist"
-            aria-orientation="vertical"
-            aria-label={t("landing.showcase.title")}
-            onKeyDown={onKeyDown}
-          >
-            {VIEWS.map((view, i) => {
-              const Icon = view.icon;
-              const selected = view.key === active;
-              return (
-                <button
-                  key={view.key}
-                  ref={(el) => {
-                    tabs.current[i] = el;
-                  }}
-                  type="button"
-                  role="tab"
-                  id={`ui-tab-${view.key}`}
-                  aria-selected={selected}
-                  aria-controls={`ui-panel-${view.key}`}
-                  tabIndex={selected ? 0 : -1}
-                  className={selected ? "ui-view is-active" : "ui-view"}
-                  onClick={() => setActive(view.key)}
-                >
-                  <span className="ui-view-icon" aria-hidden="true">
-                    <Icon size={16} />
-                  </span>
-                  <span className="ui-view-text">
-                    <span className="ui-view-label">{t(`landing.showcase.views.${view.key}.label`)}</span>
-                    <span className="ui-view-desc">{t(`landing.showcase.views.${view.key}.desc`)}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="ui-stage-wrap" data-reveal style={revealDelay(140)}>
-            <span className="showcase-glow" aria-hidden="true" />
-            <figure
-              className="ui-stage"
-              id={`ui-panel-${active}`}
-              role="tabpanel"
-              aria-labelledby={`ui-tab-${active}`}
-            >
-              <button
-                type="button"
-                className="ui-zoom"
-                onClick={openLightbox}
-                aria-label={`${label} — ${t("landing.showcase.zoom")}`}
+        <div className="showcase-rows">
+          {VIEWS.map((view, i) => {
+            const Icon = view.icon;
+            const label = t(`landing.showcase.views.${view.key}.label`);
+            const desc = t(`landing.showcase.views.${view.key}.desc`);
+            return (
+              <article
+                className="showcase-row"
+                key={view.key}
+                /* 奇偶行左右交替：图片与文字互换位置（窄屏在 CSS 里统一成单列）。 */
+                data-flip={i % 2 === 1 ? "true" : undefined}
               >
-                <img
-                  key={active}
-                  className="ui-shot"
-                  src={current.src}
-                  alt={shotAlt}
-                  width={1080}
-                  height={522}
-                  loading="lazy"
-                  decoding="async"
-                />
-                <span className="ui-zoom-hint" aria-hidden="true">
-                  <Maximize2 size={15} />
-                  {t("landing.showcase.zoom")}
-                </span>
-              </button>
-            </figure>
-          </div>
+                <figure className="showcase-row-shot" data-reveal style={revealDelay(60)}>
+                  <button
+                    type="button"
+                    className="ui-zoom"
+                    onClick={() => openLightbox(view.key)}
+                    aria-label={`${label} — ${t("landing.showcase.zoom")}`}
+                  >
+                    <img
+                      className="ui-shot"
+                      src={view.src}
+                      /* alt 只写界面名：说明文案已加长，整段塞进 alt 反而拖累读屏。 */
+                      alt={label}
+                      width={1080}
+                      height={522}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <span className="ui-zoom-hint" aria-hidden="true">
+                      <Maximize2 size={15} />
+                      {t("landing.showcase.zoom")}
+                    </span>
+                  </button>
+                </figure>
+
+                <div className="showcase-row-copy" data-reveal style={revealDelay(120)}>
+                  {/* 编号与参考图一致：两位补零（01…05）。 */}
+                  <span className="showcase-row-no" aria-hidden="true">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <h3 className="showcase-row-title">
+                    <span className="showcase-row-icon" aria-hidden="true">
+                      <Icon size={16} />
+                    </span>
+                    {label}
+                  </h3>
+                  <p className="showcase-row-desc">{desc}</p>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
 
       <dialog
         ref={lightbox}
         className="ui-lightbox"
-        aria-label={`${label} — ${t("landing.showcase.zoom")}`}
+        aria-label={current ? t(`landing.showcase.views.${current.key}.label`) : undefined}
         onClick={onBackdropClick}
-        onClose={() => setZoomed(false)}
+        onClose={() => setZoomed(null)}
       >
-        <figure className="ui-lightbox-inner">
-          <img className="ui-lightbox-shot" src={current.src} alt={shotAlt} width={1080} height={522} />
-          <figcaption className="ui-lightbox-cap">
-            <strong>{label}</strong>
-            <span>{desc}</span>
-            <button
-              type="button"
-              className="ui-lightbox-close"
-              onClick={closeLightbox}
-              aria-label={t("landing.showcase.close")}
-            >
-              <X size={17} aria-hidden="true" />
-            </button>
-          </figcaption>
-        </figure>
+        {current && (
+          <figure className="ui-lightbox-inner">
+            <img
+              className="ui-lightbox-shot"
+              src={current.src}
+              alt={t(`landing.showcase.views.${current.key}.label`)}
+              width={1080}
+              height={522}
+            />
+            <figcaption className="ui-lightbox-cap">
+              <strong>{t(`landing.showcase.views.${current.key}.label`)}</strong>
+              <span>{t(`landing.showcase.views.${current.key}.desc`)}</span>
+              <button
+                type="button"
+                className="ui-lightbox-close"
+                onClick={() => lightbox.current?.close()}
+                aria-label={t("landing.showcase.close")}
+              >
+                <X size={17} aria-hidden="true" />
+              </button>
+            </figcaption>
+          </figure>
+        )}
       </dialog>
     </section>
   );
