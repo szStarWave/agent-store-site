@@ -34,25 +34,51 @@ const enUS = {
       subtitle:
         "Real screens, not mockups: import experts, skills and connectors, then run and watch — all on your machine.",
       views: {
+        /* `desc` is the one-line summary (lightbox caption); `points` is the inline list. */
         chat: {
           label: "Chat",
-          desc: "Reasoning, tool calls and replies share a single timeline. Every step keeps the reason it took, so you can replay a whole session afterwards instead of seeing only the final answer.",
+          desc: "Reasoning, tool calls and replies on one timeline",
+          points: [
+            "Reasoning, tool calls and replies share a single timeline.",
+            "Every step keeps the reason it took.",
+            "Replay a whole session afterwards instead of seeing only the final answer.",
+          ],
         },
         experts: {
           label: "Experts",
-          desc: "Pick experts and expert teams by scenario, check the summary and fit before you decide, then add them to your machine in one click. Usable right away — no restart, no extra configuration.",
+          desc: "Pick experts and expert teams by scenario, add in one click",
+          points: [
+            "Pick experts and expert teams by scenario, and check the summary before you decide.",
+            "Add them to your machine in one click — usable right away.",
+            "No restart, no extra configuration.",
+          ],
         },
         skills: {
           label: "Skills",
-          desc: "Search skills by name or source, and tell installed apart from available. Installing, enabling and removing all happen locally, with source and version within reach.",
+          desc: "Search by name or source, manage what is installed",
+          points: [
+            "Search skills by name or source.",
+            "Tell installed apart from available.",
+            "Installing, enabling and removing all happen locally, with source and version within reach.",
+          ],
         },
         connectors: {
           label: "Connectors",
-          desc: "Browse the external systems you can connect, and see at a glance whether credentials are ready. Once connected they are callable from a conversation, while the credentials themselves never leave your machine.",
+          desc: "External systems and credential status at a glance",
+          points: [
+            "Browse the external systems you can connect.",
+            "See at a glance whether credentials are ready.",
+            "Once connected they are callable from a conversation, while the credentials never leave your machine.",
+          ],
         },
         settings: {
           label: "Settings",
-          desc: "Manage light and dark theme, interface language and the App Server connection in one place. Port and connection state stay visible, with version and update entry points alongside.",
+          desc: "Theme, language and the App Server connection",
+          points: [
+            "Manage light and dark theme, interface language and the App Server connection in one place.",
+            "Port and connection state stay visible.",
+            "Version and update entry points sit alongside.",
+          ],
         },
       },
       zoom: "Click to enlarge",

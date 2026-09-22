@@ -1737,21 +1737,11 @@ details[open] > .platform-grid {
   flex-direction: column;
   min-width: 0;
 }
-.showcase-row-no {
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  color: var(--muted-2);
-}
 .showcase-row-title {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 10px;
-  padding-top: 14px;
-  /* 编号与标题之间用一条细线分隔，和参考图的层次一致。 */
-  border-top: 1px solid var(--line);
+  margin: 0;
   font-size: clamp(20px, 2.2vw, 26px);
   letter-spacing: -0.02em;
 }
@@ -1765,13 +1755,33 @@ details[open] > .platform-grid {
   background: var(--primary-soft);
   color: var(--primary);
 }
-.showcase-row-desc {
-  margin-top: 12px;
-  /* 文案已扩写为多行，限制每行长度以免读起来太宽。 */
+
+/* 分点列表：编号独占一行、正文在其下，条与条之间用细线分隔。
+   第一条的上边框同时充当「标题」与列表之间的那条线。 */
+.showcase-points {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+}
+.showcase-point {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.showcase-point-no {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--muted-2);
+}
+.showcase-point-text {
   max-width: 46ch;
   color: var(--muted);
   font-size: 15px;
-  line-height: 1.7;
+  line-height: 1.65;
   text-wrap: pretty;
 }
 
