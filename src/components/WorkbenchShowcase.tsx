@@ -98,7 +98,10 @@ export default function WorkbenchShowcase() {
           {VIEWS.map((view, i) => {
             const Icon = view.icon;
             const label = t(`landing.showcase.views.${view.key}.label`);
-            const desc = t(`landing.showcase.views.${view.key}.desc`);
+            // 分点文案是数组，用 `returnObjects` 整棵取出（词条在 src/i18n/*.ts）。
+            const points = t(`landing.showcase.views.${view.key}.points`, {
+              returnObjects: true,
+            }) as string[];
             return (
               <article
                 className="showcase-row"
@@ -131,17 +134,27 @@ export default function WorkbenchShowcase() {
                 </figure>
 
                 <div className="showcase-row-copy" data-reveal style={revealDelay(120)}>
-                  {/* 编号与参考图一致：两位补零（01…05）。 */}
-                  <span className="showcase-row-no" aria-hidden="true">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
                   <h3 className="showcase-row-title">
                     <span className="showcase-row-icon" aria-hidden="true">
                       <Icon size={16} />
                     </span>
                     {label}
                   </h3>
-                  <p className="showcase-row-desc">{desc}</p>
+                  {/*
+                    分点列出（参考图那种「编号 + 一行短句、条间细线」的节奏）。
+                    用 `<ol>` 而不是一组 `<span>`：条目是有序的，读屏会念出次序，
+                    编号本身则标 `aria-hidden`，避免与列表语义重复播报。
+                  */}
+                  <ol className="showcase-points">
+                    {points.map((point, n) => (
+                      <li className="showcase-point" key={point}>
+                        <span className="showcase-point-no" aria-hidden="true">
+                          {String(n + 1).padStart(2, "0")}
+                        </span>
+                        <span className="showcase-point-text">{point}</span>
+                      </li>
+                    ))}
+                  </ol>
                 </div>
               </article>
             );
