@@ -14,9 +14,25 @@
  * 所以除「跳到主要内容」的定位外不需要额外覆盖。
  */
 
+/* ── 语言切换按钮 ───────────────────────────────────────────────────────
+   由 `src/theme/NavbarItem/LocaleToggleNavbarItem` 渲染（`type: "custom-localeToggle"`）。
+   这里只做图标与文字的对齐——外观其余部分复用原生的 `.navbar__item` / `.navbar__link`，
+   所以它在文档页与落地页上都会与相邻导航项一致。
+   **必须留在本文件**（不加 `html:not(.docs-wrapper)` 守卫），因为 Navbar 两种页面都有。 */
+.navbar-locale-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 移动端抽屉里图标与文字之间留点空。 */
+.menu__link.navbar-locale-toggle {
+  gap: 8px;
+}
+
 /* ── 跳到主要内容 ───────────────────────────────────────────────────────
    theme-classic 的 `SkipToContent` 默认是视觉隐藏、聚焦时出现的。原生样式已处理，
-   这里只保证它在固定导航上方可见、不被遮挡。 */
+   这里只保证它固定定位且不被内容遮挡。 */
 .skip-to-content:focus {
   position: fixed;
   left: 8px;
