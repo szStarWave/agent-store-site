@@ -272,8 +272,10 @@ const config: Config = {
       copyright: "footer.copyright",
     },
     prism: {
-      theme: prismThemes.github,
-      darkTheme: prismThemes.dracula,
+      // 明暗两套都用 VS Code Dark+（`vsDark`）。它是深色主题（底色 `#1E1E1E`），
+      // 因此浅色页面上代码块也是深底，明暗切换时代码块观感不变。
+      theme: prismThemes.vsDark,
+      darkTheme: prismThemes.vsDark,
       // 与旧站一致的围栏语言集合。**不含 `jsonc`**：Prism 没有 jsonc 语法包，
       // 写进来会让 prism-include-languages 的 require 失败并中断构建；
       // 它由 src/clientModules/prism-jsonc.ts 以 json 的别名补上。
