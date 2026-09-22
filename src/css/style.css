@@ -1713,96 +1713,70 @@ details[open] > .platform-grid {
 .showcase .subtle {
   margin-top: 12px;
 }
-.showcase-layout {
-  display: grid;
-  grid-template-columns: minmax(200px, 264px) minmax(0, 1fr);
-  gap: 26px;
-  align-items: start;
-  margin-top: 34px;
-}
-
-/* View switcher — vertical rail on desktop, scrollable chips on narrow screens */
-.ui-views {
+/* 图文交替的多行：每行一张截屏配一段「编号 + 标题 + 说明」。
+   奇偶行左右互换（`data-flip`），窄屏在媒体查询里统一成单列。 */
+.showcase-rows {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 72px;
+  margin-top: 48px;
 }
-.ui-view {
+.showcase-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 56px;
+  align-items: center;
+}
+/* 奇数行把图片放到右侧：两列互换，文字列靠左。 */
+.showcase-row[data-flip] .showcase-row-shot {
+  order: 2;
+}
+
+.showcase-row-copy {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 11px 13px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  color: var(--muted);
-  cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  flex-direction: column;
+  min-width: 0;
 }
-.ui-view:hover {
-  background: var(--bg-soft);
-  color: var(--ink);
+.showcase-row-no {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--muted-2);
 }
-.ui-view:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+.showcase-row-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 14px;
+  /* 编号与标题之间用一条细线分隔，和参考图的层次一致。 */
+  border-top: 1px solid var(--line);
+  font-size: clamp(20px, 2.2vw, 26px);
+  letter-spacing: -0.02em;
 }
-.ui-view.is-active {
-  background: var(--surface);
-  border-color: var(--line);
-  color: var(--ink);
-  box-shadow: var(--shadow-sm);
-}
-.ui-view-icon {
+.showcase-row-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: var(--bg-soft);
-  color: var(--muted-2);
-  transition: background 0.18s ease, color 0.18s ease;
-}
-.ui-view.is-active .ui-view-icon {
   background: var(--primary-soft);
   color: var(--primary);
 }
-.ui-view-text {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-.ui-view-label {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.ui-view-desc {
-  font-size: 12.5px;
-  line-height: 1.5;
+.showcase-row-desc {
+  margin-top: 12px;
+  /* 文案已扩写为多行，限制每行长度以免读起来太宽。 */
+  max-width: 46ch;
   color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
   text-wrap: pretty;
 }
 
-/* Screenshot stage — pinned aspect ratio, so switching views never reflows */
-.ui-stage-wrap {
-  position: relative;
-}
-.showcase-glow {
-  position: absolute;
-  inset: 6% 4% -8%;
-  background:
-    radial-gradient(ellipse 60% 55% at 50% 40%, rgba(0, 112, 243, 0.14), transparent 70%),
-    radial-gradient(ellipse 45% 45% at 70% 70%, rgba(121, 40, 202, 0.1), transparent 70%);
-  filter: blur(20px);
-  pointer-events: none;
-}
-.ui-stage {
+/* 截图位：固定宽高比，切换/加载都不会引起回流。 */
+.showcase-row-shot {
   position: relative;
   margin: 0;
   aspect-ratio: 1080 / 522;
@@ -1947,30 +1921,17 @@ details[open] > .platform-grid {
   .showcase {
     padding-top: 52px;
   }
-  .showcase-layout {
+  /* 窄屏统一成单列：图片在上、文字在下，并清掉左右交替的 order。 */
+  .showcase-rows {
+    gap: 52px;
+    margin-top: 34px;
+  }
+  .showcase-row {
     grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
-    margin-top: 26px;
+    gap: 20px;
   }
-  .ui-views {
-    flex-direction: row;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 4px;
-    scrollbar-width: none;
-    scroll-snap-type: x proximity;
-  }
-  .ui-views::-webkit-scrollbar {
-    display: none;
-  }
-  .ui-view {
-    align-items: center;
-    flex: 0 0 auto;
-    padding: 8px 12px;
-    scroll-snap-align: start;
-  }
-  .ui-view-desc {
-    display: none;
+  .showcase-row[data-flip] .showcase-row-shot {
+    order: 0;
   }
 }
 
