@@ -148,19 +148,25 @@ const config: Config = {
         pages: { path: "src/pages" },
         theme: {
           /**
-           * **本分支的关键改动**：全局只加载 `docusaurus-overrides.css` + 站点设计系统。
+           * 三份 CSS 的职责划分（顺序即层叠顺序）：
+           *
+           * 1. `tokens.css` —— 设计令牌，**全局**。导航与页脚在文档页也要用同一套令牌，
+           *    所以令牌不能留在被守卫的 `style.css` 里（否则文档页取不到色值）。
+           * 2. `style.css` —— 站点组件样式（落地页 / 市场页）。规则被
+           *    `src/plugins/scope-site-css.ts` 加了 `html:not(.docs-wrapper)` 守卫，
+           *    **只在非文档页生效**，文档页拿到干净的 Infima。
+           * 3. `docusaurus-overrides.css` —— 全站外壳（导航、页脚）与接缝，不加守卫。
            *
            * 注意一个硬约束：**Docusaurus 把所有 CSS 合并进单个 `styles.css`**
            * （`@docusaurus/core/lib/webpack/base.js` 的 `cacheGroups.styles` 带 `enforce: true`，
-           * 官方注释写明是为了避免多 CSS chunk 的加载顺序不确定）。因此**无法**靠「只在某些页面
-           * import」来隔离 `style.css`——它必然出现在每个页面上。
-           *
-           * 所以「文档页回归原生」是靠**选择器作用域**实现的，而不是靠加载范围：
-           * `src/css/scope-site-css.postcss.mjs` 在构建期给 `style.css` 的规则加一层
-           * `html:not(.docs-wrapper)` 守卫，文档页（`<html class="docs-wrapper …">`）因此
-           * 完全不受站点样式影响，拿到干净的 Infima。
+           * 官方注释写明是为了避免多 CSS chunk 的加载顺序不确定）。所以**无法**靠
+           * 「只在某些页面 import」来隔离——「文档页回归原生」是靠选择器作用域实现的。
            */
-          customCss: ["./src/css/style.css", "./src/css/docusaurus-overrides.css"],
+          customCss: [
+            "./src/css/tokens.css",
+            "./src/css/style.css",
+            "./src/css/docusaurus-overrides.css",
+          ],
         },
         sitemap: { changefreq: "weekly", priority: 0.5 },
       },
@@ -235,7 +241,12 @@ const config: Config = {
      * 所以列标题**必须**存在。
      */
     footer: {
-      style: "dark",
+      /**
+       * `"light"` 而非 `"dark"`：站点页脚是「白底 + 1px 上边框」，用边框而非色块表达层次。
+       * 写成 `"dark"` 会加上 `.footer--dark`（#303846 色块），与站点设计不是一套。
+       * 具体配色见 `src/css/docusaurus-overrides.css` 的页脚段。
+       */
+      style: "light",
       links: [
         {
           title: "footer.docs",

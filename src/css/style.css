@@ -1,58 +1,8 @@
-/* ── Vercel Geist tokens ──────────────────────────────────
-   White canvas / #171717 ink / #0070f3 functional blue.
-   Mono uppercase labels, pill CTAs, 8px-based spacing. */
-:root {
-  --bg: #ffffff;
-  --bg-soft: #fafafa;
-  --surface: #ffffff;
-  --line: #ebebeb;
-  --line-strong: #d4d4d4;
-  --ink: #171717;
-  --muted: #666666;
-  --muted-2: #8c8c8c;
-  --primary: #0070f3;
-  --primary-strong: #0068d6;
-  --primary-soft: #ebf5ff;
-  --on-primary: #ffffff;
-  --cta: #171717;
-  --cta-hover: #333333;
-  --cta-ink: #ffffff;
-  --green: #1f9d55;
-  --amber: #b25e09;
-  --danger: #d64545;
-  --focus: hsla(212, 100%, 48%, 1);
-  --shadow-sm: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.04) 0px 2px 2px;
-  --shadow-md: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.06) 0px 8px 24px -8px;
-  --radius: 8px;
-  --radius-lg: 12px;
-  --nav-h: 64px;
-  --maxw: 1200px;
-  --font: "Geist Variable", Geist, Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  --mono: "Geist Mono Variable", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-[data-theme="dark"] {
-  --bg: #000000;
-  --bg-soft: #0a0a0a;
-  --surface: #0a0a0a;
-  --line: #262626;
-  --line-strong: #3d3d3d;
-  --ink: #ededed;
-  --muted: #a1a1a1;
-  --muted-2: #707070;
-  --primary: #3291ff;
-  --primary-strong: #57a6ff;
-  --primary-soft: rgba(0, 112, 243, 0.14);
-  --on-primary: #ffffff;
-  --cta: #ededed;
-  --cta-hover: #ffffff;
-  --cta-ink: #000000;
-  --green: #4cc38a;
-  --amber: #f5a524;
-  --shadow-sm: rgba(255, 255, 255, 0.08) 0px 0px 0px 1px;
-  --shadow-md: rgba(255, 255, 255, 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0.6) 0px 12px 32px -8px;
-}
+/* ── 设计令牌已抽到 `src/css/tokens.css` ────────────────────────────────
+   令牌是**全局**的（导航栏与页脚在文档页也要用同一套），而本文件的规则被
+   `src/plugins/scope-site-css.ts` 加了 `html:not(.docs-wrapper)` 守卫、只作用于非文档页。
+   若把令牌留在本文件，文档页就取不到 `--bg` / `--ink` / `--maxw`，全站统一的导航与页脚
+   会退化成无色。所以令牌移到不带守卫的 `tokens.css`，本文件只保留站点组件样式。 */
 
 * {
   box-sizing: border-box;

@@ -1,0 +1,70 @@
+/* ── Vercel Geist tokens ──────────────────────────────────
+   White canvas / #171717 ink / #0070f3 functional blue.
+   Mono uppercase labels, pill CTAs, 8px-based spacing.
+
+   **本文件是全局的**（不属于被 `html:not(.docs-wrapper)` 守卫的 `style.css`）。
+
+   为什么令牌必须全局：导航栏与页脚是全站共用的组件（文档页也有），要它们与落地页/市场页
+   观感一致，就得让两类页面都能取到同一套令牌。令牌本身只是变量定义、不产生任何视觉，
+   所以在文档页多定义一组变量是无害的——文档页的排版仍由 Infima 完全掌控。
+
+   分工：
+   - 本文件：设计令牌（颜色 / 间距 / 圆角 / 字体 / 宽度）。
+   - `style.css`：站点组件样式（落地页、市场页），按页隔离。
+   - `docusaurus-overrides.css`：全站共用的外壳样式（导航、页脚）与接缝。
+*/
+:root {
+  --bg: #ffffff;
+  --bg-soft: #fafafa;
+  --surface: #ffffff;
+  --line: #ebebeb;
+  --line-strong: #d4d4d4;
+  --ink: #171717;
+  --muted: #666666;
+  --muted-2: #8c8c8c;
+  --primary: #0070f3;
+  --primary-strong: #0068d6;
+  --primary-soft: #ebf5ff;
+  --on-primary: #ffffff;
+  --cta: #171717;
+  --cta-hover: #333333;
+  --cta-ink: #ffffff;
+  --green: #1f9d55;
+  --amber: #b25e09;
+  --danger: #d64545;
+  --focus: hsla(212, 100%, 48%, 1);
+  --shadow-sm: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.04) 0px 2px 2px;
+  --shadow-md: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.06) 0px 8px 24px -8px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --nav-h: 64px;
+  --maxw: 1200px;
+  --font: "Geist Variable", Geist, Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --mono: "Geist Mono Variable", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* 深色令牌。属性写在小写 `data-theme` 上——Docusaurus 原生的 ColorMode 用的正是
+   这个属性名（见 `@docusaurus/theme-common` 的 colorMode），所以站点令牌能直接被
+   原生的明暗切换按钮驱动，不需要站点自己维护主题状态。 */
+[data-theme="dark"] {
+  --bg: #000000;
+  --bg-soft: #0a0a0a;
+  --surface: #0a0a0a;
+  --line: #262626;
+  --line-strong: #3d3d3d;
+  --ink: #ededed;
+  --muted: #a1a1a1;
+  --muted-2: #707070;
+  --primary: #3291ff;
+  --primary-strong: #57a6ff;
+  --primary-soft: rgba(0, 112, 243, 0.14);
+  --on-primary: #ffffff;
+  --cta: #ededed;
+  --cta-hover: #ffffff;
+  --cta-ink: #000000;
+  --green: #4cc38a;
+  --amber: #f5a524;
+  --shadow-sm: rgba(255, 255, 255, 0.08) 0px 0px 0px 1px;
+  --shadow-md: rgba(255, 255, 255, 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0.6) 0px 12px 32px -8px;
+}

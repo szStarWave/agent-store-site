@@ -1,18 +1,119 @@
 /**
- * Docusaurus 接缝样式。
+ * 全站外壳与接缝样式。
  *
- * ## 本分支（`test/docs-default-theme`）的职责划分
+ * ## 职责划分（本分支 `test/docs-default-theme`）
  *
- * - `src/css/style.css` —— 站点的设计系统（落地页 / 市场页）。它的规则被
- *   `src/plugins/scope-site-css.ts` 在构建期加了 `html:not(.docs-wrapper)` 守卫，
- *   因此**只在非文档页生效**，文档页拿到干净的 Infima。
- * - 本文件 —— 两种页面都需要的那点接缝。**必须保持全局、不加守卫**，
- *   而且不能引用只有 `style.css` 才定义的设计变量（`--bg` / `--ink` / `--font` 等），
- *   因为文档页没有那些变量，引用会让声明整条失效。
+ * - `tokens.css` —— 设计令牌，**全局**（导航与页脚在文档页也要用同一套）。
+ * - `style.css` —— 站点组件样式（落地页 / 市场页）。规则被
+ *   `src/plugins/scope-site-css.ts` 加了 `html:not(.docs-wrapper)` 守卫，**只在非文档页生效**。
+ * - **本文件** —— 全站都需要的那部分，**不加守卫**。
  *
- * 内容很少是有意的：这一版让文档页彻底回归 theme-classic 原生样式，
- * 所以除「跳到主要内容」的定位外不需要额外覆盖。
+ * ## 导航与页脚为什么放这里
+ *
+ * 两者是全站共用组件（文档页也有）。要让它们与落地页/市场页观感一致，样式就必须对
+ * 两类页面都生效——所以写在本文件，而不是被守卫的 `style.css`。
+ * 而**结构不动**：仍由 theme-classic 的原生 `@theme/Navbar` 与 `@theme/Footer` 渲染，
+ * 因此文档页侧边栏、移动端抽屉、滚动隐藏、明暗切换等行为都不受影响，只换了外观。
+ *
+ * ## 做法：先把站点令牌映射到 Infima 变量
+ *
+ * Infima 的组件（导航、页脚、面包屑、页内目录、分页）全都读 `--ifm-*` 变量。
+ * 与其逐条覆盖它们的规则，不如**把站点令牌映射到这些变量上**——原生组件便自动采用站点配色，
+ * 同时完整保留自己的布局与响应式行为。下面只在「Infima 的布局本身就与站点设计不同」的
+ * 地方（导航高度、内边距、药丸链接、页脚配色）才写规则。
  */
+
+/* ── 站点令牌 → Infima 变量 ──────────────────────────────────────────────
+   必须写在本文件（全局）：写进被守卫的 `style.css` 后文档页取不到，导航与页脚会退化成无色。
+   映射的都是**设计语义**（颜色 / 字体 / 圆角 / 容器宽度），不含布局决策，
+   因此文档页的正文排版仍完全由 Infima 掌控。 */
+:root {
+  --ifm-font-family-base: var(--font);
+  --ifm-font-family-monospace: var(--mono);
+  --ifm-font-color-base: var(--ink);
+  --ifm-background-color: var(--bg);
+  --ifm-background-surface-color: var(--surface);
+  --ifm-color-content: var(--ink);
+  --ifm-color-content-secondary: var(--muted);
+
+  /* 主色：Infima 默认 #3578e5，站点用 Vercel 蓝。 */
+  --ifm-color-primary: var(--primary);
+  --ifm-color-primary-dark: var(--primary-strong);
+  --ifm-color-primary-darker: var(--primary-strong);
+  --ifm-color-primary-darkest: var(--primary-strong);
+  --ifm-color-primary-light: var(--primary);
+  --ifm-color-primary-lighter: var(--primary);
+  --ifm-color-primary-lightest: var(--primary-soft);
+  --ifm-link-color: var(--primary);
+  --ifm-link-hover-color: var(--primary-strong);
+
+  --ifm-global-radius: var(--radius);
+  --ifm-container-width: var(--maxw);
+  --ifm-container-width-xl: var(--maxw);
+  --ifm-navbar-height: var(--nav-h);
+}
+
+/* ── 导航栏 ─────────────────────────────────────────────────────────────
+   站点导航是「半透明磨砂 + 1px 下边框」，Infima 默认是「实底 + 投影」。
+   高度经 `--ifm-navbar-height` 统一到 64px（`--nav-h`），
+   使锚点偏移（`style.css` 的 `scroll-margin-top: calc(var(--nav-h) + …)`）与实际一致。 */
+.navbar {
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  backdrop-filter: blur(12px) saturate(1.4);
+  border-bottom: 1px solid var(--line);
+  /* 去掉 Infima 的投影：站点用 1px 边框表达层次。 */
+  box-shadow: none;
+  padding: 0;
+}
+
+/* 内容宽度收敛到 `--maxw`，与落地页/市场页对齐（Infima 默认满宽 + 16px 内边距）。 */
+.navbar__inner {
+  max-width: var(--maxw);
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 24px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.navbar__brand {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-right: 24px;
+}
+
+.navbar__title {
+  font-size: 15px;
+}
+
+/* 导航项做成站点风格的药丸（原 `.nav-link` 的等价物），而不是 Infima 的纯文字链接。 */
+.navbar__item.navbar__link {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 999px;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.navbar__item.navbar__link:hover,
+.navbar__item.navbar__link.navbar__link--active {
+  background: var(--bg-soft);
+  color: var(--ink);
+}
+
+/* 语言切换与明暗切换按钮沿用同一套静默配色。 */
+.navbar .clean-btn {
+  color: var(--muted);
+  transition: color 0.14s ease;
+}
+
+.navbar .clean-btn:hover {
+  color: var(--ink);
+}
 
 /* ── 语言切换按钮 ───────────────────────────────────────────────────────
    由 `src/theme/NavbarItem/LocaleToggleNavbarItem` 渲染（`type: "custom-localeToggle"`）。
@@ -28,6 +129,58 @@
 /* 移动端抽屉里图标与文字之间留点空。 */
 .menu__link.navbar-locale-toggle {
   gap: 8px;
+}
+
+/* ── 页脚 ───────────────────────────────────────────────────────────────
+   站点的页脚是「白底 + 1px 上边框」（用边框而非色块表达层次），与 Infima 的
+   `footer--dark` 色块（#303846）不是一套。`themeConfig.footer.style` 因此改为 `"light"`，
+   使 `.footer--dark` 不再生效，配色统一由下面这组变量给出。 */
+.footer {
+  --ifm-footer-background-color: var(--bg);
+  --ifm-footer-color: var(--muted);
+  --ifm-footer-link-color: var(--muted);
+  --ifm-footer-link-hover-color: var(--ink);
+  --ifm-footer-title-color: var(--ink);
+  --ifm-footer-padding-horizontal: 24px;
+  --ifm-footer-padding-vertical: 56px;
+
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+
+/* 内容宽度与导航、落地页对齐到 `--maxw`。 */
+.footer .container {
+  max-width: var(--maxw);
+  padding: 0;
+}
+
+/* 列标题：站点用 13px 半粗，而不是 Infima 的 h4 标题体量。 */
+.footer__title {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+/* 链接：站点是 14px、4px 纵向留白，悬停变墨色而非变蓝。 */
+.footer__link-item {
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 4px 0;
+}
+
+/* 版权行：站点用 1px 分隔线 + 更浅的次级文字。 */
+.footer__bottom {
+  max-width: var(--maxw);
+  margin: 40px auto 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.footer__copyright {
+  color: var(--muted-2);
+  font-size: 13px;
 }
 
 /* ── 跳到主要内容 ───────────────────────────────────────────────────────
