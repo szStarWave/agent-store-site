@@ -12,8 +12,8 @@ Agent 判断改动边界。它不是上手文档——命令与目录落点见�
 | --- | --- | --- |
 | 落地页 `/`、`/zh-CN`、`/en-US` | `app/pages/Landing.tsx` | `src/views/Landing.tsx` + `src/pages/{index,zh-CN/index,en-US/index}.tsx` |
 | 市场目录页 `/market`、`/zh-CN/market`、`/en-US/market` | `app/pages/Market.tsx` | `src/views/Market.tsx` + `src/pages/market.tsx` 等 |
-| 文档站 `/zh-CN/docs/*`、`/en-US/docs/*` | `app/pages/Docs.tsx`（`react-markdown` 运行时解析） | docs 插件构建期解析 + `src/theme/DocItem/Layout` 站点外壳 |
-| 站点外壳（导航 / 页脚 / 主题 / 动效） | `app/root.tsx` + `app/layouts/Lang.tsx` | `src/theme/Layout/index.tsx`（swizzle） |
+| 文档站 `/zh-CN/docs/*`、`/en-US/docs/*` | `app/pages/Docs.tsx`（`react-markdown` 运行时解析） | docs 插件构建期解析 + 原生 `@theme/DocItem`（本分支不再 swizzle） |
+| 站点外壳（导航 / 页脚 / 主题 / 动效） | `app/root.tsx` + `app/layouts/Lang.tsx` | 原生 `@theme/Navbar` / `@theme/Footer` + `src/theme/Root`（语言 context）+ `src/theme/Footer`、`src/theme/NavbarItem`（文案与语言前缀） |
 
 **产物仍是纯静态**：`docusaurus build` → `build/`，由 EdgeOne Makers 托管。旧站的
 `build/client/` 目录形态不复存在。
@@ -61,7 +61,7 @@ plugins: [...LANGUAGES.map(docsPlugin), marketSourceDevPlugin]
 ```
 
 站点语言由 **URL** 决定（`src/lib/locale-constants.ts` 的 `languageFromPath()`），
-`src/theme/Layout` 把它注入 React context，组件用 `useLanguage()` / `useTranslation()` 读取。
+`src/theme/Root` 把它注入 React context，组件用 `useLanguage()` / `useTranslation()` 读取。
 
 > **旧站靠 i18next 的全局可变语言**（路由 loader 在渲染前 `changeLanguage()`）。Docusaurus
 > 没有路由 loader，而 SSG 与客户端 hydration 必须得到同一种语言——全局可变状态在预渲染时
@@ -147,7 +147,9 @@ Select-String -Path build/__server/server.bundle.js -Pattern "resolveWeak" | Mea
 **自己的 `Layout` 里**挂的。站点替换了 `Layout`（为了保留自己的站点 chrome），
 于是这层 provider 一起没了。
 
-**修复**：`src/theme/Layout/index.tsx` 里显式包一层 `@theme/Layout/Provider`。
+**修复**：站点 swizzle 的 `Layout` 里显式包一层 `@theme/Layout/Provider`。
+（这条坑值得留档：**只要替换 `Layout`，就必须自己挂 `LayoutProvider`**；
+当前分支已移除 `Layout` swizzle、改 swizzle `Root`，该 provider 由原生 `Layout` 自己提供。）
 
 ### 6.4 TypeScript 7 移除了 `baseUrl`
 
@@ -188,10 +190,15 @@ Select-String -Path build/zh-CN/docs/configuration/index.html -Pattern 'id="mcp-
 `localeConfigs[currentLocale].htmlLang` 设置。站点只声明一个 locale（这是 §3 的前提），
 所以每页都拿到 `zh-CN`。搜索引擎与屏幕阅读器据此选断词与发音规则，英文页被判成中文是实打实的缺陷。
 
-**修复**（`src/theme/Layout/index.tsx`）：在 swizzle 的 `Layout` 里用
-`<Head><html lang={lang} /></Head>` 按 URL 覆写。react-helmet 的 `<html>` 属性是合并语义，
-后写的值覆盖先写的，所以能生效。**不要**改用 `useEffect` 改 `document.documentElement.lang`：
-那只在客户端生效，SSG 产物里仍是错的。
+**修复**：在 swizzle 的最外层组件里用 `<Head><html lang={lang} /></Head>` 按 URL 覆写。
+react-helmet 的 `<html>` 属性是合并语义，后写的值覆盖先写的，所以能生效。
+**不要**改用 `useEffect` 改 `document.documentElement.lang`：那只在客户端生效，SSG 产物里仍是错的。
+
+**踩过的第二个坑**：`<Head>` 的位置很关键，必须放在 `children` **之后**。
+`@docusaurus/core` 的 `SiteMetadataDefaults` 挂在 `Root` 的**子树上**
+（见 core 的 `App.js`：`<Root><ThemeProvider><SiteMetadataDefaults/>…`），
+所以放在 `children` 之前会被它覆盖——构建出来英文页仍是 `lang="zh-CN"`，且没有任何报错。
+当前的落点是 `src/theme/Root/index.tsx`。
 
 ## 7. 与旧站的差异清单
 
@@ -205,12 +212,26 @@ Select-String -Path build/zh-CN/docs/configuration/index.html -Pattern 'id="mcp-
 | 构建产物 | `build/client/` | `build/` |
 | 布局数据重写 | `edgeone.json` 里的 `/zh-CN/_.data` → `/zh-CN.data` | **不需要**：Docusaurus 的客户端路由不产出 `.data` 请求 |
 | 开发态 `/source/**` | `vite.config.ts` 的 `marketSourcePlugin()` | `src/plugins/market-source-dev.ts`（经 `devServer.setupMiddlewares`） |
-| 主题切换 | 写 `<html data-theme>` | 不变（`ThemeToggle` 继续写同一属性，CSS 未改） |
-| 侧边栏 / 页脚文档列表 | `app/lib/docs.ts` 的 `DOC_ORDER` | `src/lib/docOrder.ts`（无 React 依赖，构建期配置也能引用） |
+| 主题切换 | 站点自绘 `ThemeToggle` 写 `<html data-theme>` | 改用 Docusaurus 原生 `ColorModeToggle`（同样写 `data-theme`），站点令牌因此无需自管主题状态 |
+| 侧边栏顺序 | `app/lib/docs.ts` 的 `DOC_ORDER`，站点自绘侧边栏 | 原生侧边栏 + `sidebars.ts`（顺序**生成自** `src/lib/docOrder.ts`，与页脚、文档索引页共用一个真源） |
 
-**CSS 未改**：`src/css/style.css`（58 KB 手写设计系统）原样迁移到 `src/css/style.css`，
-页面类名与旧站一致。新增的 `src/css/docusaurus-overrides.css` 只处理「Docusaurus 骨架与站点的
-接缝」（Infima 的 `body` 排版、`.skip-to-content` 定位等）。
+**CSS 分三层**（早期版本是三处混在一起，改为按「作用范围」分层）：
+
+| 文件 | 作用范围 | 内容 |
+| --- | --- | --- |
+| `src/css/tokens.css` | **全局** | 设计令牌（颜色 / 间距 / 圆角 / 字体 / `--maxw` / `--nav-h`）。深色令牌写在 `[data-theme="dark"]` 上，与 Docusaurus 原生 ColorMode 同属性。 |
+| `src/css/style.css` | 非文档页 | 站点组件样式（落地页 / 市场页），58 KB 手写设计系统，页面类名与旧站一致。 |
+| `src/css/docusaurus-overrides.css` | **全局** | 全站外壳（导航 / 页脚）与接缝：令牌 → `--ifm-*` 变量映射、`.skip-to-content` 定位。 |
+
+**为什么令牌要单独一层**：导航栏与页脚是全站共用组件（文档页也有）。若令牌留在
+`style.css`（被 `html:not(.docs-wrapper)` 守卫、只在非文档页生效），文档页就取不到
+`--bg` / `--maxw`，全站统一的外壳会退化成无色。令牌本身只是变量定义、不产生视觉，
+所以在文档页多定义一组是无害的——正文排版仍完全由 Infima 掌控。
+
+**导航与页脚的做法**：不替换组件，仍由 theme-classic 的原生 `@theme/Navbar` 与
+`@theme/Footer` 渲染（因此文档页侧边栏、移动端抽屉、滚动隐藏、明暗切换全部保留），
+只把站点令牌映射到它们读取的 `--ifm-*` 变量上，再补少量「布局本身就不同」的规则
+（导航高度 / 内边距 / 药丸链接 / 页脚配色）。
 
 ## 8. 迁移后的目录速查
 
@@ -218,11 +239,16 @@ Select-String -Path build/zh-CN/docs/configuration/index.html -Pattern 'id="mcp-
 docusaurus.config.ts      站点配置（两个 docs 实例、markdown.format、Prism、静态目录）
 src/pages/                路由：index / market / 404 / {zh-CN,en-US}/{index,market,docs}
 src/views/                页面组件（Landing / Market / DocsIndex）
-src/theme/Layout/         swizzle：站点外壳（NavBar + Footer + 语言 context + LayoutProvider）
-src/theme/DocItem/        swizzle：文档页外壳（侧边栏 + 正文 + 页内目录）
+src/theme/Root/           swizzle：语言 context + 按 URL 覆写 <html lang>
+src/theme/Footer/         swizzle：页脚（文案词条解析 + 语言前缀），包原生 Footer/Layout
+src/theme/NavbarItem/     swizzle：自定义导航项（custom-localeLink / custom-localeToggle）
+src/css/tokens.css        设计令牌（全局）
+src/css/style.css         站点组件样式（非文档页，被 scope-site-css 加守卫）
+src/css/docusaurus-overrides.css  全站外壳（导航 / 页脚）与接缝（全局）
+sidebars.ts               侧边栏顺序，生成自 src/lib/docOrder.ts
 src/i18n/                 上下文驱动的双语层（zh-CN / en-US 词条 + t 函数）
-src/lib/                  locale-constants / docOrder / market / platform / effects
-src/plugins/              market-source-dev（仅开发态托管 /source/**）
+src/lib/                  locale-constants / docOrder / i18n-value / market / platform / effects
+src/plugins/              market-source-dev（开发态 /source/**）、scope-site-css（CSS 作用域）
 src/remark/               legacy-heading-ids（文档锚点沿用旧算法）
 src/clientModules/        prism-jsonc（jsonc → json 别名）
 src/types/assets.d.ts     图片 / 字体模块声明
