@@ -93,6 +93,35 @@ button {
   font: inherit;
   cursor: pointer;
 }
+/**
+ * 抹掉 Infima 给**裸 `<code>`** 加的「胶囊框」。
+ *
+ * Infima（theme-classic 的默认主题）对元素级 `code` 定义了：
+ * ```css
+ * code {
+ *   background-color: var(--ifm-code-background);   // 浅灰底
+ *   border: 0.1rem solid rgba(0, 0, 0, 0.1);        // 细边框
+ *   border-radius: var(--ifm-code-border-radius);
+ *   font-size: var(--ifm-code-font-size);           // 90%，字号也被缩小
+ *   padding: ...;
+ * }
+ * ```
+ * 文档页不受影响（`pre code` 会把它显式复位，且文档页本就该用 Infima）。
+ * 但落地页的组件早于 Infima 存在、自带等宽排版，裸 `<code>` 因此被套上边框与内边距——
+ * 典型如 hero 终端里的 `flowy-agent-store`、`.dev-pkg-name`、`.agent-prompt-card`。
+ *
+ * 站点组件自己负责代码块的观感（`.term-body`、`.step-cmd`、`.ps-cmd` 等各自定义），
+ * 所以这里把 Infima 的元素级装饰整体复位，只保留「等宽字体」这一条语义。
+ * 用 `:where()` 把特异性压到 0，任何组件规则都能轻松覆盖。
+ */
+:where(code):not(pre code) {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font-size: inherit;
+  font-family: var(--mono);
+}
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
