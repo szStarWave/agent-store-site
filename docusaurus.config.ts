@@ -191,6 +191,20 @@ const config: Config = {
       defaultMode: "light",
     },
     /**
+     * 右侧「本页目录」只收 h2。Docusaurus 默认收到 h3，而上游文档的 h3 很密：
+     * `examples-sdk` 14 个、`typescript-sdk` 19 个、`configuration` 12 个。全列出来
+     * 单页有二三十条，标题本身又长、在窄栏里多数要折成两行，反而看不出结构；
+     * 只收 h2 后单页落在 4–14 条（`typescript-sdk` 9 条、`examples-sdk` 14 条）。
+     *
+     * 这里**只调原生配置，不加 CSS**——本分支的前提就是文档页用原生样式。
+     * 若个别页面需要放宽，用 front matter 的 `toc_max_heading_level`；
+     * 但 `content/docs/` 的 Markdown 从上游同步、不带 front matter，所以只能走全局设置。
+     */
+    tableOfContents: {
+      minHeadingLevel: 2,
+      maxHeadingLevel: 2,
+    },
+    /**
      * 原生 Navbar / Footer 的链接来自 `themeConfig`，而它**在构建期就固定**，
      * 不能按 URL 变语言。本站是 `/zh-CN/…` 与 `/en-US/…` 双前缀，因此：
      *
