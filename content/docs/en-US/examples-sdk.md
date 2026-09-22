@@ -543,7 +543,13 @@ if (call.is_error) {
 
 > **Arguments are not validated client-side**: `input_schema` is arbitrary JSON Schema and the client only hands it to you. A wrong argument comes back as `is_error: true` with the server's own complaint — **not** as a rejected promise; only "we never reached the tool" rejects. `policy_denied` means the host never turned the proxy on, or this pair was narrowed out by `allow` / explicitly denied — no longer "you forgot to maintain an allowlist".
 
-## 9. Catalogue one-liners: agents / teams / skills / models / workspaces
+## 9. Catalogue one-liners
+
+All five resource faces (agents / teams / skills / models / workspaces) answer `list` / `get` with
+structured summaries only, never the persona body; workspaces also has create and revoke. Reads and
+writes are listed separately below.
+
+### 9.1 Catalogue calls: list / get
 
 ```ts
 const agents = await client.agents.list();          // AgentSummary[]
@@ -557,15 +563,21 @@ const skills = await client.skills.list();          // SkillSummary[]
 console.log(skills.filter((s) => s.writable).map((s) => s.name)); // user skills you may edit
 
 const models = await client.models.list();          // ModelSummary[]: what this host can run
+```
 
+### 9.2 workspaces: create and revoke
+
+```ts
 const workspaces = await client.workspaces.list();  // WorkspaceView[]
 const created = await client.workspaces.create("/abs/path/to/project"); // canonicalized server-side
 await client.workspaces.revoke(created.workspace_id); // soft delete; existing sessions survive
 ```
 
-**Reading every file a Skill ships** (a Skill is a directory: alongside `SKILL.md` it carries
-`references/`, `scripts/` and friends; `skills.get()`'s body summary is truncated at ~1200
-chars, so companion files are only reachable this way):
+### 9.3 Reading the files a Skill ships
+
+A Skill is a directory: alongside `SKILL.md` it carries `references/`, `scripts/` and friends;
+`skills.get()`'s body summary is truncated at ~1200 chars, so companion files are only
+reachable this way:
 
 ```ts
 if (client.initializeInfo?.capabilities.skill_files) {   // a host may wire the catalog without this
@@ -581,7 +593,7 @@ if (client.initializeInfo?.capabilities.skill_files) {   // a host may wire the 
 }
 ```
 
-### 9.1 Exporting an expert / team to an external runtime (`fp-8`)
+### 9.4 Exporting an expert / team to an external runtime (`fp-8`)
 
 `agents.get()` / `teams.get()` are the **catalog** faces: structured fields, and **never** the persona body. To
 obtain the expert **definition** itself — so your own runtime can run it — use `export()`:
