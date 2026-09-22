@@ -102,98 +102,19 @@ div[id] {
   scroll-margin-top: calc(var(--nav-h) + 20px);
 }
 
-.site {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-}
-.site-main {
-  padding-top: var(--nav-h);
-  flex: 1;
-}
+/* ── Navbar / Footer 的样式已交回 theme-classic ─────────────────────────
+   本站曾有自己的 NavBar / Footer / ThemeToggle 组件（类名 `.navbar`、`.navbar-inner`、
+   `.brand`、`.nav-link`、`.icon-btn`、`.footer`、`.footer-inner` …）。改用原生
+   `@theme/Navbar` 与 `@theme/Footer` 后那些组件已删除，但它们与 theme-classic
+   **同名**的规则还留在这里，会压过原生样式：
 
-/* ── Navbar ─────────────────────────────────────────────── */
-.navbar {
-  position: fixed;
-  inset: 0 0 auto 0;
-  z-index: 20;
-  height: var(--nav-h);
-  background: color-mix(in srgb, var(--bg) 80%, transparent);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  backdrop-filter: blur(12px) saturate(1.4);
-  border-bottom: 1px solid var(--line);
-}
-.navbar-inner {
-  max-width: var(--maxw);
-  height: 100%;
-  margin: 0 auto;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-  font-size: 15px;
-  letter-spacing: -0.01em;
-}
-.brand-mark {
-  display: block;
-  border-radius: 6px;
-  /* Black artwork stays visible on dark chrome. */
-  border: 1px solid var(--line-strong);
-  object-fit: cover;
-}
-.brand-name {
-  white-space: nowrap;
-}
-.navbar-links {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.nav-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 500;
-  transition: background 0.14s ease, color 0.14s ease;
-}
-.nav-link:hover {
-  background: var(--bg-soft);
-  color: var(--ink);
-}
-.nav-link.is-active {
-  background: var(--bg-soft);
-  color: var(--ink);
-  font-weight: 600;
-}
-.nav-download {
-  margin-left: 8px;
-}
-.icon-btn {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
-  transition: background 0.14s ease, color 0.14s ease;
-}
-.icon-btn:hover {
-  background: var(--bg-soft);
-  color: var(--ink);
-}
+   - `.footer { background: var(--bg) }` 把 `footer--dark` 的深底换成浅底，
+     而文字仍是 `.footer--dark` 的浅色 → 浅字配浅底，页脚几乎看不清；
+   - `.navbar { position: fixed }` 把 Infima 的 `position: sticky` 顶掉。
+
+   两份 CSS 在同一个 `styles.css` 里（Docusaurus 强制合并所有 CSS），而本文件排在
+   Infima **之后**，同特异性下本文件胜出，所以这些遗留规则确实会生效。
+   原生的导航与页脚现在完全由 Infima + theme-classic 负责，这里不再需要任何覆盖。 */
 
 /* ── Buttons: black pill CTAs, quiet outline ────────────── */
 .btn {
@@ -1083,68 +1004,12 @@ div[id] {
   color: var(--amber);
 }
 
-/* ── Footer ─────────────────────────────────────────────── */
-.footer {
-  border-top: 1px solid var(--line);
-  background: var(--bg);
-  padding: 56px 24px 32px;
-}
-.footer-inner {
-  max-width: var(--maxw);
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 40px;
-  align-items: start;
-}
-.footer-brand {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-.footer-brand .brand-mark {
-  margin-top: 2px;
-}
-.footer-tagline {
-  color: var(--muted);
-  font-size: 14px;
-  margin-top: 6px;
-  max-width: 32ch;
-}
-.footer-cols {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
-}
-.footer-col h4 {
-  margin: 0 0 12px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.footer-col {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-}
-.footer-col a {
-  color: var(--muted);
-  font-size: 14px;
-  padding: 4px 0;
-  transition: color 0.14s ease;
-}
-.footer-col a:hover {
-  color: var(--ink);
-}
-.footer-bottom {
-  max-width: var(--maxw);
-  margin: 40px auto 0;
-  padding-top: 24px;
-  border-top: 1px solid var(--line);
-  color: var(--muted-2);
-  font-size: 13px;
-}
+/* ── Footer 的样式已交回 theme-classic ──────────────────────────────────
+   原 `.footer` / `.footer-inner` / `.footer-brand` / `.footer-tagline` /
+   `.footer-cols` / `.footer-col` / `.footer-bottom` 等规则属于**已删除的自定义 Footer**。
+   它们与 theme-classic 的 `.footer` 同名且排在 Infima 之后，会把 `footer--dark` 的深底
+   覆盖成 `var(--bg)`（浅色），导致浅色文字落在浅色背景上、页脚几乎看不清。
+   页脚现在完全由原生组件 + Infima 渲染，这里不再保留任何相关规则。 */
 
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 900px) {
@@ -1193,17 +1058,8 @@ div[id] {
   .step-cmd {
     justify-self: start;
   }
-  .footer-inner {
-    grid-template-columns: 1fr;
-  }
 }
 @media (max-width: 640px) {
-  .nav-github {
-    display: none;
-  }
-  .brand-name {
-    font-size: 14px;
-  }
   .hero {
     padding: 72px 0 64px;
   }
