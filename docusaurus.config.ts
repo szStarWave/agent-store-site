@@ -179,52 +179,79 @@ const config: Config = {
     },
     /**
      * 原生 Navbar / Footer 的链接来自 `themeConfig`，而它**在构建期就固定**，
-     * 无法按 URL 变语言。本站是 `/zh-CN/…` 与 `/en-US/…` 双前缀，所以这里先按 zh-CN
-     * 填写以获得原生观感；双语切换能力不在本分支的试验范围内（见分支说明）。
+     * 不能按 URL 变语言。本站是 `/zh-CN/…` 与 `/en-US/…` 双前缀，因此：
+     *
+     * - 站内项用 `type: "custom-localeLink"`（见 `src/theme/NavbarItem/LocaleNavbarItem`），
+     *   `to` 写**不带语言前缀**的路径，渲染时按当前语言补上。
+     * - **文案写 `src/i18n/*.ts` 的词条键**（如 `nav.docs`），渲染时解析成当前语言；
+     *   写普通文案（`GitHub`）则原样显示。见 `src/lib/i18n-value.ts`。
+     * - 语言切换按钮是 `type: "custom-localeToggle"`，跳到同一页面另一种语言的地址。
+     * - 外链仍用原生 `href`（不补前缀）。
+     *
+     * 这两个类型以官方约定的 `custom-` 前缀注册
+     * （theme-classic 的 `NavbarItemSchema` 只放行以 `custom-` 开头的未知 type）。
      */
     navbar: {
       title: "Flowy Agent Store",
       hideOnScroll: false,
       items: [
-        { to: "/zh-CN/market", label: "市场", position: "left" },
-        { to: "/zh-CN/docs", label: "文档", position: "left" },
+        { type: "custom-localeLink", to: "/market", label: "nav.market", position: "left" },
+        { type: "custom-localeLink", to: "/docs", label: "nav.docs", position: "left" },
         {
           href: "https://github.com/Michael-Lfx/allo",
           label: "GitHub",
           position: "right",
         },
         {
+          type: "custom-localeLink",
           href: "https://github.com/szStarWave/agent-store-site/releases",
-          label: "下载",
+          label: "nav.download",
           position: "right",
         },
+        { type: "custom-localeToggle", position: "right" },
       ],
     },
+    /**
+     * 页脚链接列。
+     *
+     * 文案直接写在**原生字段**里，值是 `src/i18n/*.ts` 的词条键，
+     * 由 `src/theme/Footer` 与 `Footer/LinkItem` 在渲染时解析：
+     * `title` → `footer.docs`、`label` → `docs.sections.cli`、`copyright` → `footer.copyright`。
+     *
+     * 为什么不用自定义的 `titleKey` / `copyrightKey`：Joi 对 `FooterColumnItemSchema` 与
+     * footer 根对象**没有** `.unknown()`，自定义键会被直接拒绝，且报错是
+     * 「footer 必须要么简单要么多列，不能混用」——看不出真因。只有
+     * `FooterLinkItemSchema` 允许未知键。既然列标题与版权行只能用原生字段，
+     * 链接项也统一用它，全配置只有一种约定。
+     *
+     * 顺带一提：`isMultiColumnFooterLinks()` 靠 `'title' in links[0]` 判断多列形态，
+     * 所以列标题**必须**存在。
+     */
     footer: {
       style: "dark",
       links: [
         {
-          title: "文档",
+          title: "footer.docs",
           items: [
-            { label: "快速开始", to: "/zh-CN/docs/quick-start" },
-            { label: "命令行用法", to: "/zh-CN/docs/cli" },
-            { label: "配置文件", to: "/zh-CN/docs/configuration" },
-            { label: "TypeScript SDK", to: "/zh-CN/docs/typescript-sdk" },
+            { label: "docs.sections.quickStart", to: "/docs/quick-start" },
+            { label: "docs.sections.cli", to: "/docs/cli" },
+            { label: "docs.sections.configuration", to: "/docs/configuration" },
+            { label: "docs.sections.typescriptSdk", to: "/docs/typescript-sdk" },
           ],
         },
         {
-          title: "资源",
+          title: "footer.resources",
           items: [
-            { label: "市场", to: "/zh-CN/market" },
+            { label: "nav.market", to: "/market" },
             {
-              label: "发布",
+              label: "footer.releases",
               href: "https://github.com/szStarWave/agent-store-site/releases",
             },
-            { label: "GitHub", href: "https://github.com/Michael-Lfx/allo" },
+            { label: "footer.github", href: "https://github.com/Michael-Lfx/allo" },
           ],
         },
       ],
-      copyright: "© Flowy Agent Store 贡献者。本站点与运行时以本地优先为原则。",
+      copyright: "footer.copyright",
     },
     prism: {
       theme: prismThemes.github,

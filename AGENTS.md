@@ -62,7 +62,7 @@ JSON 解析并抛 `Unexpected token '<'`。
 
 | 路径 | 角色 |
 | --- | --- |
-| `src/` | 应用代码：`pages/`（路由）、`views/`（页面组件）、`components/`、`theme/`（swizzle 的 `Layout` 与 `DocItem`）、`i18n/`、`lib/`、`plugins/`、`remark/`、`css/style.css`（手写 CSS + 设计变量，无 Tailwind / UnoCSS） |
+| `src/` | 应用代码：`pages/`（路由）、`views/`（页面组件）、`components/`、`theme/`（swizzle：`Root` + `Footer` 与 `NavbarItem` 的薄包装）、`i18n/`、`lib/`、`plugins/`、`remark/`、`css/style.css`（手写 CSS + 设计变量，无 Tailwind / UnoCSS） |
 | `content/docs/` | 站点文档（双语 Markdown），**不是**生成物；由 docs 插件直接读，正文不解析 MDX |
 | `content/market.json` | 生成物：目录页数据源 |
 | `content/release.json` | 版本号单一真源，站点 UI 与 `scripts/release.mjs` 共用同一个号 |
