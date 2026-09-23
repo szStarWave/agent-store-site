@@ -202,8 +202,9 @@ client.connectors.list(): Promise<ConnectorSummary[]>;
 client.connectors.get(connectorId: string): Promise<ConnectorDetail>;        // 命名空间工具 + 认证态
 client.connectors.status(connectorId: string): Promise<ConnectorStatusView>; // connected 仅在认证就绪且最近探测成功
 client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;  // 运行连接探测（真连接、结果持久化）；工具签名从这里取
-client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>;
-client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // 发起宿主浏览器 OAuth 流，轮询 authStatus 至 authenticated
+client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>; // 失败原因在 error 里；state 不会变成「失败」
+client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // 发起宿主浏览器 OAuth 流；只确认「浏览器已拉起」
+client.connectors.waitForAuth(connectorId: string, options?: { timeoutMs?, pollMs? }): Promise<WaitForAuthOutcome>; // 等到结束，并带回失败原因
 client.connectors.logout(connectorId: string): Promise<void>;                // 吊销令牌
 client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // 调用代理
 ```
@@ -214,7 +215,7 @@ client.connectors.call(connectorId: string, tool: string, args?: unknown): Promi
 >
 > **工具级失败不是 promise 拒绝**：上游 `isError: true` 时它仍然 **resolve**，`is_error` 为真。只有根本没够着工具才 reject：`connector_call_timeout`、`connector_call_failed`、`response_too_large`、`connector_unavailable`、`policy_denied`、`not_found`。先查 `capabilities.connector_calls`（方法是否存在**不等于**有工具可调）。结果对象逐字透传（`content` / `structuredContent` 等不断字段），上限 1 MiB，默认超时 30s。stdio、Streamable HTTP 与 SSE 三种连接器都支持。
 
-> Token 永不经过此包：OAuth 浏览器流由可信宿主持有，客户端只触发与轮询。
+> Token 永不经过此包：OAuth 浏览器流由可信宿主持有，客户端只触发与等待。失败有**两条**通道，别只看一条：浏览器**之前**的失败（端点发现、client 身份、绑定回调）由 `authStart` 同步回 `state: "error"`；**之后**的失败（换 token 被拒、回调超时、授权服务器限流回 `slow_down`）**只**出现在 `authStatus().error` 里，`state` 一直停在 `not_authenticated`——wire 上没有「失败」这个状态。`waitForAuth(id)` 就是第二条通道的循环：`{state:"authenticated"}` / `{state:"error", error}` / `{state:"timeout"}`，默认预算 120s（= 宿主的回调窗口），只有状态读本身失败才 reject。
 
 #### `store` — 商店生命周期（获取 / 安装 / 使用 / 禁用 / 卸载）
 
@@ -229,7 +230,7 @@ client.store.setEnabled(item, enabled: boolean, opts?: { componentIds? }): Promi
 client.store.uninstall(item, opts?: { componentIds? }): Promise<StoreOperationOutcome>;
 ```
 
-> 它**不新增任何 wire 方法**，只把顶层平方法编排成一条状态机（`search → install → … → uninstall`）。`install` 默认 `waitForReady: true`：技能拷完即可用，连接器不然——注册出来是 `disabled` 的既定默认，所以就先 enable 再探针。就绪超时**不丢安装结果**（返回成功的安装 + `readyIssue: "ready_timeout"`）；需要授权的连接器立刻返回 `authorization_required`。`outcome.components` 是服务端逐组件明细（`action` / `ok` / 稳定 `code`）的**原样透传**，失败不会被吞。
+> 它**不新增任何 wire 方法**，只把顶层平方法编排成一条状态机（`search → install → … → uninstall`）。`install` 默认 `waitForReady: true`：技能拷完即可用，连接器不然——注册出来是 `disabled` 的既定默认，所以就先 enable 再探针。就绪超时**不丢安装结果**（返回成功的安装 + `readyIssue: "ready_timeout"`）；需要授权的连接器立刻返回 `authorization_required`。就绪轮询**不会每轮都真探针**：首轮（以及之后每 `readyProbeMs`，默认 5s）真连一次，其余轮次只读状态——一次探针会解析已存 token（临近过期即刷新，401 再刷新一次），按轮询间隔去探针等于在 30 秒里对连接器及其授权服务器打十几次请求。`outcome.components` 是服务端逐组件明细（`action` / `ok` / 稳定 `code`）的**原样透传**，失败不会被吞。
 
 #### `conversations` — 持久会话
 
@@ -512,7 +513,7 @@ try {
 | `agents` | `list()` / `get(agentId)` / `export(agentId)` | `agent/list` / `agent/get` / `agent/export` |
 | `teams` | `list()` / `get(teamId)` / `export(teamId, teamVersion?)` | `team/list` / `team/get` / `team/export` |
 | `skills` | `list()` / `get(skillId)` / `files(skillId)` / `readFile(skillId, path)` / `readFileWithType(skillId, path)` | `skill/list` / `skill/get` / `skill/files` / `skill/file` |
-| `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `logout(id)` / `call(id, tool, args?)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` · `call` |
+| `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `waitForAuth(id, opts?)` / `logout(id)` / `call(id, tool, args?)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` · `call` |
 | `store` | `list()` / `search(query, filter?)` / `installed()` / `checkUpdates()` / `updateHint(item)` / `install(item, opts?)` / `setEnabled(item, enabled, opts?)` / `uninstall(item, opts?)` | 组合方法，无独立 wire 方法：`store/list` · `store/install-entry` · `install/run` · `install/status` · `install/disable` · `install/enable` · `install/uninstall` |
 | `conversations` | `create(input)` / `update(id, input)` / `modelOptions()` / `list(limit?)` / `get(id)` / `messages(query)` / `send(id, content, idempotencyKey, options?)` / `cancel(id)` / `delete(id)` / `follow(id, options?)` | `conversation/*` 同名方法 |
 | `runs` | `agent(input)` / `team(input)` / `get(id)` / `plan(id)` / `result(id)` / `events(query)` / `cancel(input)` / `steer(input)` / `answerDecision(input)` / `follow(id, options?)` | `agent/run` · `team/run` · `run/get` · `run/plan` · `run/result` · `run/events` · `run/cancel` · `run/steer` · `run/answer-decision` |

@@ -298,7 +298,14 @@ if (!outcome.ok) console.warn("components failed:", outcome.components.filter((c
 if (outcome.ready === false) {
   // 需要授权的连接器会立刻返回，不会把就绪超时预算烧光
   if (outcome.readyIssue === "authorization_required") {
-    await client.connectors.authStart(outcome.readyComponentId!);
+    const started = await client.connectors.authStart(outcome.readyComponentId!);
+    // authStart 只确认「浏览器已拉起」：之前的失败同步回 state:"error"
+    if (started.state === "error") throw new Error(started.error ?? "auth start failed");
+    const auth = await client.connectors.waitForAuth(outcome.readyComponentId!);
+    // 之后的失败只能从 authStatus.error 读到，waitForAuth 会把它带回来
+    if (auth.state !== "authenticated") {
+      throw new Error(auth.state === "error" ? auth.error : "oauth timed out in the browser");
+    }
   } else {
     console.warn("not ready:", outcome.readyIssue);
   }
@@ -315,7 +322,7 @@ await client.store.uninstall(items[0]);         // 真的释放运行时产物
 
 几条实测结论：
 
-- 技能拷完即可用；连接器注册出来是 **disabled** 的既定默认，所以就绪检查会先 enable 再探针。
+- 技能拷完即可用；连接器注册出来是 **disabled** 的既定默认，所以就绪检查会先 enable 再探针。探针**有节奏**：首轮（以及之后每 `readyProbeMs`，默认 5s）真连一次，其余轮次只读状态——一次探针会解析已存 token（临近过期即刷新，401 再刷新一次）。
 - 就绪超时**不丢安装结果**：返回成功安装 + `ready: false` / `readyIssue: "ready_timeout"`。
 - 没有更新动词：`checkUpdates()` / `updateHint()` 只告诉你该「卸载后重装」。
 - 卸载是**可重入**的：产物已不在算成功；部分失败时那些组件保持已安装、`ok: false`、并点名到组件。
@@ -464,7 +471,7 @@ sub.onEvent((event) => {
 
 ## 8. Connector OAuth 全流程
 
-典型链路：`list` 取 `connectorId` → `authStart` 发起浏览器流 → 轮询 `authStatus` 至 `authenticated` → 用完 `logout` 吊销。
+典型链路：`list` 取 `connectorId` → `authStart` 发起浏览器流 → `waitForAuth` 等到结束（**并拿到失败原因**）→ 用完 `logout` 吊销。
 
 ```ts
 // 1) 从目录取得 connectorId
@@ -478,21 +485,19 @@ if (before.state !== "authenticated") {
   // 3) 发起宿主浏览器 OAuth 流（立即返回 started，不阻塞）
   const started = await client.connectors.authStart(github.id);
   if (started.state !== "started") {
+    // 浏览器之前的失败：当场就有原因
     throw new Error(started.error ?? "auth start failed");
   }
 
-  // 4) 轮询直到 authenticated（或超时 / 需要重新授权）
-  const deadline = Date.now() + 5 * 60_000; // 5 分钟宽限
-  let authenticated = false;
-  while (Date.now() < deadline) {
-    const status = await client.connectors.authStatus(github.id);
-    if (status.state === "authenticated") { authenticated = true; break; }
-    if (status.state === "reauthorization_required") {
-      throw new Error("reauthorization required");
-    }
-    await new Promise((r) => setTimeout(r, 1_500)); // 1.5s 间隔
+  // 4) 等到结束（默认 120s 预算 = 宿主的回调窗口）
+  const auth = await client.connectors.waitForAuth(github.id);
+  if (auth.state === "error") {
+    // 浏览器之后的失败只有这一条通道：换 token 被拒 / 回调超时 / 被限流
+    throw new Error(auth.error);
   }
-  if (!authenticated) throw new Error("oauth timed out");
+  if (auth.state === "timeout") {
+    throw new Error("oauth did not finish in the browser");
+  }
 }
 
 // 5) 授权后连接器状态应为 connected（认证就绪 + 最近探测成功）
@@ -503,7 +508,7 @@ console.log(status.status);
 await client.connectors.logout(github.id);
 ```
 
-> `authStart` 只返回 `started`，**不返回授权 URL 或 token**——浏览器流程由可信宿主持有，客户端只触发与轮询（见[接口参考](/zh-CN/docs/typescript-sdk) §3.4）。stdio 类型连接器不支持 OAuth，服务端会报 `OAuth is not supported for stdio connectors`。
+> `authStart` 只返回 `started`，**不返回授权 URL 或 token**——浏览器流程由可信宿主持有，客户端只触发与等待（见[接口参考](/zh-CN/docs/typescript-sdk) §3.4）。失败有两条通道：浏览器**之前**的失败由 `authStart` 同步回 `state: "error"`；**之后**的失败（换 token 被拒、回调超时、授权服务器限流回 `slow_down`）只出现在 `authStatus().error` 里，`state` 一直停在 `not_authenticated`——手写 `while (state !== "authenticated")` 循环的典型结局是「它就是没变成 authenticated」，而原因早就躺在它每次读到、却没有读的 `error` 里。stdio 类型连接器不支持 OAuth，服务端会报 `OAuth is not supported for stdio connectors`。
 
 ### 8.1 调用工具：先读签名，再调用
 
