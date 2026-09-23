@@ -123,7 +123,7 @@ API keys / custom auth go directly in the transport `headers`; standard OAuth is
 
 ### Integrating via the TypeScript SDK
 
-The SDK's connector client is **catalog reads + OAuth pass-through + the call proxy**: `list` / `get` / `status` / `test` (`get` and `test` carry each tool's parameter schema, so you can see how to call it before calling it), `authStart` / `authStatus` / `logout`, and `call`, which actually runs a tool over the host's own connection and needs the host to admit it in `[connector_proxy]` (see the [Configuration file](/en-US/docs/configuration)). **But** the App Server protocol has **no** WebSocket method for "register an MCP server", so inside the SDK a self-developed MCP server is wired in through the protocol-native **import → install** chain: package the server as a connector market directory, `import/run` it into an immutable PluginSnapshot, and `install/run` registers the connector into the runtime `mcp_servers` automatically.
+The SDK's connector client is **catalog reads + OAuth pass-through + the call proxy**: `list` / `get` / `status` / `test` (`get` and `test` carry each tool's parameter schema, so you can see how to call it before calling it), `authStart` / `authStatus` / `waitForAuth` / `logout`, and `call`, which actually runs a tool over the host's own connection and needs the host to admit it in `[connector_proxy]` (see the [Configuration file](/en-US/docs/configuration)). **But** the App Server protocol has **no** WebSocket method for "register an MCP server", so inside the SDK a self-developed MCP server is wired in through the protocol-native **import → install** chain: package the server as a connector market directory, `import/run` it into an immutable PluginSnapshot, and `install/run` registers the connector into the runtime `mcp_servers` automatically.
 
 1. Create a minimal connector market directory — **two levels**: the market manifest lists entries, each entry's `source` points at its own directory, and the server declaration lives in there:
 
@@ -181,7 +181,7 @@ The SDK's connector client is **catalog reads + OAuth pass-through + the call pr
    await harness.close();
    ```
 
-3. For standard OAuth, start with the SDK's `connector.authStart(connectorId)` and poll `connector.authStatus` until `authenticated`;
+3. For standard OAuth, start with the SDK's `connector.authStart(connectorId)` and wait with `connector.waitForAuth(connectorId)` (its `error` carries the reason when it fails);
 4. At run time, inject via `mentions`: `{ kind: "connector", id }` appends to the run's MCP list (must be an enabled server); skills mount with `{ kind: "skill", id }`. Query install state with `install/status` and manage it with `install/enable` / `install/disable`.
 
 ### Path B: marketplace / plugin distribution (for public distribution)

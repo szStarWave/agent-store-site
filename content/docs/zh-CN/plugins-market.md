@@ -123,7 +123,7 @@ API Key / 自定义鉴权直接写在传输层的 `headers`；标准 OAuth 由�
 
 ### 通过 TypeScript SDK 接入
 
-SDK 的连接器客户端是**目录读面 + OAuth 直通 + 调用代理**：`list` / `get` / `status` / `test`（`get` 与 `test` 会带上每个工具的参数 schema，先看清怎么调再调）、`authStart` / `authStatus` / `logout`，以及真正执行工具的 `call`（走宿主自己的连接，需宿主在 `[connector_proxy]` 里放行，见[配置文件](/zh-CN/docs/configuration)）。**但** App Server 协议**没有**「注册 MCP Server」的 WebSocket 方法，所以 SDK 内的自研 MCP Server 接入走协议原生的**导入 → 安装**链路：把 Server 打包为连接器市场目录，`import/run` 导入为不可变 PluginSnapshot，`install/run` 安装时由运行时自动注册进 `mcp_servers`。
+SDK 的连接器客户端是**目录读面 + OAuth 直通 + 调用代理**：`list` / `get` / `status` / `test`（`get` 与 `test` 会带上每个工具的参数 schema，先看清怎么调再调）、`authStart` / `authStatus` / `waitForAuth` / `logout`，以及真正执行工具的 `call`（走宿主自己的连接，需宿主在 `[connector_proxy]` 里放行，见[配置文件](/zh-CN/docs/configuration)）。**但** App Server 协议**没有**「注册 MCP Server」的 WebSocket 方法，所以 SDK 内的自研 MCP Server 接入走协议原生的**导入 → 安装**链路：把 Server 打包为连接器市场目录，`import/run` 导入为不可变 PluginSnapshot，`install/run` 安装时由运行时自动注册进 `mcp_servers`。
 
 1. 写一个最小连接器市场目录——**两级**：市场清单列条目，`source` 指向条目自己的目录，server 声明装在那个目录里：
 
@@ -181,7 +181,7 @@ SDK 的连接器客户端是**目录读面 + OAuth 直通 + 调用代理**：`li
    await harness.close();
    ```
 
-3. 标准 OAuth 直接用 SDK 的 `connector.authStart(connectorId)` 发起、轮询 `connector.authStatus` 至 `authenticated`；
+3. 标准 OAuth 直接用 SDK 的 `connector.authStart(connectorId)` 发起、`connector.waitForAuth(connectorId)` 等到结束（失败原因从它的 `error` 拿）；
 4. Run 时通过 `mentions` 注入：`{ kind: "connector", id }` 追加到 run 的 MCP 列表（须为已启用 Server）；技能则用 `{ kind: "skill", id }` 挂载。安装状态可用 `install/status` 查询、`install/enable` / `install/disable` 管理。
 
 ### 路径 B：市场 / 插件分发（面向公开分发）

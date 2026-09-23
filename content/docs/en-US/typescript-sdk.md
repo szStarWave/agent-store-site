@@ -202,8 +202,9 @@ client.connectors.list(): Promise<ConnectorSummary[]>;
 client.connectors.get(connectorId: string): Promise<ConnectorDetail>;        // namespaced tools + auth state
 client.connectors.status(connectorId: string): Promise<ConnectorStatusView>; // connected only when auth ready AND last probe OK
 client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;  // run probe (really connects; result persisted); tool schemas come from here
-client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>;
-client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // start host browser OAuth flow; poll authStatus until authenticated
+client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>; // the reason lives in `error`; `state` never becomes "failed"
+client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // start the host browser OAuth flow; only confirms the browser was opened
+client.connectors.waitForAuth(connectorId: string, options?: { timeoutMs?, pollMs? }): Promise<WaitForAuthOutcome>; // wait for the end, and bring back the reason
 client.connectors.logout(connectorId: string): Promise<void>;                // revoke token
 client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // call proxy
 ```
@@ -214,7 +215,7 @@ client.connectors.call(connectorId: string, tool: string, args?: unknown): Promi
 >
 > **A tool-level failure is not a rejection**: when the server answers `isError: true` the promise still **resolves**, with `is_error` set. It rejects only when the call never reached the tool: `connector_call_timeout`, `connector_call_failed`, `response_too_large`, `connector_unavailable`, `policy_denied`, `not_found`. Check `capabilities.connector_calls` first (the method existing does **not** mean any tool is callable). The result object is passed through verbatim (`content`, `structuredContent`, … nothing dropped), capped at 1 MiB, default timeout 30s. All three connector transports are supported: stdio, Streamable HTTP and SSE.
 
-> Tokens never pass through this package: the OAuth browser flow is owned by the trusted host; clients only trigger and poll.
+> Tokens never pass through this package: the OAuth browser flow is owned by the trusted host; clients only trigger and wait. Failures have **two** channels, so do not read only one: a failure **before** the browser (endpoint discovery, client identity, binding the callback) comes back synchronously as `authStart`'s `state: "error"`; a failure **after** it (a refused token exchange, a callback timeout, an authorization server throttling with `slow_down`) appears in `authStatus().error` **only**, while `state` stays `not_authenticated` — the wire has no "failed" state. `waitForAuth(id)` is the loop over that second channel: `{state:"authenticated"}` / `{state:"error", error}` / `{state:"timeout"}`, a 120s budget by default (= the host's callback window), rejecting only when the status read itself fails.
 
 #### `store` — store lifecycle (acquire / install / use / disable / uninstall)
 
@@ -229,7 +230,7 @@ client.store.setEnabled(item, enabled: boolean, opts?: { componentIds? }): Promi
 client.store.uninstall(item, opts?: { componentIds? }): Promise<StoreOperationOutcome>;
 ```
 
-> It adds **no wire method**: it only composes the flat top-level methods into one state machine (`search → install → … → uninstall`). `install` defaults to `waitForReady: true` — a skill is usable once copied, a connector is not: it is registered `disabled` by documented default, so readiness enables it before probing. A readiness timeout **never discards the install** (you get the successful install plus `readyIssue: "ready_timeout"`); a connector needing authorization returns `authorization_required` immediately. `outcome.components` is the server's per-component detail (`action` / `ok` / a stable `code`) passed through **verbatim**; failures are never swallowed.
+> It adds **no wire method**: it only composes the flat top-level methods into one state machine (`search → install → … → uninstall`). `install` defaults to `waitForReady: true` — a skill is usable once copied, a connector is not: it is registered `disabled` by documented default, so readiness enables it before probing. A readiness timeout **never discards the install** (you get the successful install plus `readyIssue: "ready_timeout"`); a connector needing authorization returns `authorization_required` immediately. Readiness polling does **not** probe on every round: it really connects on the first round (and then at most once per `readyProbeMs`, 5s by default) and reads the status in between — a probe resolves the stored token (refreshing it when near expiry, and again on a 401), so probing at the poll interval meant a dozen requests against the connector and its authorization server inside a 30s budget. `outcome.components` is the server's per-component detail (`action` / `ok` / a stable `code`) passed through **verbatim**; failures are never swallowed.
 
 #### `conversations` — persistent conversations
 
@@ -513,7 +514,7 @@ How the three packages' real exports line up with the protocol methods. Method n
 | `agents` | `list()` / `get(agentId)` / `export(agentId)` | `agent/list` / `agent/get` / `agent/export` |
 | `teams` | `list()` / `get(teamId)` / `export(teamId, teamVersion?)` | `team/list` / `team/get` / `team/export` |
 | `skills` | `list()` / `get(skillId)` / `files(skillId)` / `readFile(skillId, path)` / `readFileWithType(skillId, path)` | `skill/list` / `skill/get` / `skill/files` / `skill/file` |
-| `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `logout(id)` / `call(id, tool, args?)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` · `call` |
+| `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `waitForAuth(id, opts?)` / `logout(id)` / `call(id, tool, args?)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` · `call` |
 | `store` | `list()` / `search(query, filter?)` / `installed()` / `checkUpdates()` / `updateHint(item)` / `install(item, opts?)` / `setEnabled(item, enabled, opts?)` / `uninstall(item, opts?)` | composed methods, no wire method of their own: `store/list` · `store/install-entry` · `install/run` · `install/status` · `install/disable` · `install/enable` · `install/uninstall` |
 | `conversations` | `create(input)` / `update(id, input)` / `modelOptions()` / `list(limit?)` / `get(id)` / `messages(query)` / `send(id, content, idempotencyKey, options?)` / `cancel(id)` / `delete(id)` / `follow(id, options?)` | the same-named `conversation/*` methods |
 | `runs` | `agent(input)` / `team(input)` / `get(id)` / `plan(id)` / `result(id)` / `events(query)` / `cancel(input)` / `steer(input)` / `answerDecision(input)` / `follow(id, options?)` | `agent/run` · `team/run` · `run/get` · `run/plan` · `run/result` · `run/events` · `run/cancel` · `run/steer` · `run/answer-decision` |

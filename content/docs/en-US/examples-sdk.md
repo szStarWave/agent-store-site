@@ -298,7 +298,14 @@ if (!outcome.ok) console.warn("components failed:", outcome.components.filter((c
 if (outcome.ready === false) {
   // A connector that needs authorization returns immediately instead of burning the readiness budget
   if (outcome.readyIssue === "authorization_required") {
-    await client.connectors.authStart(outcome.readyComponentId!);
+    const started = await client.connectors.authStart(outcome.readyComponentId!);
+    // authStart only confirms the browser was opened: a failure before it comes back as state:"error"
+    if (started.state === "error") throw new Error(started.error ?? "auth start failed");
+    const auth = await client.connectors.waitForAuth(outcome.readyComponentId!);
+    // A failure after it is readable from authStatus.error only; waitForAuth brings it back
+    if (auth.state !== "authenticated") {
+      throw new Error(auth.state === "error" ? auth.error : "oauth timed out in the browser");
+    }
   } else {
     console.warn("not ready:", outcome.readyIssue);
   }
@@ -315,7 +322,7 @@ await client.store.uninstall(items[0]);         // actually releases the runtime
 
 Facts verified against the runtime:
 
-- A skill is usable as soon as it is copied; a connector is registered **disabled** by the installer's documented default, so the readiness check enables it and then probes.
+- A skill is usable as soon as it is copied; a connector is registered **disabled** by the installer's documented default, so the readiness check enables it and then probes. Probing has a **cadence**: it really connects on the first round (and then at most once per `readyProbeMs`, 5s by default) and reads the status in between — a probe resolves the stored token (refreshing it when near expiry, and again on a 401).
 - A readiness timeout **does not lose the install result**: you get a successful install plus `ready: false` / `readyIssue: "ready_timeout"`.
 - There is no update verb: `checkUpdates()` / `updateHint()` only tell you to uninstall and install again.
 - Uninstall is **re-entrant**: an artifact that is already gone counts as success; on partial failure those components stay installed with `ok: false` and are named individually.
@@ -469,7 +476,7 @@ sub.onEvent((event) => {
 
 ## 8. Connector OAuth end-to-end
 
-The typical path: `list` to get a `connectorId` → `authStart` to open the browser flow → poll `authStatus` until `authenticated` → `logout` to revoke when you are done.
+The typical path: `list` to get a `connectorId` → `authStart` to open the browser flow → `waitForAuth` to wait for the end (**and get the reason if it failed**) → `logout` to revoke when you are done.
 
 ```ts
 // 1) Get the connectorId from the catalog
@@ -483,21 +490,19 @@ if (before.state !== "authenticated") {
   // 3) Start the host browser OAuth flow (returns immediately with started, non-blocking)
   const started = await client.connectors.authStart(github.id);
   if (started.state !== "started") {
+    // A failure before the browser: the reason is right here
     throw new Error(started.error ?? "auth start failed");
   }
 
-  // 4) Poll until authenticated (or timeout / reauthorization required)
-  const deadline = Date.now() + 5 * 60_000; // 5 minute grace period
-  let authenticated = false;
-  while (Date.now() < deadline) {
-    const status = await client.connectors.authStatus(github.id);
-    if (status.state === "authenticated") { authenticated = true; break; }
-    if (status.state === "reauthorization_required") {
-      throw new Error("reauthorization required");
-    }
-    await new Promise((r) => setTimeout(r, 1_500)); // 1.5s interval
+  // 4) Wait for the end (120s budget by default = the host's callback window)
+  const auth = await client.connectors.waitForAuth(github.id);
+  if (auth.state === "error") {
+    // A failure after the browser has this one channel only: refused token exchange / callback timeout / throttling
+    throw new Error(auth.error);
   }
-  if (!authenticated) throw new Error("oauth timed out");
+  if (auth.state === "timeout") {
+    throw new Error("oauth did not finish in the browser");
+  }
 }
 
 // 5) After auth the connector status should be connected (auth ready + last probe succeeded)
@@ -508,7 +513,7 @@ console.log(status.status);
 await client.connectors.logout(github.id);
 ```
 
-> `authStart` only returns `started` and **never returns an auth URL or token** — the browser flow is owned by the trusted host, and the client only triggers and polls (see the [reference](/en-US/docs/typescript-sdk) §3.4). stdio connectors do not support OAuth; the server returns `OAuth is not supported for stdio connectors`.
+> `authStart` only returns `started` and **never returns an auth URL or token** — the browser flow is owned by the trusted host, and the client only triggers and waits (see the [reference](/en-US/docs/typescript-sdk) §3.4). Failures have two channels: a failure **before** the browser comes back synchronously as `authStart`'s `state: "error"`; a failure **after** it (a refused token exchange, a callback timeout, an authorization server throttling with `slow_down`) appears in `authStatus().error` only, while `state` stays `not_authenticated` — a hand-rolled `while (state !== "authenticated")` loop typically ends in "it never became authenticated", with the reason sitting unread in the `error` it fetched every time. stdio connectors do not support OAuth; the server returns `OAuth is not supported for stdio connectors`.
 
 ### 8.1 Calling a tool: read the signature first
 
