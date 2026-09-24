@@ -200,7 +200,9 @@ div[id] {
   color: var(--ink);
   font-size: clamp(40px, 5.6vw, 64px);
   font-weight: 700;
-  line-height: 1.05;
+  /* 行高不能压到 1 附近：`.hero-title` 用 background-clip: text 上色，
+     末行字形（如 g 的下伸部）超出元素盒的部分没有背景可显示，会被「裁掉」。 */
+  line-height: 1.16;
   letter-spacing: -0.045em;
   max-width: 18ch;
   margin: 0 auto;
@@ -250,7 +252,7 @@ div[id] {
   color: var(--primary);
 }
 
-/* 产品实拍：与 Octop 一致，hero 底部放一张真实界面截图。 */
+/* 产品实拍轮播：与 Octop 一致，hero 底部放真实界面截图，多张自动轮换。 */
 .hero-shot {
   position: relative;
   width: min(880px, 100%);
@@ -262,11 +264,57 @@ div[id] {
     0 40px 90px -40px rgba(63, 34, 24, 0.35),
     var(--shadow-sm);
   overflow: hidden;
+  padding-bottom: 46px;
 }
-.hero-shot img {
+/* 截图舞台：固定宽高比，切换不引起回流；各张绝对定位堆叠、透明度过渡。 */
+.hero-shot-stage {
+  position: relative;
+  aspect-ratio: 1080 / 522;
+}
+.hero-shot-img {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+.hero-shot-img.is-active {
+  opacity: 1;
+}
+.hero-shot-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.hero-shot-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--line-strong);
+  cursor: pointer;
+  transition: background 0.2s ease, width 0.2s ease;
+}
+.hero-shot-dot:hover {
+  background: var(--muted-2);
+}
+.hero-shot-dot.is-active {
+  width: 22px;
+  background: var(--primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-shot-img {
+    transition: none;
+  }
 }
 
 /* ── Features / Workflow / Download（已并入 install / why 区块）── */
@@ -1038,6 +1086,8 @@ div[id] {
   background-size: 250% 100%;
   background-position: 85% 0;
   color: var(--ink);
+  /* 兜底：给末行下伸部留出渐变背景，避免字形底部被裁。 */
+  padding-bottom: 0.08em;
   animation: fx-sheen 9s ease-in-out infinite;
 }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
