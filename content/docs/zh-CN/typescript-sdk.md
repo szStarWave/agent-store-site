@@ -491,6 +491,33 @@ try {
 }
 ```
 
+### 4.6 导出助手：`exportAgent` / `exportTeam` / `materializePack`（`0.1.0-beta.8` 起）
+
+把「专家定义 + 技能字节」一次**写成一个目录**（目录在调用方这边）。它编排的是既有的四个 wire 方法
+（`agent/export` · `team/export` · `skill/files` · `skill/file`），**没有新协议方法、不碰指纹**；
+写盘发生在你的进程里，宿主永远不写文件。`materializePack` 收一个**已在手上的 pack**（内存对象），
+把它连同引用的技能字节写成目录——pack 数据本身不变，只是落成文件。
+
+```ts
+import { exportAgent, exportTeam, materializePack } from "@flowy-agent-store/sdk";
+
+// 单专家；专家团用 exportTeam(client, teamId, dir, teamVersion?)（整包失败语义留在服务端）
+const result = await exportAgent(client, agentId, "./my-expert");
+result.pack;           // ExpertPack —— 内存里也拿得到
+result.writtenSkills;  // 实际写入的技能名（跨成员去重后）
+result.danglingSkills; // 声明了但本机取不到的技能：{ id, error }，如实上报不静默跳过
+```
+
+- **布局**：`expert-pack.json`（线上 pack 逐字节）＋ `persona.md`（**仅 agent 形态**——团没有自己的
+  persona）＋ `members/<id>/persona.md`（**仅 team 形态**，每个成员一个，团长在首位）＋
+  `skills/<name>/…`（被引用的技能，按 id 去重）。
+- **错误语义**：pack **先取数、后写盘**——wire 导出失败（`agent_not_installed` / `agent_disabled` /
+  `policy_denied` / `version_mismatch` / `response_too_large`…）不留半成品目录；`skill/files` 失败进
+  `danglingSkills` 并继续；`skill/file` 在列文件成功后失败则**抛出**（宿主 I/O 错误不吞）。
+- **不内联技能字节**：pack 里技能永远是引用 `{name, id}`；需要不同布局时可以用示例页 §9.4 的
+  11 行公开原语配方自己拼。
+- 参数收窄的结构类型（`agents` / `teams` / `skills` 三个子客户端面），传入 `launchHarness` 的返回值即可。
+
 ---
 
 ## 5. 逐方法 API 参考

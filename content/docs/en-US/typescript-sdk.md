@@ -495,6 +495,37 @@ try {
 }
 ```
 
+### 4.6 Export helpers: `exportAgent` / `exportTeam` / `materializePack` (since `0.1.0-beta.8`)
+
+Write "an expert definition plus its skill bytes" into **a directory of your own**, in one call. The
+helpers orchestrate the four existing wire methods (`agent/export` · `team/export` · `skill/files` ·
+`skill/file`) — **no new protocol method, no fingerprint change** — and the writing happens in your process;
+the host never writes a file. `materializePack` takes a **pack you already hold** (an in-memory object) and
+writes it, together with the skill bytes it references, as a real directory — the pack data itself is
+unchanged, it just becomes files on disk.
+
+```ts
+import { exportAgent, exportTeam, materializePack } from "@flowy-agent-store/sdk";
+
+// Single expert; for a team use exportTeam(client, teamId, dir, teamVersion?) (all-or-nothing stays server-side)
+const result = await exportAgent(client, agentId, "./my-expert");
+result.pack;           // the ExpertPack — also in memory
+result.writtenSkills;  // skill names actually written (deduplicated across members)
+result.danglingSkills; // declared but unresolvable here: { id, error } — reported, never skipped in silence
+```
+
+- **Layout**: `expert-pack.json` (the wire pack byte-for-byte) + `persona.md` (**agent kind only** — a team
+  has no persona of its own) + `members/<id>/persona.md` (**team kind only**, one per member, leader first)
+  + `skills/<name>/…` (referenced skills, deduplicated by id).
+- **Error semantics**: the pack is fetched **before** anything is written — a failed wire export
+  (`agent_not_installed` / `agent_disabled` / `policy_denied` / `version_mismatch` / `response_too_large`…)
+  leaves no half-written directory; a `skill/files` rejection lands in `danglingSkills` and the loop
+  continues; a `skill/file` failure after a successful listing **throws** (host I/O errors are not swallowed).
+- **Skills are never inlined**: the pack carries `{name, id}` references only; for a different layout, assemble
+  it yourself from the 11-line public-primitive recipe in the examples page §9.4.
+- The first argument is a narrow structural type (the `agents` / `teams` / `skills` sub-client faces); pass the
+  value `launchHarness` resolved to.
+
 ---
 
 ## 5. Per-method API reference

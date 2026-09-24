@@ -609,8 +609,27 @@ if (client.initializeInfo?.capabilities.expert_export) {  // 报的是「这个�
 **不在包里**。接入前请逐条回答方案 §5 的 **R1–R11 责任清单**——一张标了 N/A 的清单本身就是答案，
 比让某个语义在沉默中失效好。
 
-**物化成一个目录**。pack 里的技能是**引用**（正文走既有的技能文件面），所以这一步是消费方自己的代码，
-不是我们的 API——公开原语拼起来 11 行：
+**写成一个目录**。pack 里的技能是**引用**（正文走既有的技能文件面）。SDK 现在把这步做成了公开函数——
+单专家用 `exportAgent`，专家团用 `exportTeam`（团长在首位），已有 pack 用 `materializePack`
+（把内存里的 pack 对象连同技能字节写成目录）：
+
+```ts
+import { exportTeam } from "@flowy-agent-store/sdk";
+
+// 整包失败留在服务端：任一成员缺失 ⇒ 整个调用失败，不落任何文件
+const result = await exportTeam(client, teamId, "./frontend-backend-experts");
+result.pack;           // ExpertPack —— 内存里也拿得到，不需要二次调用
+result.writtenSkills;  // 实际写入的技能名（跨成员去重后）
+result.danglingSkills; // 声明了但本机取不到的技能：{ id, error } —— 如实上报，不静默跳过
+```
+
+写出的布局：`expert-pack.json`（线上 pack 逐字节）、`persona.md`（**仅 agent 形态**——团没有自己的
+persona）、`members/<id>/persona.md`（**仅 team 形态**，每个成员一个）、`skills/<name>/…`（每个被引用
+的技能，按 id 去重）。错误语义：pack **先取数、后写盘**，导出失败不留半成品目录；`skill/files` 失败进
+`danglingSkills` 并继续；`skill/file` 在列文件成功后失败则**抛出**——那是宿主 I/O 错误，吞掉会造出
+「列了文件却缺内容」的残目录。
+
+它的底层就是这段 11 行公开原语配方（需要不同布局时照这个形状自己拼）：
 
 ```ts
 import { mkdir, writeFile } from "node:fs/promises";

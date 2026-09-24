@@ -203,6 +203,13 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 出现在「端口」底下。
 详见 [TypeScript SDK](/zh-CN/docs/typescript-sdk)。**指纹严格相等，升级到此版必须同时升级 SDK。**
 
+**SDK 导出助手（`0.1.0-beta.8`，无 wire 变更）**：`@flowy-agent-store/sdk` 新增
+`exportAgent` / `exportTeam` / `materializePack` 三个函数，把「专家定义 + 技能字节」一次
+写成一个目录（单专家 / 专家团，团长在首位；成员技能按 id 去重；声明了但本机取不到的技能进
+`danglingSkills` 如实上报）。协议与方法计数不变——它编排的是既有的 `agent/export` · `team/export` ·
+`skill/files` · `skill/file` 四个方法。旧版 SDK 也可以用同一段公开原语手写，升级只是省掉这段样板。
+示例见 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §9.4。
+
 截至 2026-09-20，**已发布产物 `0.1.0-beta.7` 对应的是 `fp-8` 与 `48 / 73`**，`[memory] enabled` 与 `max_output_size` / `protocol` 接线这两项也已在同一个工作区里（它们不进指纹，因此对读产物看不出来，见[升级与迁移指引](/zh-CN/docs/upgrade) §8）。
 
 上一批（`0.1.0-beta.6` 之后积累的专家 / 专家团定义导出与宿主配置增量）已随 `0.1.0-beta.7` 发布，逐条见 §2.1；`beta.6` 的 SDK 入口改名与返回形状变更见 §2.2，`0.1.0-beta.4` 及更早的批次见 §2.4–§2.5。
