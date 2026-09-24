@@ -193,7 +193,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 ## 4. 未发布的变更与发布节奏
 
 **待发布（尚未发版）**：连接器用户凭据（`fp-9` 加入，方法计数 `48 / 73` → `51 / 76`；
-`fp-10` 把表单文案归位到 `credential` 块上，计数不变）——
+`fp-10` 把表单文案归位到 `credential` 块上；`fp-11` 新增 `connector/register`，计数 `52 / 77`）——
 连接器摘要多一个 `credential` 块，并新增 `connector/credential/get` · `set` · `clear` 三个方法
 与 SDK 上的 `connectors.credentials()` / `setCredentials()` / `clearCredentials()`。需要用户自己
 填 key / token 的连接器从此有正式输入口：密钥值两个方向都不过线（`fields[].value` 只对 `plain`
@@ -201,6 +201,13 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 表单自己的文案（`title` / `description` / `doc_url` / `doc_label`）在 `fp-10` 从 `fields[]`
 移到块上——市场的一份 `token-schema.json` 只在顶层声明一次，逐字段复制会让"去哪里拿密钥"
 出现在「端口」底下。
+
+`fp-11` 补上**自带 server 的开发者**这条路：`connector/register` 接受一个宿主从未导入过的 MCP
+server（`name` / `transport` / `description`），**模板即声明**——URL、headers、env 里的
+`${secret:NAME}` 就是那张凭据表单，所以不必把 server 打成市场条目、也不必写
+`token-schema.json`；`${NAME}` 归连接器自己的 `values`。密钥仍只走 `setCredentials` 一条写入面，
+注册出来的行是 disabled（启用仍需探测通过），方法是安装所有者专用，同名再注册即更新。
+SDK 侧是 `connectors.register()`。
 详见 [TypeScript SDK](/zh-CN/docs/typescript-sdk)。**指纹严格相等，升级到此版必须同时升级 SDK。**
 
 **SDK 导出助手（`0.1.0-beta.8`，无 wire 变更）**：`@flowy-agent-store/sdk` 新增
