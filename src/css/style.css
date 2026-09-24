@@ -174,21 +174,21 @@ div[id] {
   max-width: 640px;
 }
 
-/* ── Hero: black band, white display, terminal card ─────── */
+/* ── Hero: warm tinted band, ink display, terminal card ──── */
 .hero {
   position: relative;
   overflow: hidden;
   padding: 104px 0 88px;
-  background: #000000;
-  color: #ffffff;
+  background: linear-gradient(180deg, var(--hero-tint) 0%, var(--bg) 82%);
+  color: var(--ink);
 }
 .hero::before {
   content: "";
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(600px 320px at 50% -80px, rgba(0, 112, 243, 0.28), transparent 70%),
-    radial-gradient(480px 300px at 85% 110%, rgba(121, 40, 202, 0.16), transparent 70%);
+    radial-gradient(600px 320px at 50% -80px, rgba(240, 78, 62, 0.14), transparent 70%),
+    radial-gradient(480px 300px at 85% 110%, rgba(245, 158, 80, 0.12), transparent 70%);
   pointer-events: none;
 }
 .hero-inner {
@@ -197,12 +197,12 @@ div[id] {
 }
 .hero .eyebrow {
   justify-content: center;
-  color: #a1a1a1;
+  color: var(--muted);
 }
 .hero h1 {
-  color: #ffffff;
+  color: var(--ink);
   font-size: clamp(40px, 5.6vw, 64px);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.045em;
   max-width: 18ch;
@@ -211,7 +211,7 @@ div[id] {
 .hero-sub {
   margin: 24px auto 0;
   max-width: 640px;
-  color: #a1a1a1;
+  color: var(--muted);
   font-size: 18px;
   line-height: 1.7;
 }
@@ -222,22 +222,14 @@ div[id] {
   margin-top: 32px;
   flex-wrap: wrap;
 }
-.hero-actions .btn-primary {
-  background: #ffffff;
-  border-color: #ffffff;
-  color: #171717;
-}
-.hero-actions .btn-primary:hover {
-  background: #e5e5e5;
-  border-color: #e5e5e5;
-}
 .hero-actions .btn-quiet {
-  border-color: #333333;
-  color: #e5e5e5;
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
 }
 .hero-actions .btn-quiet:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: #525252;
+  background: var(--surface);
+  border-color: var(--muted-2);
 }
 .hero-terminal {
   width: min(680px, 100%);
@@ -245,7 +237,7 @@ div[id] {
   border: 1px solid #333333;
   border-radius: var(--radius-lg);
   background: #0a0a0a;
-  box-shadow: 0 24px 64px -24px rgba(0, 112, 243, 0.35);
+  box-shadow: 0 24px 64px -24px rgba(240, 78, 62, 0.35);
   overflow: hidden;
   text-align: left;
 }
@@ -291,7 +283,7 @@ div[id] {
   white-space: pre;
 }
 .term-prompt {
-  color: #3291ff;
+  color: #ff8a70;
   user-select: none;
 }
 .term-ok {
@@ -309,11 +301,12 @@ div[id] {
   align-items: center;
   gap: 7px;
   padding: 6px 14px;
-  border: 1px solid #333333;
+  border: 1px solid var(--line-strong);
   border-radius: 999px;
-  color: #d4d4d4;
+  color: var(--muted);
   font-size: 13px;
   font-weight: 500;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
 }
 .pill i {
   width: 6px;
@@ -734,8 +727,8 @@ div[id] {
   color: var(--ink);
 }
 .docs-toc a.is-active {
-  color: var(--ink);
-  border-left-color: var(--ink);
+  color: var(--primary-strong);
+  border-left-color: var(--primary-strong);
   font-weight: 600;
 }
 .docs-content {
@@ -1200,12 +1193,12 @@ div[id] {
   justify-content: center;
   font-size: 18px;
   font-weight: 700;
-  color: hsl(var(--avatar-h, 212) 45% 35%);
-  background: hsl(var(--avatar-h, 212) 80% 93%);
+  color: hsl(var(--avatar-h, 12) 55% 38%);
+  background: hsl(var(--avatar-h, 12) 85% 93%);
 }
 [data-theme="dark"] .market-avatar-fallback {
-  color: hsl(var(--avatar-h, 212) 70% 80%);
-  background: hsl(var(--avatar-h, 212) 45% 18%);
+  color: hsl(var(--avatar-h, 12) 80% 80%);
+  background: hsl(var(--avatar-h, 12) 50% 18%);
 }
 .market-version {
   margin-left: 8px;
@@ -1338,7 +1331,7 @@ div[id] {
   height: 640px;
   left: max(-180px, calc(50% - 900px));
   top: -300px;
-  background: radial-gradient(closest-side, rgba(0, 112, 243, 0.55), transparent 72%);
+  background: radial-gradient(closest-side, rgba(240, 78, 62, 0.45), transparent 72%);
   animation: fx-drift-a 26s ease-in-out infinite alternate;
 }
 .aurora-b {
@@ -1346,7 +1339,7 @@ div[id] {
   height: 720px;
   right: max(-200px, calc(50% - 920px));
   top: -180px;
-  background: radial-gradient(closest-side, rgba(121, 40, 202, 0.45), transparent 72%);
+  background: radial-gradient(closest-side, rgba(245, 158, 80, 0.4), transparent 72%);
   animation: fx-drift-b 32s ease-in-out infinite alternate;
 }
 .aurora-c {
@@ -1354,7 +1347,7 @@ div[id] {
   height: 560px;
   left: calc(50% - 280px);
   bottom: -360px;
-  background: radial-gradient(closest-side, rgba(0, 209, 178, 0.32), transparent 72%);
+  background: radial-gradient(closest-side, rgba(255, 124, 104, 0.26), transparent 72%);
   animation: fx-drift-c 24s ease-in-out infinite alternate;
 }
 @keyframes fx-drift-a {
@@ -1379,8 +1372,8 @@ div[id] {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px);
   background-size: 56px 56px;
   -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 30%, transparent 75%);
   mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 30%, transparent 75%);
@@ -1393,7 +1386,7 @@ div[id] {
   height: 420px;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(0, 112, 243, 0.16), transparent 70%);
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(240, 78, 62, 0.14), transparent 70%);
 }
 
 /* ── Terminal: rotating conic beam border + typed lines ─── */
@@ -1415,9 +1408,9 @@ div[id] {
   background: conic-gradient(
     from var(--beam-angle),
     transparent 0deg,
-    rgba(0, 112, 243, 0.9) 45deg,
-    rgba(0, 112, 243, 0.55) 105deg,
-    rgba(0, 112, 243, 0.25) 145deg,
+    rgba(240, 78, 62, 0.9) 45deg,
+    rgba(240, 78, 62, 0.55) 105deg,
+    rgba(240, 78, 62, 0.25) 145deg,
     transparent 170deg,
     transparent 360deg
   );
@@ -1532,7 +1525,7 @@ div[id] {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: var(--ink);
+  background: var(--primary);
   transform: scaleY(0);
   transform-origin: top;
   transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.15s;
@@ -1550,10 +1543,10 @@ div[id] {
 @keyframes fx-breathe {
   0%,
   100% {
-    box-shadow: 0 8px 28px -10px rgba(0, 112, 243, 0.4);
+    box-shadow: 0 8px 28px -10px rgba(240, 78, 62, 0.4);
   }
   50% {
-    box-shadow: 0 10px 44px -8px rgba(0, 112, 243, 0.7);
+    box-shadow: 0 10px 44px -8px rgba(240, 78, 62, 0.65);
   }
 }
 .btn-glow::before {
@@ -1587,19 +1580,19 @@ div[id] {
   width: 720px;
   height: 480px;
   transform: translateX(-50%);
-  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(0, 112, 243, 0.07), transparent 70%);
+  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(240, 78, 62, 0.06), transparent 70%);
   pointer-events: none;
 }
 .download::before {
   top: auto;
   bottom: -240px;
-  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(121, 40, 202, 0.07), transparent 70%);
+  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(245, 158, 80, 0.08), transparent 70%);
 }
 [data-theme="dark"] .features::before {
-  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(0, 112, 243, 0.12), transparent 70%);
+  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(240, 78, 62, 0.12), transparent 70%);
 }
 [data-theme="dark"] .download::before {
-  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(121, 40, 202, 0.12), transparent 70%);
+  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(245, 158, 80, 0.1), transparent 70%);
 }
 
 /* ── Misc helpers ───────────────────────────────────────── */
@@ -1629,19 +1622,19 @@ details[open] > .platform-grid {
   }
 }
 
-/* ── Hero title: cool sheen sweep ───────────────────────── */
+/* ── Hero title: warm sheen sweep ───────────────────────── */
 .hero-title {
   background: linear-gradient(
     100deg,
-    #ffffff 24%,
-    #a9c9ff 44%,
-    #e8f0ff 50%,
-    #a9c9ff 56%,
-    #ffffff 76%
+    var(--ink) 24%,
+    #ff8a70 44%,
+    #ffb59f 50%,
+    #ff8a70 56%,
+    var(--ink) 76%
   );
   background-size: 250% 100%;
   background-position: 85% 0;
-  color: #ffffff;
+  color: var(--ink);
   animation: fx-sheen 9s ease-in-out infinite;
 }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
@@ -1957,7 +1950,7 @@ details[open] > .platform-grid {
   position: relative;
   padding: 96px 0;
   background:
-    radial-gradient(ellipse 70% 60% at 50% 0%, rgba(0, 112, 243, 0.06), transparent 70%),
+    radial-gradient(ellipse 70% 60% at 50% 0%, rgba(240, 78, 62, 0.07), transparent 70%),
     var(--bg-soft);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -2017,7 +2010,7 @@ details[open] > .platform-grid {
   min-width: 26px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: rgba(0, 112, 243, 0.16);
+  background: rgba(240, 78, 62, 0.13);
   color: var(--primary);
   font-family: var(--mono);
   font-size: 12px;
@@ -2282,11 +2275,11 @@ details[open] > .platform-grid {
   width: 760px;
   height: 520px;
   transform: translateX(-50%);
-  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(0, 112, 243, 0.08), transparent 70%);
+  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(240, 78, 62, 0.07), transparent 70%);
   pointer-events: none;
 }
 [data-theme="dark"] .market::before {
-  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(0, 112, 243, 0.14), transparent 70%);
+  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(240, 78, 62, 0.13), transparent 70%);
 }
 .market-updated {
   margin-top: 6px;
@@ -2466,7 +2459,7 @@ details[open] > .platform-grid {
   margin: 22px auto 0;
   text-align: center;
   max-width: 560px;
-  color: #8c8c8c;
+  color: var(--muted-2);
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 500;
@@ -2479,7 +2472,7 @@ details[open] > .platform-grid {
   width: 40px;
   height: 1px;
   margin: 0 auto 16px;
-  background: linear-gradient(90deg, transparent, #333333, transparent);
+  background: linear-gradient(90deg, transparent, var(--line-strong), transparent);
 }
 
 /* ── Landing: features value line ───────────────────────── */
