@@ -266,6 +266,46 @@ div[id] {
   overflow: hidden;
   padding-bottom: 46px;
 }
+/* 截图点击热区：整块舞台可点，悬停/聚焦出现「点击放大」角标。 */
+.hero-shot-zoom {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.hero-shot-zoom:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.hero-shot-hint {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: rgba(34, 21, 18, 0.72);
+  color: #ffffff;
+  font-size: 12px;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.hero-shot-zoom:hover .hero-shot-hint,
+.hero-shot-zoom:focus-visible .hero-shot-hint {
+  opacity: 1;
+}
+@media (hover: none) {
+  .hero-shot-hint {
+    opacity: 1;
+  }
+}
+
 /* 截图舞台：固定宽高比，切换不引起回流；各张绝对定位堆叠、透明度过渡。 */
 .hero-shot-stage {
   position: relative;
@@ -311,9 +351,94 @@ div[id] {
   width: 22px;
   background: var(--primary);
 }
+
+/* ── 截图 lightbox（原生 <dialog>：Esc、焦点圈定与背景遮罩免费获得）── */
+.shot-lightbox {
+  width: min(94vw, 1280px);
+  max-width: none;
+  max-height: 92vh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+}
+.shot-lightbox::backdrop {
+  background: rgba(23, 16, 16, 0.74);
+  backdrop-filter: blur(6px);
+}
+.shot-lightbox-inner {
+  position: relative;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.55);
+  animation: fx-lightbox-in 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.shot-lightbox-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 76vh;
+  object-fit: contain;
+  border-radius: 10px;
+  background: var(--bg-soft);
+}
+.shot-lightbox-cap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.shot-lightbox-cap strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.shot-lightbox-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.shot-lightbox-close:hover {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+.shot-lightbox-close:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+@keyframes fx-lightbox-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .hero-shot-img {
     transition: none;
+  }
+  .shot-lightbox-inner {
+    animation: none;
   }
 }
 

@@ -26,6 +26,8 @@ const enUS = {
     heroCtaStart: "Get started",
     heroCtaDocs: "Read the docs",
     heroShotsLabel: "Workbench screenshot carousel",
+    heroShotZoom: "Click to enlarge",
+    heroShotClose: "Close",
     heroShots: {
       chat: "Chat view: reasoning, tool calls and replies on one timeline",
       experts: "Experts view: pick experts and expert teams by scenario, add in one click",
