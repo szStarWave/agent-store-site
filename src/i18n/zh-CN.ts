@@ -24,7 +24,14 @@ const zhCN = {
       "单个可执行文件，浏览器打开即用。执行与凭据只留本机，云端只同步定义与版本——零数据库、无常驻服务。",
     heroCtaStart: "快速开始",
     heroCtaDocs: "阅读文档",
-    heroShotAlt: "Flowy Agent Store 工作台截图：会话界面",
+    heroShotsLabel: "工作台截图轮播",
+    heroShots: {
+      chat: "会话界面：思考过程、工具调用与回复在同一条时间线上",
+      experts: "专家视图：按场景挑选专家与专家团，一键添加",
+      skills: "技能视图：按名称或来源检索，管理已安装项",
+      connectors: "连接器视图：外部系统接入与凭据状态一览",
+      settings: "设置视图：主题、语言与 App Server 连接",
+    },
     install: {
       title: "三步上手",
       subtitle: "不用自己先装复杂环境。复制下面的安装命令运行即可，程序会自动准备需要的东西。",

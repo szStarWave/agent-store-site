@@ -25,7 +25,14 @@ const enUS = {
       "One executable opens a full workbench in your browser. Execution and credentials stay on your machine; the cloud only syncs definitions and versions — no database, no resident service.",
     heroCtaStart: "Get started",
     heroCtaDocs: "Read the docs",
-    heroShotAlt: "Flowy Agent Store workbench screenshot: chat view",
+    heroShotsLabel: "Workbench screenshot carousel",
+    heroShots: {
+      chat: "Chat view: reasoning, tool calls and replies on one timeline",
+      experts: "Experts view: pick experts and expert teams by scenario, add in one click",
+      skills: "Skills view: search by name or source, manage what is installed",
+      connectors: "Connectors view: external systems and credential status at a glance",
+      settings: "Settings view: theme, language and the App Server connection",
+    },
     install: {
       title: "Up and running in three steps",
       subtitle:

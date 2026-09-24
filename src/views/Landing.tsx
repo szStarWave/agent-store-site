@@ -16,7 +16,11 @@ import {
 import PageMeta from "../components/PageMeta";
 import FaqSection from "../components/FaqSection";
 import CopyButton from "../components/CopyButton";
-import heroShot from "../assets/webui/chat.webp";
+import chatShot from "../assets/webui/chat.webp";
+import connectorsShot from "../assets/webui/connectors.webp";
+import expertsShot from "../assets/webui/experts.webp";
+import settingsShot from "../assets/webui/settings.webp";
+import skillsShot from "../assets/webui/skills.webp";
 
 const META = {
   "zh-CN": {
@@ -31,7 +35,76 @@ const META = {
   },
 } as const;
 
-/* ── Hero：徽章 + 大标语 + 双 CTA + 产品实拍 ─────────────────── */
+/* ── Hero：徽章 + 大标语 + 双 CTA + 产品实拍轮播 ─────────────── */
+
+/** 轮播的界面截图（与工作台各视图一一对应，文案在 i18n `landing.heroShots`）。 */
+const HERO_SHOTS = [
+  { key: "chat", src: chatShot },
+  { key: "experts", src: expertsShot },
+  { key: "skills", src: skillsShot },
+  { key: "connectors", src: connectorsShot },
+  { key: "settings", src: settingsShot },
+] as const;
+
+/** 轮播间隔与淡入淡出时长（CSS 里 `.hero-shot-img` 的 transition 要与此匹配）。 */
+const SHOT_INTERVAL_MS = 4200;
+
+/**
+ * 产品实拍轮播：自动逐张淡入淡出，悬停/聚焦暂停，圆点可手动切换。
+ * `prefers-reduced-motion` 下不自动播放（仍可手动点圆点）。
+ */
+function HeroShotCarousel() {
+  const { t } = useTranslation();
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (paused) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = setInterval(() => setIndex((i) => (i + 1) % HERO_SHOTS.length), SHOT_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [paused]);
+
+  return (
+    <figure
+      className="hero-shot"
+      style={revealDelay(320)}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
+    >
+      <div className="hero-shot-stage">
+        {HERO_SHOTS.map((shot, i) => (
+          <img
+            key={shot.key}
+            className={i === index ? "hero-shot-img is-active" : "hero-shot-img"}
+            src={shot.src}
+            alt={i === index ? t(`landing.heroShots.${shot.key}`) : ""}
+            width={1080}
+            height={522}
+            loading={i === 0 ? "eager" : "lazy"}
+            decoding="async"
+            aria-hidden={i !== index}
+          />
+        ))}
+      </div>
+      <div className="hero-shot-dots" role="group" aria-label={t("landing.heroShotsLabel")}>
+        {HERO_SHOTS.map((shot, i) => (
+          <button
+            key={shot.key}
+            type="button"
+            className={i === index ? "hero-shot-dot is-active" : "hero-shot-dot"}
+            aria-label={t(`landing.heroShots.${shot.key}`)}
+            aria-current={i === index}
+            onClick={() => setIndex(i)}
+          />
+        ))}
+      </div>
+    </figure>
+  );
+}
+
 function HeroSection({ lang }: { lang: ReturnType<typeof useLanguage> }) {
   const { t } = useTranslation();
   return (
@@ -58,16 +131,7 @@ function HeroSection({ lang }: { lang: ReturnType<typeof useLanguage> }) {
             {t("landing.heroCtaDocs")}
           </Link>
         </div>
-        <figure className="hero-shot" style={revealDelay(320)}>
-          <img
-            src={heroShot}
-            alt={t("landing.heroShotAlt")}
-            width={1080}
-            height={522}
-            loading="eager"
-            decoding="async"
-          />
-        </figure>
+        <HeroShotCarousel />
       </div>
     </section>
   );
