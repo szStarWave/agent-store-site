@@ -192,7 +192,9 @@ Rules for adding and correcting entries:
 
 ## 4. Unpublished changes and release cadence
 
-As of 2026-09-20, **the working tree matches the published artifact `0.1.0-beta.7`** — `fp-8` and `48 / 73` shipped with this release, and the `[memory] enabled` and `max_output_size` / `protocol` wiring are in the same working tree (they never enter the fingerprint, so reading artifacts side by side cannot reveal them; see §8 of the [Upgrade and migration guide](/en-US/docs/upgrade)). **This section currently has no pending entries.**
+**Pending (not yet released)**: connector user credentials (`fp-9`, method count `48 / 73` → `51 / 76`) — the connector summary gains a `credential` block and three methods `connector/credential/get` · `set` · `clear`, with `connectors.credentials()` / `setCredentials()` / `clearCredentials()` in the SDK. Connectors that need a key or token the *user* supplies finally have a proper input path: a secret value never crosses the wire in either direction (`fields[].value` appears only for `plain` fields), credentials are stored per caller, and the write face accepts only keys the connector's own declaration names. See the [TypeScript SDK](/en-US/docs/typescript-sdk). **The fingerprint is compared strictly, so upgrading to this version requires upgrading the SDK too.**
+
+As of 2026-09-20, **the published artifact `0.1.0-beta.7` corresponds to `fp-8` and `48 / 73`**; the `[memory] enabled` and `max_output_size` / `protocol` wiring are in the same working tree (they never enter the fingerprint, so reading artifacts side by side cannot reveal them; see §8 of the [Upgrade and migration guide](/en-US/docs/upgrade)).
 
 The previous batch (expert / team definition export plus the host-configuration increment accumulated after `0.1.0-beta.6`) shipped with `0.1.0-beta.7` — listed one by one in §2.1; `beta.6`'s SDK entry rename and return-shape change are in §2.2, and `0.1.0-beta.4` and earlier batches are in §2.4–§2.5.
 

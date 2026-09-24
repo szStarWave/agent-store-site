@@ -29,7 +29,7 @@ bun add @flowy-agent-store/protocol
 All packages ship ESM + CJS (`exports` maps `import` / `require` / `types`); they work out of the box in Node and bundlers.
 
 > **Version status**: all three packages are `0.1.0-beta.*` pre-releases (the API is not frozen, and **no backward compatibility is promised during beta**). Pin an **exact** version in production — this page and the repo currently correspond to `0.1.0-beta.7` (the `beta` tag). Do not rely on a bare `bun add`: the registry's `latest` currently points at `0.1.0-beta.2`, **not** the newest `0.1.0-beta.7`. For dist-tag semantics, per-version upgrade steps and self-check commands see the [Upgrade and migration guide](/en-US/docs/upgrade).
-> **Protocol surface scope**: the `APP_SERVER_PROTOCOL_VERSION` example in §2 and the method counts in §5.3 (`48 / 73`) are taken from the **working tree**, which currently **matches the published artifacts** (since `0.1.0-beta.7`; earlier versions led them, and that batch shipped with this release — it is recorded in §8 of the [Upgrade and migration guide](/en-US/docs/upgrade), together with the self-check commands). The fingerprint is compared for **strict equality** (a client built against an old value cannot connect to a new runtime), so when you build your own binary or touch the protocol, read the constant in §2 rather than copying a value out of this page's prose.
+> **Protocol surface scope**: the `APP_SERVER_PROTOCOL_VERSION` example in §2 and the method counts in §5.3 (`51 / 76`) are taken from the **working tree**, which currently **matches the published artifacts** (since `0.1.0-beta.7`; earlier versions led them, and that batch shipped with this release — it is recorded in §8 of the [Upgrade and migration guide](/en-US/docs/upgrade), together with the self-check commands). The fingerprint is compared for **strict equality** (a client built against an old value cannot connect to a new runtime), so when you build your own binary or touch the protocol, read the constant in §2 rather than copying a value out of this page's prose.
 > **Runtime**: Node.js **≥ 22** (relies on the global `WebSocket`) or Bun; the lower bound is declared by each package's `engines.node`.
 
 ---
@@ -44,7 +44,7 @@ The single TypeScript source of truth for the wire contract: every request/respo
 
 | Export | Meaning |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | A contract **fingerprint** (**currently** `"fp-8"` in the working tree; the shape is an `fp-<n>` counter, incremented on each wire change and never reusing a past value. It was once a date stamp, but that is a *label, not the day of the change* — consecutive changes advanced it a day each, so it ran ahead of the calendar); the handshake and SDK checks compare it for strict equality |
+| `APP_SERVER_PROTOCOL_VERSION` | A contract **fingerprint** (**currently** `"fp-9"` in the working tree; the shape is an `fp-<n>` counter, incremented on each wire change and never reusing a past value. It was once a date stamp, but that is a *label, not the day of the change* — consecutive changes advanced it a day each, so it ran ahead of the calendar); the handshake and SDK checks compare it for strict equality |
 | `InitializeRequest` / `InitializeResult` | Handshake request/response (incl. `protocol_version`, server info) |
 | `ClientInfo` / `ClientCapabilities` | Caller self-description |
 | `StoreList` / `StoreInstallResult` | Winget-style unified catalog |
@@ -207,7 +207,23 @@ client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // 
 client.connectors.waitForAuth(connectorId: string, options?: { timeoutMs?, pollMs? }): Promise<WaitForAuthOutcome>; // wait for the end, and bring back the reason
 client.connectors.logout(connectorId: string): Promise<void>;                // revoke token
 client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // call proxy
+client.connectors.credentials(connectorId: string): Promise<ConnectorCredential>;      // the form a connector needs filled in (`fp-9`)
+client.connectors.setCredentials(connectorId: string, values: Record<string, string>): Promise<ConnectorCredential>; // store, and get the new state back
+client.connectors.clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;              // `keys` omitted = every secret field
 ```
+
+> **Connectors that need a key or token** (`fp-9`): `credentials(id)` returns a `credential` block —
+> `mode` (`none` / `oauth` / `token`), `status` (`not_required` / `requires_input` / `configured` /
+> `error`), `missing` (**key names only**) and `fields[]` (label / placeholder / description / where
+> to get a key — both languages already resolved by the host). Write with
+> `setCredentials(id, { KEY: "…" })`; forget with `clearCredentials(id)`, or with `keys` to clear a
+> single field.
+>
+> **Values go in, never out**: a response **never** carries a secret's value — `fields[].value`
+> appears only for `plain` fields (the connector's own settings, such as `HOST` / `PORT`). The form is
+> the whole write surface: a key the connector's declaration does not name is refused. Credentials are
+> stored **per caller** (`<principal>:NAME`), so `missing` / `status` are statements *about you* — the
+> same connector can be `configured` for A and `requires_input` for B.
 
 > `call()` runs one MCP tool through the **host's own connection**: the transport, its headers and its OAuth token stay on the host — you send a tool name and an argument object, and you **cannot** name a URL, a command or a header. Whether the pair is callable is the host's `[connector_proxy]` policy: once its operator turns the proxy on, the **enabled connectors are callable**, and `allow` / `deny` are that operator's optional narrowing and subtraction. So `policy_denied` means "the host never turned the proxy on" or "this pair was narrowed out or explicitly denied" — **not** "you forgot to maintain a list".
 >
@@ -532,7 +548,7 @@ const routes = httpRouteTable();
 // { "market/remove": { verb: "POST", path: "/markets/:marketplace_id/remove", source: "…" }, … }
 ```
 
-- Covers **48 / 73** methods. The 25 outside the route table: `initialize`, `initialized`, `workspace/create`, `conversation/model-options`, `conversation/update`, `conversation/subscribe`, `conversation/unsubscribe`, `run/subscribe`, `run/unsubscribe`, `agent/list`, `agent/get`, `team/list`, `team/get`, `agent/export`, `team/export`, `config/get`, `config/set`, `skill/create`, `skill/update`, `skill/delete`, `skill/copy`, `config/get-mcp`, `config/set-mcp`, `config/set-mcp-enabled`, `skill/file`.
+- Covers **51 / 76** methods. The 25 outside the route table: `initialize`, `initialized`, `workspace/create`, `conversation/model-options`, `conversation/update`, `conversation/subscribe`, `conversation/unsubscribe`, `run/subscribe`, `run/unsubscribe`, `agent/list`, `agent/get`, `team/list`, `team/get`, `agent/export`, `team/export`, `config/get`, `config/set`, `skill/create`, `skill/update`, `skill/delete`, `skill/copy`, `config/get-mcp`, `config/set-mcp`, `config/set-mcp-enabled`, `skill/file`.
   - Those 25 methods do **not** mean the server has no HTTP route for them: `initialize` / `initialized` do have one (`POST /api/app-server/initialize`, `/initialized` — the HTTP transport's handshake goes through them), they are simply not business methods; `skill/file` has one too (`GET /api/app-server/skills/{skill_id}/files/{path}`), but it answers with **raw bytes plus a `content-type`** rather than a JSON envelope, so it is likewise absent from the JSON transport's route table — use `client.skills.readFile()` (WebSocket, base64) or `fetch` the route directly.
 - `config/get` / `config/set` (the host settings file `~/.agent-store/config.toml`) are **host management surface** (`16` §6): wire methods with no HTTP binding, and deliberately **not part of this package's client** — the Web UI calls them through its own transport helpers. Contract in `05` §4.10.
 - `config/get-mcp` / `config/set-mcp` / `config/set-mcp-enabled` (the MCP declaration file `~/.agent-store/mcp.json`) are host management surface by the same `16` §6 judgement: wire-only, no HTTP binding, and not in this package. The write face is **fail-closed** (an unparseable file, or an entry the parser rejects, leaves the file byte-identical) and the toggle is a **text-level minimal edit** (only that entry's `enabled` value moves; comments and indentation survive). Note that `config/get-mcp` is the **only** read that returns the file's own text (for the host's own editor, on demand, inside the loopback + owner gate); every other read (`config/get.mcp`) still carries no `env` / `headers` values. Contract in `05` §4.10.

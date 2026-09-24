@@ -29,7 +29,7 @@ bun add @flowy-agent-store/protocol
 包均发布为 ESM + CJS 双格式（`exports` 提供 `import` / `require` / `types`），Node 与打包器开箱即用。
 
 > **版本状态**：三个包当前均为 `0.1.0-beta.*` 预发布（API 尚未冻结，beta 期间**不承诺向后兼容**）。生产接入请固定**确切版本**——本文与仓库当前对应 `0.1.0-beta.7`（`beta` tag）。注意不要依赖裸 `bun add`：注册表 `latest` 当前指向 `0.1.0-beta.2`，**不是**最新的 `0.1.0-beta.7`。dist-tag 语义、逐版本升级步骤与自查命令见[升级与迁移指引](/zh-CN/docs/upgrade)。
-> **协议面口径**：§2 的 `APP_SERVER_PROTOCOL_VERSION` 示例与 §5.3 的方法计数（`48 / 73`）取自**仓库工作区**，而工作区当前**与已发布产物一致**（自 `0.1.0-beta.7` 起；此前几版工作区曾领先于产物，那批差异已随本版发布，登记在[升级与迁移指引](/zh-CN/docs/upgrade) §8，自查命令也在那一节）。指纹按**严格相等**校验（按旧值编出来的客户端连不上新运行时），所以自己拉二进制或改协议时，请以 §2 常量为准，不要从本文正文里抄值。
+> **协议面口径**：§2 的 `APP_SERVER_PROTOCOL_VERSION` 示例与 §5.3 的方法计数（`51 / 76`）取自**仓库工作区**，而工作区当前**与已发布产物一致**（自 `0.1.0-beta.7` 起；此前几版工作区曾领先于产物，那批差异已随本版发布，登记在[升级与迁移指引](/zh-CN/docs/upgrade) §8，自查命令也在那一节）。指纹按**严格相等**校验（按旧值编出来的客户端连不上新运行时），所以自己拉二进制或改协议时，请以 §2 常量为准，不要从本文正文里抄值。
 > **运行环境**：Node.js **≥ 22**（依赖全局 `WebSocket`）或 Bun；版本下限由各包 `engines.node` 声明。
 
 ---
@@ -44,7 +44,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出 | 说明 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 契约**指纹**（**仓库工作区当前为** `"fp-8"`；形状是 `fp-<n>` 计数器，每次 wire 变更递增、不复用任何历史值。旧值曾是日期戳，那是**标签不是变更日**——连续改动每次加一天，故常超前于日历），握手与 SDK 校验做严格相等 |
+| `APP_SERVER_PROTOCOL_VERSION` | 契约**指纹**（**仓库工作区当前为** `"fp-9"`；形状是 `fp-<n>` 计数器，每次 wire 变更递增、不复用任何历史值。旧值曾是日期戳，那是**标签不是变更日**——连续改动每次加一天，故常超前于日历），握手与 SDK 校验做严格相等 |
 | `InitializeRequest` / `InitializeResult` | 握手请求/响应（含 `protocol_version`、`server` 信息） |
 | `ClientInfo` / `ClientCapabilities` | 连接方自述 |
 | `StoreList` / `StoreInstallResult` | winget 式统一目录 |
@@ -207,7 +207,21 @@ client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // 
 client.connectors.waitForAuth(connectorId: string, options?: { timeoutMs?, pollMs? }): Promise<WaitForAuthOutcome>; // 等到结束，并带回失败原因
 client.connectors.logout(connectorId: string): Promise<void>;                // 吊销令牌
 client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // 调用代理
+client.connectors.credentials(connectorId: string): Promise<ConnectorCredential>;      // 需要用户填的表单与状态（`fp-9`）
+client.connectors.setCredentials(connectorId: string, values: Record<string, string>): Promise<ConnectorCredential>; // 存储并回新状态
+client.connectors.clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;              // keys 省略 = 全部 secret 字段
 ```
+
+> **需要 key / token 的连接器**（`fp-9`）：`credentials(id)` 回一个 `credential` 块——`mode`
+> （`none` / `oauth` / `token`）、`status`（`not_required` / `requires_input` / `configured` / `error`）、
+> `missing`（**只含键名**）与 `fields[]`（label / placeholder / description / 取密钥入口，两种语言都由
+> host 归一后下发）。用 `setCredentials(id, { KEY: "…" })` 写入，`clearCredentials(id)` 或带 `keys`
+> 单独清除。
+>
+> **值只进不出**：响应里**永远**没有 secret 的值——`fields[].value` 只对 `plain` 字段出现（那是连接器
+> 自己的设置，如 `HOST` / `PORT`），secret 字段永远不回传。写入面就是表单本身：声明里没有的键会被拒绝。
+> 凭据按**调用者**落库（`<principal>:NAME`），所以 `missing` / `status` 是「关于你」的陈述——同一个连接器
+> 对 A 是 `configured`、对 B 可能是 `requires_input`。
 
 > `call()` 经**宿主自己的连接**执行一个 MCP 工具：连接参数、headers 与 OAuth token 都留在宿主，你只发工具名与参数对象——**无法**指定 URL / 命令 / header。是否可调由宿主 `[connector_proxy]` 决定：操作者一旦开启代理，**已启用的连接器即可调用**，`allow` / `deny` 是他的可选收窄与减法。所以 `policy_denied` 表示「宿主没开代理」或「这一对被收窄/明确排除」，**不再**表示「你漏写了名单」。
 >
@@ -531,7 +545,7 @@ const routes = httpRouteTable();
 // { "market/remove": { verb: "POST", path: "/markets/:marketplace_id/remove", source: "…" }, … }
 ```
 
-- 覆盖 **48 / 73** 个方法。路由表外的 25 个方法：`initialize`、`initialized`、`workspace/create`、`conversation/model-options`、`conversation/update`、`conversation/subscribe`、`conversation/unsubscribe`、`run/subscribe`、`run/unsubscribe`、`agent/list`、`agent/get`、`team/list`、`team/get`、`agent/export`、`team/export`、`config/get`、`config/set`、`skill/create`、`skill/update`、`skill/delete`、`skill/copy`、`config/get-mcp`、`config/set-mcp`、`config/set-mcp-enabled`、`skill/file`。
+- 覆盖 **51 / 76** 个方法。路由表外的 25 个方法：`initialize`、`initialized`、`workspace/create`、`conversation/model-options`、`conversation/update`、`conversation/subscribe`、`conversation/unsubscribe`、`run/subscribe`、`run/unsubscribe`、`agent/list`、`agent/get`、`team/list`、`team/get`、`agent/export`、`team/export`、`config/get`、`config/set`、`skill/create`、`skill/update`、`skill/delete`、`skill/copy`、`config/get-mcp`、`config/set-mcp`、`config/set-mcp-enabled`、`skill/file`。
   - 这 25 个方法**不代表服务端没有 HTTP 路由**：`initialize` / `initialized` 就有（`POST /api/app-server/initialize`、`/initialized`，HTTP 传输的握手正走它们），只是它们不是业务方法；`skill/file` 也有（`GET /api/app-server/skills/{skill_id}/files/{path}`），但它回的是**原始字节 + `content-type`**、不是 JSON 信封，所以同样没进 JSON 传输的路由表——用 `client.skills.readFile()`（WS，base64）或 `fetch` 直连该路由。
 - `config/get` / `config/set`（宿主设置文件 `~/.agent-store/config.toml`）是**宿主管理面**（`16` §6）：只有 wire 方法，没有 HTTP 绑定，也**不在本包客户端内**——Web UI 自己经 transport 调用。契约见 `05` §4.10。
 - `config/get-mcp` / `config/set-mcp` / `config/set-mcp-enabled`（MCP 声明文件 `~/.agent-store/mcp.json`）同样按 `16` §6 判定为**宿主管理面**：只有 wire 方法、没有 HTTP 绑定，也不在本包客户端内。写面是**失败即不写**（整文件解析不过、或目标条目不合法 → 磁盘逐字节不变），开关是**文本级最小编辑**（只改那一条的 `enabled`，注释与缩进原样保留）。注意 `config/get-mcp` 是**唯一**返回文件原文的读面（供宿主自己的编辑器按需调用，全程只在回环与 owner 闸门内）；其余读面（`config/get.mcp`）仍然不含 `env` / `headers` 的取值。契约见 `05` §4.10。
