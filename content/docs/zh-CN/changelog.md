@@ -192,7 +192,14 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-截至 2026-09-20，**工作区与已发布产物 `0.1.0-beta.7` 一致**——`fp-8` 与 `48 / 73` 已随本版发布，`[memory] enabled` 与 `max_output_size` / `protocol` 接线这两项也已在同一个工作区里（它们不进指纹，因此对读产物看不出来，见[升级与迁移指引](/zh-CN/docs/upgrade) §8）。**本节当前没有待发布的条目。**
+**待发布（尚未发版）**：连接器用户凭据（`fp-9`，方法计数 `48 / 73` → `51 / 76`）——
+连接器摘要多一个 `credential` 块，并新增 `connector/credential/get` · `set` · `clear` 三个方法
+与 SDK 上的 `connectors.credentials()` / `setCredentials()` / `clearCredentials()`。需要用户自己
+填 key / token 的连接器从此有正式输入口：密钥值两个方向都不过线（`fields[].value` 只对 `plain`
+字段出现），写入按调用者命名空间落库，`connector/credential/*` 只接受该连接器声明里出现过的键。
+详见 [TypeScript SDK](/zh-CN/docs/typescript-sdk)。**指纹严格相等，升级到此版必须同时升级 SDK。**
+
+截至 2026-09-20，**已发布产物 `0.1.0-beta.7` 对应的是 `fp-8` 与 `48 / 73`**，`[memory] enabled` 与 `max_output_size` / `protocol` 接线这两项也已在同一个工作区里（它们不进指纹，因此对读产物看不出来，见[升级与迁移指引](/zh-CN/docs/upgrade) §8）。
 
 上一批（`0.1.0-beta.6` 之后积累的专家 / 专家团定义导出与宿主配置增量）已随 `0.1.0-beta.7` 发布，逐条见 §2.1；`beta.6` 的 SDK 入口改名与返回形状变更见 §2.2，`0.1.0-beta.4` 及更早的批次见 §2.4–§2.5。
 
