@@ -18,136 +18,54 @@ const zhCN = {
   },
   landing: {
     eyebrow: "本地优先 · 单文件运行时",
+    heroBadge: "GitHub 开源 · 免费使用",
     heroTitle: "一行命令，本机跑起 Agent 工作台",
     heroSubtitle:
       "单个可执行文件，浏览器打开即用。执行与凭据只留本机，云端只同步定义与版本——零数据库、无常驻服务。",
-    heroTrust: "开源免费 · 单文件运行时 · 数据不出本机",
-    heroCtaDownload: "免费下载",
-    heroCtaMarket: "浏览市场资源",
+    heroCtaStart: "快速开始",
     heroCtaDocs: "阅读文档",
-    heroTerminalListening: "App Server 已在 http://127.0.0.1:8787 启动",
-    heroTerminalOpened: "工作台已在浏览器中打开",
-    showcase: {
-      label: "产品预览",
-      title: "工作台实拍",
-      subtitle: "下面都是真实界面：导入专家、技能与连接器，跑起来、看得见，全部在本机完成。",
-      views: {
-        /* `desc` 是一行摘要（lightbox 图注用），`points` 是行内分点列表。 */
-        chat: {
-          label: "会话",
-          desc: "思考过程、工具调用与回复在同一条时间线上",
-          points: [
-            "思考过程、工具调用与回复在同一条时间线上。",
-            "每一步为什么这么做都留在记录里。",
-            "会话结束后可以整段回看，而不是只剩最后那句回答。",
-          ],
-        },
-        experts: {
-          label: "专家",
-          desc: "按场景挑选专家与专家团，一键添加",
-          points: [
-            "按场景挑选专家与专家团，看清简介与适用场景再决定。",
-            "一键添加到本机，添加后即刻可用。",
-            "不需要重启，也不必额外配置。",
-          ],
-        },
-        skills: {
-          label: "技能",
-          desc: "按名称或来源检索，管理已安装项",
-          points: [
-            "按名称或来源检索技能。",
-            "区分「已安装」与「可获取」。",
-            "安装、启用与移除都在本机完成，来源与版本随手可查。",
-          ],
-        },
-        connectors: {
-          label: "连接器",
-          desc: "外部系统接入与凭据状态一览",
-          points: [
-            "浏览可以接入的外部系统。",
-            "凭据是否就绪一眼就能看清。",
-            "接入后即可在会话里直接调用，而凭据本身始终只留在本机。",
-          ],
-        },
-        settings: {
-          label: "设置",
-          desc: "主题、语言与 App Server 连接",
-          points: [
-            "集中管理明暗主题、界面语言与 App Server 连接。",
-            "端口与连接状态可见。",
-            "版本信息与更新入口也在同一处。",
-          ],
-        },
-      },
-      zoom: "点击放大",
-      close: "关闭",
+    heroShotAlt: "Flowy Agent Store 工作台截图：会话界面",
+    install: {
+      title: "三步上手",
+      subtitle: "不用自己先装复杂环境。复制下面的安装命令运行即可，程序会自动准备需要的东西。",
+      tabAuto: "一键安装",
+      tabManual: "下载压缩包",
+      cmdHint:
+        "把下面这行粘贴到 PowerShell 运行：安装运行时包并将 flowy-agent-store 加入用户 PATH（需已安装 Node.js / npm，无需管理员权限）。",
+      cmdNote: "安装完成后，在新开的终端运行 flowy-agent-store，浏览器会自动打开工作台。",
+      viewScript: "查看安装脚本源码",
+      manualHint: "选择你的平台下载压缩包，解压即用；也可以在发布页查看全部构建。",
+      releases: "在 GitHub Releases 查看历史版本与校验和",
+      copy: "复制命令",
     },
-    featureTitle: "为本地工作台而生",
-    featureSubtitle: "导入、运行、观测——全部在一个可信的本地进程里完成。",
-    featureValue: "本地优先，意味着执行、凭据与状态永远留在你的机器上；云端只负责目录、版本与分发。",
-    features: {
-      workbench: {
-        title: "专家、技能、连接器，一处导入即用",
-        desc: "统一目录导入并转为不可变快照，检索、运行都在本地完成，不再依赖外部服务。",
-      },
-      observability: {
-        title: "每一次运行，看得见、可回放",
-        desc: "计划 DAG、事件时间线与产物实时呈现；从单 Agent 到团队运行，全程可复盘。",
-      },
-      localFirst: {
-        title: "凭据与状态，永不离开本机",
-        desc: "没有云执行，也不上传任何运行数据；云端仅同步市场目录、版本与分发。",
-      },
-      oneCmd: {
-        title: "一条命令，开箱即用",
-        desc: "无数据库、无常驻服务；flowy-agent-store 即起，浏览器自动打开工作台。",
-      },
-    },
-    workflowTitle: "命令行 → 工作台，三步上手",
-    workflowSubtitle: "下载、导入、运行，全部在本机完成。",
-    workflow: {
-      step1: {
-        title: "启动运行时",
-        desc: "运行命令，单文件在本地拉起 App Server，并自动打开工作台。",
-        cmd: "flowy-agent-store",
-      },
-      step2: {
-        title: "导入专家",
-        desc: "从工作台导入 CodeBuddy / WorkBuddy 插件，或用 SDK 调 installStoreEntry()。",
-        cmd: "导入 CodeBuddy / WorkBuddy 插件",
-      },
-      step3: {
-        title: "运行与观测",
-        desc: "选择 Agent 或团队运行，实时查看 DAG、事件时间线与产物。",
-        cmd: "Run → DAG · Timeline · Artifacts",
-      },
-    },
-    marketStrip: {
-      title: "市场资源，开箱即用",
-      subtitle: "专家、技能与连接器一键导入本地目录，持续更新。",
-      cta: "进入市场",
-    },
-    dev: {
-      title: "为开发者而生",
-      subtitle:
-        "类型安全的 TypeScript SDK：只用类型、连接已运行的 App Server，或一键拉起整个运行时。",
-      pkgProtocol: {
-        name: "@flowy-agent-store/protocol",
-        desc: "线协议唯一类型源：请求、响应、通知与错误。零运行时依赖。",
-      },
-      pkgClient: {
-        name: "@flowy-agent-store/client",
-        desc: "AppServerClient 与 7 个子客户端，Transport 抽象可接 WS / HTTP。",
-      },
-      pkgSdk: {
-        name: "@flowy-agent-store/sdk",
-        desc: "spawn 二进制 → 回环 WebSocket → 就绪握手，返回可用客户端。",
-      },
-      codeTitle: "quick-start.ts",
-      cta: "阅读 TypeScript SDK 指南",
+    why: {
+      title: "为什么选择 Flowy Agent Store",
+      subtitle: "本地优先，意味着执行、凭据与状态永远留在你的机器上；云端只负责目录、版本与分发。",
+      items: [
+        {
+          title: "一次下载，人人有专属工作台",
+          desc: "单文件运行时一条命令拉起 App Server 与浏览器工作台，无数据库、无常驻服务；本机默认免登录，开箱即用。",
+        },
+        {
+          title: "接上你每天在用的那些资源",
+          desc: "专家、技能与连接器从市场一键导入本地目录，转为不可变快照后即刻可用，不需要重启或额外配置。",
+        },
+        {
+          title: "它真的看得见每一次运行",
+          desc: "计划 DAG、事件时间线与产物实时呈现；从单 Agent 到团队运行，每一步为什么这么做都留在记录里，可整段回放。",
+        },
+        {
+          title: "凭据与状态，永不离开本机",
+          desc: "没有云执行，也不上传任何运行数据；云端仅同步市场目录、版本与分发。开放到局域网时可开启 --auth 保护。",
+        },
+        {
+          title: "和你的编码 Agent 搭伙",
+          desc: "把安装提示词交给 Claude Code / Codex / Cursor 等编码 Agent，它会替你完成下载、初始化与启动，并回报工作台地址。",
+        },
+      ],
     },
     faq: {
-      title: "常见问题",
+      title: "常见问题与帮助",
       items: {
         q1: {
           q: "本地优先的边界是什么？",
@@ -167,88 +85,12 @@ const zhCN = {
         },
       },
     },
-    downloadTitle: "下载 Flowy Agent Store",
-    downloadSubtitle: "选择你的平台，或在发布页查看全部构建。",
-    download: {
-      primaryCta: "下载 {{os}}",
-      detectNote: "已根据你当前的系统识别平台",
-      allPlatforms: "全部平台",
-      psTitle: "PowerShell 一键安装（npm）",
-      psHint: "把下面这行粘贴到 PowerShell 运行：安装 npm 运行时包并将 agent-store 加入用户 PATH（需已安装 Node.js / npm，无需管理员权限）。",
-      psView: "查看安装脚本源码",
-      manual: "手动选择平台",
-      releaseNote: "在 GitHub Releases 查看历史版本与校验和",
-      copy: "复制命令",
-      copied: "已复制",
-      fallbackCta: "前往 Releases",
-      unavailableNote: "仅 Windows x64 已发布；其他平台暂未提供。",
+    cta: {
+      title: "准备好开启你的智能协作之旅了吗",
+      subtitle: "一行命令，本机跑起 Agent 工作台。开源免费，数据不出本机。",
+      primary: "快速开始",
+      secondary: "免费下载",
     },
-    agent: {
-      eyebrow: "Agent 接力",
-      title: "把这段提示词交给你的 Agent",
-      subtitle:
-        "复制下面的提示词，粘给你常用的编码 Agent（Claude Code / Codex / Cursor…）。它会替你完成下载、初始化与启动服务，并把工作台地址回报给你。",
-      blockTitle: "提示词",
-      copy: "复制提示词",
-      copied: "已复制",
-      note: "提示词会先向 npm 取当前 beta 版本（取不到则回退到本站的 {{version}}）；它只用本站的安装脚本与 GitHub Releases，不引入其他安装方式。",
-      prompt: `你是我的本机运维助手。请把这台机器上的 Flowy Agent Store 跑起来——它是一个本地优先的单文件 Agent 运行时，自带浏览器工作台。
-
-前提：64 位 Windows，且终端里有 Node.js LTS（npm）。若没有 npm，先告诉我，再改用 GitHub Releases 的压缩包（无依赖）：{{releasesUrl}}
-
-请按顺序做，每一步失败就停下并原样贴出错误输出，不要自己换别的安装方式：
-
-1) 先取当前的预发布版本（不要用 latest——npm 的 latest 指向较旧的预发布版）：
-   npm view @flowy-agent-store/runtime-win32-x64 dist-tags --json --registry https://registry.npmjs.org/
-   取输出里的 "beta" 值作为下一步的版本号；如果这条命令失败或没有 beta，就用 {{version}}。
-
-2) 安装（固定上一步取到的版本）：
-   iwr {{installUrl}} -OutFile install-flowy-agent-store.ps1
-   ./install-flowy-agent-store.ps1 -Version <上一步的版本>
-   它会把 flowy-agent-store.exe 装到 %LOCALAPPDATA%\\Programs\\flowy-agent-store 并加入用户 PATH（不需要管理员权限）。
-   若这一步报「版本不存在」（本机 npm 配了镜像源、镜像还没同步到该版本），改用前提里的 GitHub Releases 压缩包。
-
-3) PATH 刚变过，请在新开的终端窗口里启动服务：
-   flowy-agent-store --port 8787
-   它会启动 App Server 并自动打开工作台。
-   · 报端口被占用 → 换 --port 8788 重试。
-   · 报数据目录被锁 → 桌面端正在运行，让我先关掉它再重试（这是防双写保护，不是故障）。
-
-4) 轮询 http://127.0.0.1:8787 直到有响应（最多 30 秒），然后告诉我：工作台地址 + 进程是否还在运行。
-
-5) 如果我要接真实模型：问我用哪家供应商与 API Key，按 {{configUrl}} 写进 ~/.agent-store/config.toml 的 [providers.<name>] 与 [models."<provider>/<model>"]，或者让我自己在工作台设置页填。不要把 Key 回显到终端或写进日志。
-
-最后给我一句话结论：工作台地址、进程状态、下一步建议（导入专家 / 技能 / 连接器）。`,
-    },
-    socialProof: {
-      title: "他们这样用 Flowy Agent Store",
-      subtitle: "本地优先、上手即用的体验，正在被各类团队复用到日常工作中。",
-      items: [
-        {
-          quote:
-            "一行命令就在浏览器里跑起工作台，导入专家、看 DAG、查产物，本地全搞定，不用纠结环境。",
-          role: "独立开发者",
-        },
-        {
-          quote:
-            "最打动我的是本地优先——凭据和运行状态从不出本机，合规上很省心，团队也敢用。",
-          role: "平台工程师",
-        },
-        {
-          quote:
-            "市场里的专家、技能、连接器直接导入本地目录，拉下来就能跑，新人当天就能上手。",
-          role: "技术负责人",
-        },
-      ],
-    },
-    platforms: {
-      macos: "macOS",
-      windows: "Windows",
-      linux: "Linux",
-      archAarch64: "Apple 芯片",
-      archX8664: "Intel / x64",
-    },
-    marketStat: "市场收录资源",
   },
   market: {
     title: "资源市场",
