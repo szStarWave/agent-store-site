@@ -194,6 +194,14 @@ Rules for adding and correcting entries:
 
 **Pending (not yet released)**: connector user credentials (`fp-9`, method count `48 / 73` → `51 / 76`; `fp-10` moves the form's own text onto the `credential` block, count unchanged) — the connector summary gains a `credential` block and three methods `connector/credential/get` · `set` · `clear`, with `connectors.credentials()` / `setCredentials()` / `clearCredentials()` in the SDK. Connectors that need a key or token the *user* supplies finally have a proper input path: a secret value never crosses the wire in either direction (`fields[].value` appears only for `plain` fields), credentials are stored per caller, and the write face accepts only keys the connector's own declaration names. The form's own text (`title` / `description` / `doc_url` / `doc_label`) moved from `fields[]` onto the block in `fp-10`: a marketplace `token-schema.json` declares it once at the top level, and copying it per field put "where do I get a key" under `PORT`. See the [TypeScript SDK](/en-US/docs/typescript-sdk). **The fingerprint is compared strictly, so upgrading to this version requires upgrading the SDK too.**
 
+**SDK export helpers (`0.1.0-beta.8`, no wire change)**: `@flowy-agent-store/sdk` gains three functions —
+`exportAgent` / `exportTeam` / `materializePack` — that write an expert definition plus its skill bytes
+into a directory (single expert or team, leader first; skills shared by members are deduplicated by id;
+declared-but-unresolvable skills land in `danglingSkills`, reported rather than skipped). The protocol and the
+method count are unchanged — the helpers orchestrate the existing `agent/export` · `team/export` ·
+`skill/files` · `skill/file` methods. An older SDK can still hand-write the same public-primitive recipe; the
+upgrade only removes that boilerplate. Example: [TypeScript SDK examples](/en-US/docs/examples-sdk) §9.4.
+
 As of 2026-09-20, **the published artifact `0.1.0-beta.7` corresponds to `fp-8` and `48 / 73`**; the `[memory] enabled` and `max_output_size` / `protocol` wiring are in the same working tree (they never enter the fingerprint, so reading artifacts side by side cannot reveal them; see §8 of the [Upgrade and migration guide](/en-US/docs/upgrade)).
 
 The previous batch (expert / team definition export plus the host-configuration increment accumulated after `0.1.0-beta.6`) shipped with `0.1.0-beta.7` — listed one by one in §2.1; `beta.6`'s SDK entry rename and return-shape change are in §2.2, and `0.1.0-beta.4` and earlier batches are in §2.4–§2.5.

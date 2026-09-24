@@ -619,9 +619,30 @@ credential policy is applied, and the shape of its events are all enforced by th
 pack. Before integrating, answer the **R1–R11 responsibility list** in §5 of the design document — a list with
 N/A written against an item *is* the answer, and it beats letting a semantic fail silently.
 
-**Materialising it into a directory.** Skills travel **by reference** in the pack (the bodies come from the
-existing skill file face), so this step is the consumer's own code rather than our API — 11 lines of public
-primitives:
+**Write it out as a directory.** Skills travel **by reference** in the pack (the bodies come from the
+existing skill file face). The SDK now ships this step as a public function — `exportAgent` for one expert,
+`exportTeam` for a team (leader first), and `materializePack` for a pack you already hold (it writes the
+in-memory pack object plus the skill bytes it references to a real directory):
+
+```ts
+import { exportTeam } from "@flowy-agent-store/sdk";
+
+// All-or-nothing stays on the server: any member missing → the whole call fails, nothing is written.
+const result = await exportTeam(client, teamId, "./frontend-backend-experts");
+result.pack;           // the ExpertPack, also in memory — no second call needed
+result.writtenSkills;  // skill names actually written (deduplicated across members)
+result.danglingSkills; // declared but unresolvable here: { id, error } — reported, never skipped in silence
+```
+
+The layout it writes: `expert-pack.json` (the wire pack byte-for-byte), `persona.md` (**agent kind only** —
+a team has no persona of its own), `members/<id>/persona.md` (**team kind only**, one per member), and
+`skills/<name>/…` (every referenced skill, deduplicated by id). Error semantics: the pack is fetched
+**before** anything is written, so a failed export leaves no directory; a `skill/files` rejection lands in
+`danglingSkills` and the loop continues; a `skill/file` failure after a successful listing **throws** — that
+is a host I/O error, and swallowing it would produce a directory that lists files it does not contain.
+
+Under the hood it is the same 11-line recipe of public primitives (the shape to imitate if you need a
+different layout):
 
 ```ts
 import { mkdir, writeFile } from "node:fs/promises";
