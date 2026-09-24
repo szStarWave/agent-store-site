@@ -25,6 +25,8 @@ const zhCN = {
     heroCtaStart: "快速开始",
     heroCtaDocs: "阅读文档",
     heroShotsLabel: "工作台截图轮播",
+    heroShotZoom: "点击放大",
+    heroShotClose: "关闭",
     heroShots: {
       chat: "会话界面：思考过程、工具调用与回复在同一条时间线上",
       experts: "专家视图：按场景挑选专家与专家团，一键添加",

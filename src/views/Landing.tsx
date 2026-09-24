@@ -1,6 +1,6 @@
 import Link from "@docusaurus/Link";
-import { useEffect, useState } from "react";
-import { Bot, Download, Eye, Rocket, ShieldCheck, Star, Store, FileDown } from "lucide-react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { Bot, Download, Eye, Maximize2, Rocket, ShieldCheck, Star, Store, FileDown, X } from "lucide-react";
 
 import { useLanguage, useTranslation } from "../i18n";
 import { revealDelay, useRevealAll, useSpotlight } from "../lib/effects";
@@ -50,20 +50,51 @@ const HERO_SHOTS = [
 const SHOT_INTERVAL_MS = 4200;
 
 /**
- * 产品实拍轮播：自动逐张淡入淡出，悬停/聚焦暂停，圆点可手动切换。
+ * 产品实拍轮播：自动逐张淡入淡出，悬停/聚焦暂停，圆点可手动切换；
+ * 点击当前图打开 lightbox 放大查看（原生 `<dialog>`，Esc / 点背景关闭）。
  * `prefers-reduced-motion` 下不自动播放（仍可手动点圆点）。
  */
 function HeroShotCarousel() {
   const { t } = useTranslation();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  /** lightbox 是否打开。由状态驱动 `<dialog>`，避免「先弹空面板再渲染内容」的闪动。 */
+  const [zoomed, setZoomed] = useState(false);
+  const lightbox = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
-    if (paused) return;
+    if (paused || zoomed) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const timer = setInterval(() => setIndex((i) => (i + 1) % HERO_SHOTS.length), SHOT_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [paused]);
+  }, [paused, zoomed]);
+
+  // `showModal` 让页面惰性但文档仍可滚动，所以 lightbox 打开期间锁住根元素。
+  useEffect(() => {
+    if (!zoomed) return;
+    const root = document.documentElement;
+    const previous = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = previous;
+    };
+  }, [zoomed]);
+
+  // 内容先渲染、再打开/关闭，不会闪一帧空面板。
+  useEffect(() => {
+    const dialog = lightbox.current;
+    if (!dialog) return;
+    if (zoomed && !dialog.open) dialog.showModal();
+    if (!zoomed && dialog.open) dialog.close();
+  }, [zoomed]);
+
+  /** 落在 dialog 自身上的点击就是点了背景。 */
+  const onBackdropClick = (event: MouseEvent<HTMLDialogElement>) => {
+    if (event.target === lightbox.current) lightbox.current.close();
+  };
+
+  const current = HERO_SHOTS[index];
+  const currentLabel = t(`landing.heroShots.${current.key}`);
 
   return (
     <figure
@@ -74,21 +105,32 @@ function HeroShotCarousel() {
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
     >
-      <div className="hero-shot-stage">
-        {HERO_SHOTS.map((shot, i) => (
-          <img
-            key={shot.key}
-            className={i === index ? "hero-shot-img is-active" : "hero-shot-img"}
-            src={shot.src}
-            alt={i === index ? t(`landing.heroShots.${shot.key}`) : ""}
-            width={1080}
-            height={522}
-            loading={i === 0 ? "eager" : "lazy"}
-            decoding="async"
-            aria-hidden={i !== index}
-          />
-        ))}
-      </div>
+      <button
+        type="button"
+        className="hero-shot-zoom"
+        onClick={() => setZoomed(true)}
+        aria-label={`${currentLabel} — ${t("landing.heroShotZoom")}`}
+      >
+        <div className="hero-shot-stage">
+          {HERO_SHOTS.map((shot, i) => (
+            <img
+              key={shot.key}
+              className={i === index ? "hero-shot-img is-active" : "hero-shot-img"}
+              src={shot.src}
+              alt={i === index ? currentLabel : ""}
+              width={1080}
+              height={522}
+              loading={i === 0 ? "eager" : "lazy"}
+              decoding="async"
+              aria-hidden={i !== index}
+            />
+          ))}
+        </div>
+        <span className="hero-shot-hint" aria-hidden="true">
+          <Maximize2 size={15} />
+          {t("landing.heroShotZoom")}
+        </span>
+      </button>
       <div className="hero-shot-dots" role="group" aria-label={t("landing.heroShotsLabel")}>
         {HERO_SHOTS.map((shot, i) => (
           <button
@@ -101,6 +143,35 @@ function HeroShotCarousel() {
           />
         ))}
       </div>
+
+      <dialog
+        ref={lightbox}
+        className="shot-lightbox"
+        aria-label={currentLabel}
+        onClick={onBackdropClick}
+        onClose={() => setZoomed(false)}
+      >
+        <figure className="shot-lightbox-inner">
+          <img
+            className="shot-lightbox-img"
+            src={current.src}
+            alt={currentLabel}
+            width={1080}
+            height={522}
+          />
+          <figcaption className="shot-lightbox-cap">
+            <strong>{currentLabel}</strong>
+            <button
+              type="button"
+              className="shot-lightbox-close"
+              onClick={() => lightbox.current?.close()}
+              aria-label={t("landing.heroShotClose")}
+            >
+              <X size={17} aria-hidden="true" />
+            </button>
+          </figcaption>
+        </figure>
+      </dialog>
     </figure>
   );
 }
