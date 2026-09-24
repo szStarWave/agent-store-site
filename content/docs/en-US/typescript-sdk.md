@@ -44,7 +44,7 @@ The single TypeScript source of truth for the wire contract: every request/respo
 
 | Export | Meaning |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | A contract **fingerprint** (**currently** `"fp-9"` in the working tree; the shape is an `fp-<n>` counter, incremented on each wire change and never reusing a past value. It was once a date stamp, but that is a *label, not the day of the change* — consecutive changes advanced it a day each, so it ran ahead of the calendar); the handshake and SDK checks compare it for strict equality |
+| `APP_SERVER_PROTOCOL_VERSION` | A contract **fingerprint** (**currently** `"fp-10"` in the working tree; the shape is an `fp-<n>` counter, incremented on each wire change and never reusing a past value. It was once a date stamp, but that is a *label, not the day of the change* — consecutive changes advanced it a day each, so it ran ahead of the calendar); the handshake and SDK checks compare it for strict equality |
 | `InitializeRequest` / `InitializeResult` | Handshake request/response (incl. `protocol_version`, server info) |
 | `ClientInfo` / `ClientCapabilities` | Caller self-description |
 | `StoreList` / `StoreInstallResult` | Winget-style unified catalog |
@@ -207,17 +207,20 @@ client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // 
 client.connectors.waitForAuth(connectorId: string, options?: { timeoutMs?, pollMs? }): Promise<WaitForAuthOutcome>; // wait for the end, and bring back the reason
 client.connectors.logout(connectorId: string): Promise<void>;                // revoke token
 client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // call proxy
-client.connectors.credentials(connectorId: string): Promise<ConnectorCredential>;      // the form a connector needs filled in (`fp-9`)
+client.connectors.credentials(connectorId: string): Promise<ConnectorCredential>;      // the form a connector needs filled in (`fp-10`)
 client.connectors.setCredentials(connectorId: string, values: Record<string, string>): Promise<ConnectorCredential>; // store, and get the new state back
 client.connectors.clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;              // `keys` omitted = every secret field
 ```
 
-> **Connectors that need a key or token** (`fp-9`): `credentials(id)` returns a `credential` block —
-> `mode` (`none` / `oauth` / `token`), `status` (`not_required` / `requires_input` / `configured` /
-> `error`), `missing` (**key names only**) and `fields[]` (label / placeholder / description / where
-> to get a key — both languages already resolved by the host). Write with
-> `setCredentials(id, { KEY: "…" })`; forget with `clearCredentials(id)`, or with `keys` to clear a
-> single field.
+> **Connectors that need a key or token** (`fp-9`, with the form's own text moved onto the block in
+> `fp-10`): `credentials(id)` returns a `credential` block — `mode` (`none` / `oauth` / `token`),
+> `status` (`not_required` / `requires_input` / `configured` / `error`), `missing` (**key names
+> only**) and `fields[]` (label / placeholder / description, both languages already resolved by the
+> host). The form's own text — `title` / `description` / `doc_url` / `doc_label` ("where do I get a
+> key") — sits on the **block**, not repeated per field: a marketplace `token-schema.json` declares it
+> once, at the top level.
+> Write with `setCredentials(id, { KEY: "…" })`; forget with `clearCredentials(id)`, or with `keys`
+> to clear a single field.
 >
 > **Values go in, never out**: a response **never** carries a secret's value — `fields[].value`
 > appears only for `plain` fields (the connector's own settings, such as `HOST` / `PORT`). The form is

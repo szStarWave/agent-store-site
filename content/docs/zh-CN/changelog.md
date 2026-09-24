@@ -192,11 +192,15 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-**待发布（尚未发版）**：连接器用户凭据（`fp-9`，方法计数 `48 / 73` → `51 / 76`）——
+**待发布（尚未发版）**：连接器用户凭据（`fp-9` 加入，方法计数 `48 / 73` → `51 / 76`；
+`fp-10` 把表单文案归位到 `credential` 块上，计数不变）——
 连接器摘要多一个 `credential` 块，并新增 `connector/credential/get` · `set` · `clear` 三个方法
 与 SDK 上的 `connectors.credentials()` / `setCredentials()` / `clearCredentials()`。需要用户自己
 填 key / token 的连接器从此有正式输入口：密钥值两个方向都不过线（`fields[].value` 只对 `plain`
 字段出现），写入按调用者命名空间落库，`connector/credential/*` 只接受该连接器声明里出现过的键。
+表单自己的文案（`title` / `description` / `doc_url` / `doc_label`）在 `fp-10` 从 `fields[]`
+移到块上——市场的一份 `token-schema.json` 只在顶层声明一次，逐字段复制会让"去哪里拿密钥"
+出现在「端口」底下。
 详见 [TypeScript SDK](/zh-CN/docs/typescript-sdk)。**指纹严格相等，升级到此版必须同时升级 SDK。**
 
 截至 2026-09-20，**已发布产物 `0.1.0-beta.7` 对应的是 `fp-8` 与 `48 / 73`**，`[memory] enabled` 与 `max_output_size` / `protocol` 接线这两项也已在同一个工作区里（它们不进指纹，因此对读产物看不出来，见[升级与迁移指引](/zh-CN/docs/upgrade) §8）。

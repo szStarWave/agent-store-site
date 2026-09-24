@@ -44,7 +44,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出 | 说明 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 契约**指纹**（**仓库工作区当前为** `"fp-9"`；形状是 `fp-<n>` 计数器，每次 wire 变更递增、不复用任何历史值。旧值曾是日期戳，那是**标签不是变更日**——连续改动每次加一天，故常超前于日历），握手与 SDK 校验做严格相等 |
+| `APP_SERVER_PROTOCOL_VERSION` | 契约**指纹**（**仓库工作区当前为** `"fp-10"`；形状是 `fp-<n>` 计数器，每次 wire 变更递增、不复用任何历史值。旧值曾是日期戳，那是**标签不是变更日**——连续改动每次加一天，故常超前于日历），握手与 SDK 校验做严格相等 |
 | `InitializeRequest` / `InitializeResult` | 握手请求/响应（含 `protocol_version`、`server` 信息） |
 | `ClientInfo` / `ClientCapabilities` | 连接方自述 |
 | `StoreList` / `StoreInstallResult` | winget 式统一目录 |
@@ -207,16 +207,18 @@ client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // 
 client.connectors.waitForAuth(connectorId: string, options?: { timeoutMs?, pollMs? }): Promise<WaitForAuthOutcome>; // 等到结束，并带回失败原因
 client.connectors.logout(connectorId: string): Promise<void>;                // 吊销令牌
 client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // 调用代理
-client.connectors.credentials(connectorId: string): Promise<ConnectorCredential>;      // 需要用户填的表单与状态（`fp-9`）
+client.connectors.credentials(connectorId: string): Promise<ConnectorCredential>;      // 需要用户填的表单与状态（`fp-10`）
 client.connectors.setCredentials(connectorId: string, values: Record<string, string>): Promise<ConnectorCredential>; // 存储并回新状态
 client.connectors.clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;              // keys 省略 = 全部 secret 字段
 ```
 
-> **需要 key / token 的连接器**（`fp-9`）：`credentials(id)` 回一个 `credential` 块——`mode`
-> （`none` / `oauth` / `token`）、`status`（`not_required` / `requires_input` / `configured` / `error`）、
-> `missing`（**只含键名**）与 `fields[]`（label / placeholder / description / 取密钥入口，两种语言都由
-> host 归一后下发）。用 `setCredentials(id, { KEY: "…" })` 写入，`clearCredentials(id)` 或带 `keys`
-> 单独清除。
+> **需要 key / token 的连接器**（`fp-9` 加入，`fp-10` 归位表单文案）：`credentials(id)` 回一个
+> `credential` 块——`mode`（`none` / `oauth` / `token`）、`status`（`not_required` /
+> `requires_input` / `configured` / `error`）、`missing`（**只含键名**）与 `fields[]`
+> （label / placeholder / description，两种语言都由 host 归一后下发）。表单自己的文案
+> ——`title` / `description` / `doc_url` / `doc_label`（"去哪里拿密钥"）——挂在**块上**，不逐字段重复：
+> 市场的一份 `token-schema.json` 只在顶层声明它们一次。
+> 用 `setCredentials(id, { KEY: "…" })` 写入，`clearCredentials(id)` 或带 `keys` 单独清除。
 >
 > **值只进不出**：响应里**永远**没有 secret 的值——`fields[].value` 只对 `plain` 字段出现（那是连接器
 > 自己的设置，如 `HOST` / `PORT`），secret 字段永远不回传。写入面就是表单本身：声明里没有的键会被拒绝。
