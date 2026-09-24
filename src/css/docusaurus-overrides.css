@@ -36,7 +36,7 @@
   --ifm-color-content: var(--ink);
   --ifm-color-content-secondary: var(--muted);
 
-  /* 主色：Infima 默认 #3578e5，站点用 Vercel 蓝。 */
+  /* 主色：Infima 默认 #3578e5，站点用珊瑚红（暖白 + 珊瑚红主题）。 */
   --ifm-color-primary: var(--primary);
   --ifm-color-primary-dark: var(--primary-strong);
   --ifm-color-primary-darker: var(--primary-strong);
@@ -99,10 +99,15 @@
   transition: background 0.14s ease, color 0.14s ease;
 }
 
-.navbar__item.navbar__link:hover,
-.navbar__item.navbar__link.navbar__link--active {
+.navbar__item.navbar__link:hover {
   background: var(--bg-soft);
   color: var(--ink);
+}
+
+/* 当前页的导航项：Octop 式的橙红高亮（淡珊瑚底 + 深珊瑚字）。 */
+.navbar__item.navbar__link.navbar__link--active {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
 }
 
 /* 语言切换与明暗切换按钮沿用同一套静默配色。 */
