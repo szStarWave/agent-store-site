@@ -1,6 +1,25 @@
 import Link from "@docusaurus/Link";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { Bot, Download, Eye, Maximize2, Rocket, ShieldCheck, Star, Store, FileDown, X } from "lucide-react";
+import {
+  ArrowRight,
+  Bot,
+  Box,
+  Cpu,
+  Download,
+  FileDown,
+  GitBranch,
+  History,
+  Lock,
+  Maximize2,
+  Rocket,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Store,
+  Terminal,
+  X,
+  Zap,
+} from "lucide-react";
 
 import { useLanguage, useTranslation } from "../i18n";
 import { revealDelay, useRevealAll, useSpotlight } from "../lib/effects";
@@ -24,20 +43,19 @@ import skillsShot from "../assets/webui/skills.webp";
 
 const META = {
   "zh-CN": {
-    title: "Flowy Agent Store — 本地优先的 Agent 工作台",
+    title: "Flowy Agent Store — 本地优先的 Agent 协作工作台与运行时",
     description:
-      "Flowy Agent Store 是本地优先的轻量单文件 Agent 运行时：单命令启动浏览器工作台，支持专家、技能与连接器的本地导入与调度，执行、凭据与状态均保留在本机。",
+      "Flowy Agent Store 是本地优先的轻量单文件 Agent 运行时：纯 Rust 原生单二进制分发，零外部依赖，极速开箱即用。全链路执行、敏感凭据与会话状态 100% 驻留本机；内置 380+ 专家角色、260+ 技能与 220+ MCP 连接器，支持多 Agent 计划有向无环图（Planned DAG）协同编排。",
   },
   "en-US": {
-    title: "Flowy Agent Store — Local-First Agent Workbench",
+    title: "Flowy Agent Store — Local-First Agent Runtime & Workbench",
     description:
-      "Flowy Agent Store is a local-first, lightweight single-file agent runtime. Launch the browser-based workbench with a single command to import and execute experts, skills, and connectors locally — with all execution and credentials remaining on your machine.",
+      "Flowy Agent Store is a local-first, lightweight single-file agent runtime powered by a native Rust engine. Preloaded with 380+ expert agents, 260+ skills, and 220+ MCP connectors. Full execution, private credentials, and state remain 100% local, orchestrating deterministic multi-agent Planned DAG workflows.",
   },
 } as const;
 
-/* ── Hero：徽章 + 大标语 + 双 CTA + 产品实拍轮播 ─────────────── */
+/* ── Hero：徽章 + 大标语 + 多 CTA + 产品实拍轮播 ─────────────── */
 
-/** 轮播的界面截图（与工作台各视图一一对应，文案在 i18n `landing.heroShots`）。 */
 const HERO_SHOTS = [
   { key: "chat", src: chatShot },
   { key: "experts", src: expertsShot },
@@ -46,19 +64,12 @@ const HERO_SHOTS = [
   { key: "settings", src: settingsShot },
 ] as const;
 
-/** 轮播间隔与淡入淡出时长（CSS 里 `.hero-shot-img` 的 transition 要与此匹配）。 */
 const SHOT_INTERVAL_MS = 4200;
 
-/**
- * 产品实拍轮播：自动逐张淡入淡出，悬停/聚焦暂停，圆点可手动切换；
- * 点击当前图打开 lightbox 放大查看（原生 `<dialog>`，Esc / 点背景关闭）。
- * `prefers-reduced-motion` 下不自动播放（仍可手动点圆点）。
- */
 function HeroShotCarousel() {
   const { t } = useTranslation();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-  /** lightbox 是否打开。由状态驱动 `<dialog>`，避免「先弹空面板再渲染内容」的闪动。 */
   const [zoomed, setZoomed] = useState(false);
   const lightbox = useRef<HTMLDialogElement>(null);
 
@@ -69,7 +80,6 @@ function HeroShotCarousel() {
     return () => clearInterval(timer);
   }, [paused, zoomed]);
 
-  // `showModal` 让页面惰性但文档仍可滚动，所以 lightbox 打开期间锁住根元素。
   useEffect(() => {
     if (!zoomed) return;
     const root = document.documentElement;
@@ -80,7 +90,6 @@ function HeroShotCarousel() {
     };
   }, [zoomed]);
 
-  // 内容先渲染、再打开/关闭，不会闪一帧空面板。
   useEffect(() => {
     const dialog = lightbox.current;
     if (!dialog) return;
@@ -88,7 +97,6 @@ function HeroShotCarousel() {
     if (!zoomed && dialog.open) dialog.close();
   }, [zoomed]);
 
-  /** 落在 dialog 自身上的点击就是点了背景。 */
   const onBackdropClick = (event: MouseEvent<HTMLDialogElement>) => {
     if (event.target === lightbox.current) lightbox.current.close();
   };
@@ -196,7 +204,12 @@ function HeroSection({ lang }: { lang: ReturnType<typeof useLanguage> }) {
         <p className="hero-sub" style={revealDelay(150)}>{t("landing.heroSubtitle")}</p>
         <div className="hero-actions" style={revealDelay(230)}>
           <Link className="btn btn-primary btn-lg" to={`/${lang}/docs/quick-start`}>
+            <Rocket size={17} aria-hidden="true" />
             {t("landing.heroCtaStart")}
+          </Link>
+          <Link className="btn btn-quiet btn-lg" to={`/${lang}/market`}>
+            <Store size={17} aria-hidden="true" />
+            {t("landing.heroCtaMarket")}
           </Link>
           <Link className="btn btn-quiet btn-lg" to={`/${lang}/docs`}>
             {t("landing.heroCtaDocs")}
@@ -208,138 +221,157 @@ function HeroSection({ lang }: { lang: ReturnType<typeof useLanguage> }) {
   );
 }
 
-/* ── 三步上手：左侧文案，右侧安装方式标签卡 ───────────────────── */
-function InstallSection({ lang }: { lang: ReturnType<typeof useLanguage> }) {
+/* ── 全景指标条（Stat Metrics Strip） ───────────────────────── */
+function MetricsSection() {
+  const { t } = useTranslation();
+  const metrics = t("landing.metrics", { returnObjects: true }) as {
+    value: string;
+    label: string;
+    desc: string;
+  }[];
+
+  return (
+    <section className="metrics">
+      <div className="metrics-inner">
+        <div className="metrics-grid">
+          {metrics.map((item, idx) => (
+            <div className="metric-card" key={item.label} data-reveal style={revealDelay(idx * 60)}>
+              <span className="metric-val">{item.value}</span>
+              <span className="metric-label">{item.label}</span>
+              <span className="metric-desc">{item.desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── 安装卡片组件（供工作流第一步复用） ────────────────────────── */
+function InstallCard({ lang }: { lang: ReturnType<typeof useLanguage> }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<"auto" | "manual">("auto");
   const [oneLiner, setOneLiner] = useState("");
 
   useEffect(() => {
-    // 绝对地址：`irm | iex` 在任何终端 cwd 下都可用（SSG 阶段无 window，运行时补齐）。
     setOneLiner(`irm ${window.location.origin}${installScriptUrl()} | iex`);
   }, []);
 
   return (
-    <section className="install" id="download">
-      <div className="install-inner">
-        <div className="install-copy">
-          <h2 data-reveal>{t("landing.install.title")}</h2>
-          <p className="subtle" data-reveal>{t("landing.install.subtitle")}</p>
-        </div>
-
-        <div className="install-card" data-reveal style={revealDelay(90)}>
-          <div className="install-tabs" role="tablist" aria-label={t("landing.install.title")}>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === "auto"}
-              className="install-tab"
-              onClick={() => setTab("auto")}
-            >
-              {t("landing.install.tabAuto")}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === "manual"}
-              className="install-tab"
-              onClick={() => setTab("manual")}
-            >
-              {t("landing.install.tabManual")}
-            </button>
-          </div>
-
-          <div className="install-panel">
-            {tab === "auto" ? (
-              <>
-                <p className="install-hint">{t("landing.install.cmdHint")}</p>
-                <div className="install-cmd">
-                  <code>{oneLiner || `irm ${installScriptUrl()} | iex`}</code>
-                  <CopyButton text={oneLiner || `irm ${installScriptUrl()} | iex`} label={t("landing.install.copy")} />
-                </div>
-                <p className="install-note">{t("landing.install.cmdNote")}</p>
-                <p className="install-note">
-                  <a href={installScriptUrl()} target="_blank" rel="noreferrer">
-                    {t("landing.install.viewScript")}
-                  </a>
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="install-hint">{t("landing.install.manualHint")}</p>
-                <div className="install-platforms">
-                  {RELEASED_PLATFORMS.map((p) => (
-                    <a key={`${p.os}-${p.arch}`} className="install-platform" href={releaseAssetUrl(p)}>
-                      <Download size={15} aria-hidden="true" />
-                      <span className="install-platform-os">{PLATFORM_LABELS[p.os][lang]}</span>
-                      <span className="install-platform-arch">{ARCH_LABELS[p.arch][lang]}</span>
-                    </a>
-                  ))}
-                </div>
-                <p className="install-note">
-                  <a href={releasesPageUrl()} target="_blank" rel="noreferrer">
-                    {t("landing.install.releases")}
-                  </a>
-                </p>
-              </>
-            )}
-          </div>
-        </div>
+    <div className="install-card" id="download">
+      <div className="install-tabs" role="tablist" aria-label={t("landing.install.title")}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "auto"}
+          className="install-tab"
+          onClick={() => setTab("auto")}
+        >
+          {t("landing.install.tabAuto")}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "manual"}
+          className="install-tab"
+          onClick={() => setTab("manual")}
+        >
+          {t("landing.install.tabManual")}
+        </button>
       </div>
-    </section>
+
+      <div className="install-panel">
+        {tab === "auto" ? (
+          <>
+            <p className="install-hint">{t("landing.install.cmdHint")}</p>
+            <div className="install-cmd">
+              <code>{oneLiner || `irm ${installScriptUrl()} | iex`}</code>
+              <CopyButton text={oneLiner || `irm ${installScriptUrl()} | iex`} label={t("landing.install.copy")} />
+            </div>
+            <p className="install-note">{t("landing.install.cmdNote")}</p>
+            <p className="install-note">
+              <a href={installScriptUrl()} target="_blank" rel="noreferrer">
+                {t("landing.install.viewScript")}
+              </a>
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="install-hint">{t("landing.install.manualHint")}</p>
+            <div className="install-platforms">
+              {RELEASED_PLATFORMS.map((p) => (
+                <a key={`${p.os}-${p.arch}`} className="install-platform" href={releaseAssetUrl(p)}>
+                  <Download size={15} aria-hidden="true" />
+                  <span className="install-platform-os">{PLATFORM_LABELS[p.os][lang]}</span>
+                  <span className="install-platform-arch">{ARCH_LABELS[p.arch][lang]}</span>
+                </a>
+              ))}
+            </div>
+            <p className="install-note">
+              <a href={releasesPageUrl()} target="_blank" rel="noreferrer">
+                {t("landing.install.releases")}
+              </a>
+            </p>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
-/* ── 为什么选择：左侧卖点按钮，右侧详情面板 ───────────────────── */
-const WHY_ICONS = [Rocket, Store, Eye, ShieldCheck, Bot];
-
-function WhySection() {
+/* ── 三步工作流展示（Seamless Workflow） ────────────────────── */
+function WorkflowSection({ lang }: { lang: ReturnType<typeof useLanguage> }) {
   const { t } = useTranslation();
-  const [active, setActive] = useState(0);
-  const items = t("landing.why.items", { returnObjects: true }) as { title: string; desc: string }[];
-  const Icon = WHY_ICONS[active] ?? WHY_ICONS[0];
-  const current = items[active] ?? items[0];
-
-  const onKeyNav = (event: React.KeyboardEvent) => {
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    event.preventDefault();
-    setActive((prev) => (prev + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length);
-  };
 
   return (
-    <section className="why" id="features">
-      <div className="why-inner">
-        <h2 data-reveal>{t("landing.why.title")}</h2>
-        <p className="subtle" data-reveal>{t("landing.why.subtitle")}</p>
+    <section className="workflow" id="workflow">
+      <div className="workflow-inner">
+        <div className="section-head" data-reveal>
+          <div className="eyebrow">
+            <Zap size={14} aria-hidden="true" />
+            <span>{t("landing.workflow.tag")}</span>
+          </div>
+          <h2>{t("landing.workflow.title")}</h2>
+          <p className="subtle">{t("landing.workflow.subtitle")}</p>
+        </div>
 
-        <div className="why-grid" data-reveal style={revealDelay(90)}>
-          <div className="why-tabs" role="tablist" aria-label={t("landing.why.title")} onKeyDown={onKeyNav}>
-            {items.map((item, i) => {
-              const TabIcon = WHY_ICONS[i] ?? WHY_ICONS[0];
-              return (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={i === active}
-                  className="why-tab"
-                  key={item.title}
-                  onClick={() => setActive(i)}
-                >
-                  <span className="why-tab-icon" aria-hidden="true">
-                    <TabIcon size={16} />
-                  </span>
-                  {item.title}
-                </button>
-              );
-            })}
+        <div className="workflow-grid">
+          {/* Step 1 */}
+          <div className="workflow-step" data-reveal style={revealDelay(0)}>
+            <span className="workflow-step-badge">{t("landing.workflow.step1.badge")}</span>
+            <h3>{t("landing.workflow.step1.title")}</h3>
+            <p>{t("landing.workflow.step1.desc")}</p>
+            <div className="workflow-step-slot">
+              <InstallCard lang={lang} />
+            </div>
           </div>
 
-          <div className="why-detail" role="tabpanel">
-            <span className="why-detail-icon" aria-hidden="true">
-              <Icon size={22} />
-            </span>
-            <h3>{current.title}</h3>
-            <p>{current.desc}</p>
+          {/* Step 2 */}
+          <div className="workflow-step" data-reveal style={revealDelay(100)}>
+            <span className="workflow-step-badge">{t("landing.workflow.step2.badge")}</span>
+            <h3>{t("landing.workflow.step2.title")}</h3>
+            <p>{t("landing.workflow.step2.desc")}</p>
+            <div className="workflow-step-slot">
+              <Link className="btn btn-quiet" to={`/${lang}/market`}>
+                <Store size={15} aria-hidden="true" />
+                <span>{t("landing.heroCtaMarket")}</span>
+                <ArrowRight size={14} aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div className="workflow-step" data-reveal style={revealDelay(200)}>
+            <span className="workflow-step-badge">{t("landing.workflow.step3.badge")}</span>
+            <h3>{t("landing.workflow.step3.title")}</h3>
+            <p>{t("landing.workflow.step3.desc")}</p>
+            <div className="workflow-step-slot">
+              <Link className="btn btn-quiet" to={`/${lang}/docs/architecture`}>
+                <GitBranch size={15} aria-hidden="true" />
+                <span>{t("docs.sections.architecture")}</span>
+                <ArrowRight size={14} aria-hidden="true" />
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -347,7 +379,116 @@ function WhySection() {
   );
 }
 
-/* ── 尾部 CTA ─────────────────────────────────────────────── */
+/* ── 六大架构支柱矩阵（Architectural Pillars） ───────────────── */
+const FEATURE_ICONS = [ShieldCheck, Cpu, GitBranch, Box, Lock, History];
+
+function FeaturesSection() {
+  const { t } = useTranslation();
+  const features = t("landing.features.items", { returnObjects: true }) as {
+    tag: string;
+    title: string;
+    desc: string;
+  }[];
+
+  return (
+    <section className="features" id="features">
+      <div className="features-inner">
+        <div className="section-head" data-reveal>
+          <div className="eyebrow">
+            <Sparkles size={14} aria-hidden="true" />
+            <span>{t("landing.features.tag")}</span>
+          </div>
+          <h2>{t("landing.features.title")}</h2>
+          <p className="subtle">{t("landing.features.subtitle")}</p>
+        </div>
+
+        <div className="features-grid">
+          {features.map((item, idx) => {
+            const Icon = FEATURE_ICONS[idx] ?? Sparkles;
+            return (
+              <div className="feature-card" key={item.title} data-reveal style={revealDelay(idx * 70)}>
+                <div className="feature-head">
+                  <div className="feature-icon-box">
+                    <Icon size={22} aria-hidden="true" />
+                  </div>
+                  <span className="feature-tag">{item.tag}</span>
+                </div>
+                <h3>{item.title}</h3>
+                <p>{item.desc}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── 开放生态与模型兼容墙（Ecosystem Support Wall） ─────────── */
+const ECOSYSTEM_DATA = {
+  models: ["OpenAI", "Anthropic Claude", "Qwen 通义千问", "DeepSeek", "Ollama", "vLLM", "SiliconFlow"],
+  standards: ["Model Context Protocol (MCP)", "CodeBuddy Plugins", "WorkBuddy Skills", "JSON-RPC 2.0", "SQLite WAL"],
+  tooling: ["TypeScript SDK", "Flowy CLI", "Embedded Web UI", "PowerShell", "cURL / WebSocket"],
+};
+
+function EcosystemSection() {
+  const { t } = useTranslation();
+
+  return (
+    <section className="ecosystem" id="ecosystem">
+      <div className="ecosystem-inner">
+        <div className="section-head" data-reveal>
+          <div className="eyebrow">
+            <Bot size={14} aria-hidden="true" />
+            <span>{t("landing.ecosystem.tag")}</span>
+          </div>
+          <h2>{t("landing.ecosystem.title")}</h2>
+          <p className="subtle">{t("landing.ecosystem.subtitle")}</p>
+        </div>
+
+        <div className="ecosystem-groups">
+          <div className="ecosystem-group" data-reveal style={revealDelay(0)}>
+            <span className="ecosystem-group-title">{t("landing.ecosystem.modelsTag")}</span>
+            <div className="ecosystem-chips">
+              {ECOSYSTEM_DATA.models.map((name) => (
+                <span className="ecosystem-chip" key={name}>
+                  <i className="ecosystem-chip-dot" aria-hidden="true" />
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="ecosystem-group" data-reveal style={revealDelay(100)}>
+            <span className="ecosystem-group-title">{t("landing.ecosystem.standardsTag")}</span>
+            <div className="ecosystem-chips">
+              {ECOSYSTEM_DATA.standards.map((name) => (
+                <span className="ecosystem-chip" key={name}>
+                  <i className="ecosystem-chip-dot" aria-hidden="true" />
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="ecosystem-group" data-reveal style={revealDelay(200)}>
+            <span className="ecosystem-group-title">{t("landing.ecosystem.devsTag")}</span>
+            <div className="ecosystem-chips">
+              {ECOSYSTEM_DATA.tooling.map((name) => (
+                <span className="ecosystem-chip" key={name}>
+                  <i className="ecosystem-chip-dot" aria-hidden="true" />
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── 尾部高转化率 CTA ──────────────────────────────────────── */
 function CtaSection({ lang }: { lang: ReturnType<typeof useLanguage> }) {
   const { t } = useTranslation();
   return (
@@ -361,12 +502,17 @@ function CtaSection({ lang }: { lang: ReturnType<typeof useLanguage> }) {
         <p className="subtle subtle-center" data-reveal>{t("landing.cta.subtitle")}</p>
         <div className="cta-actions" data-reveal style={revealDelay(120)}>
           <Link className="btn btn-primary btn-lg" to={`/${lang}/docs/quick-start`}>
+            <Rocket size={17} aria-hidden="true" />
             {t("landing.cta.primary")}
           </Link>
           <a className="btn btn-quiet btn-lg" href="#download">
             <FileDown size={17} aria-hidden="true" />
             {t("landing.cta.secondary")}
           </a>
+          <Link className="btn btn-quiet btn-lg" to={`/${lang}/market`}>
+            <Store size={17} aria-hidden="true" />
+            {t("landing.heroCtaMarket")}
+          </Link>
           <a className="btn btn-quiet btn-lg" href={githubUrl()} target="_blank" rel="noreferrer">
             GitHub
           </a>
@@ -379,16 +525,17 @@ function CtaSection({ lang }: { lang: ReturnType<typeof useLanguage> }) {
 export default function Landing() {
   const lang = useLanguage();
 
-  // 页面级装饰性效果（滚动入场、聚光）。
   useRevealAll();
-  useSpotlight(".install-platform");
+  useSpotlight(".metric-card, .feature-card, .workflow-step, .install-platform");
 
   return (
     <>
       <PageMeta title={META[lang].title} description={META[lang].description} canonicalPath={`/${lang}`} />
       <HeroSection lang={lang} />
-      <InstallSection lang={lang} />
-      <WhySection />
+      <MetricsSection />
+      <WorkflowSection lang={lang} />
+      <FeaturesSection />
+      <EcosystemSection />
       <FaqSection />
       <CtaSection lang={lang} />
     </>
