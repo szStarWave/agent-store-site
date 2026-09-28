@@ -1,10 +1,10 @@
 # Compatibility matrix
 
-This page answers three questions: **which platforms run**, **which sources can be imported**, and **how far an imported thing actually works**.
+This document details supported host environments, ingestion specifications for external assets, and the compatibility rating taxonomy.
 
 ## Platforms
 
-Only **Windows x64** builds are published today; every other platform is not available yet and needs a separate decision before it opens up. Binaries are distributed on [GitHub Releases](https://github.com/szStarWave/agent-store-site/releases) under per-target names (current preview builds are marked as pre-releases).
+Precompiled binaries are currently distributed for **Windows x64**; other platforms are planned for future phases. Binaries are available on [GitHub Releases](https://github.com/szStarWave/agent-store-site/releases) (preview releases are tagged as pre-release).
 
 | OS | Architecture | Status |
 | --- | --- | --- |
@@ -14,72 +14,70 @@ Only **Windows x64** builds are published today; every other platform is not ava
 | Linux | x86_64 | Not available |
 | Linux | aarch64 | Not available |
 
-> The download button detects your system: only Windows x64 gets a direct link; other platforms are routed to GitHub Releases.
+> The website download button detects the client platform; non-Windows x64 clients are redirected to the GitHub Releases listing.
 
 ## Source formats
 
 | Source | Import path | Compatibility you may get |
 | --- | --- | --- |
 | CodeBuddy Plugin | Importer → PluginSnapshot | `compatible` / `compatible-with-adapter` / `manual-review` |
-| WorkBuddy Skill | Importer → PluginSnapshot | `compatible` (attached scripts are imported, never executed) |
+| WorkBuddy Skill | Importer → PluginSnapshot | `compatible` (attached scripts are imported for storage, never executed) |
 | WorkBuddy Connector | Importer → PluginSnapshot | `compatible-with-adapter` (MCP); `manual-review` (CLI connectors) |
 | Unconfirmed-license resources | marked `pending-legal-review` | excluded from public distribution |
 
 ### What the compatibility status means
 
-A status says **how far this thing works inside this product** — not what it can do inside the product it came from:
+Compatibility statuses define the operational readiness and adapter boundary of an asset within this product, rather than its native capabilities in upstream environments:
 
 | Status | Meaning |
 | --- | --- |
-| `compatible` | Semantics and shape both work as-is |
-| `compatible-with-adapter` | Works after the adapter converts it (e.g. an MCP connector, brought in through tool namespacing) |
-| `manual-review` | Needs human review before it can be enabled (e.g. CLI connectors, Hooks, LSP) |
-| `unsupported` | Explicitly not supported today |
-| `pending-legal-review` | Copyright / distribution rights unconfirmed; barred from public markets and default installers |
+| `compatible` | Syntax and execution semantics are natively supported |
+| `compatible-with-adapter` | Operational after adapter protocol transformation (e.g. MCP connectors mapped into tool namespaces) |
+| `manual-review` | Requires manual security inspection prior to activation (e.g. CLI connectors, Hooks, LSP servers) |
+| `unsupported` | Explicitly unsupported in the current runtime |
+| `pending-legal-review` | Copyright or redistribution rights are unverified; excluded from public markets and default bundles |
 
 ### It is really three dimensions
 
-The single status you see in the UI is only one of them. An import report records three independent facts, so that "convertible" is never mistaken for "already runnable":
+The single status displayed in the UI represents an aggregated view. The ingestion report evaluates three orthogonal dimensions to avoid conflating "convertible" with "verified runnable":
 
 | Dimension | Values | Question it answers |
 | --- | --- | --- |
-| `semantic_status` | the status table above | Can the semantics be preserved? |
-| `runtime_status` | `not-verified` → `adapter-verified` → `runtime-verified` → `release-eligible` | Have the adapter and the runtime actually been verified? |
-| `distribution_status` | `local-only` | May it be installed / distributed? |
+| `semantic_status` | The status enum listed above | Can domain semantics be fully preserved? |
+| `runtime_status` | `not-verified` → `adapter-verified` → `runtime-verified` → `release-eligible` | Have the adapter and runtime verified execution? |
+| `distribution_status` | `local-only` | Is local installation and redistribution permitted? |
 
-> Only a component that is `runtime-verified` and has passed the release gate is marked runnable; `pending-legal-review` always overrides the distribution status. So **"imported successfully" is not "can run"** — splitting the status into three dimensions is what makes that visible in the report.
->
-> Spelling: the catalog face (`compatibility_status`) hyphenates these values, while the three-dimension import report underscores them — two spellings of one set, not two sets of statuses.
+> Components are marked runnable only upon reaching `runtime-verified` status and passing release gates; `pending-legal-review` takes highest precedence and overrides all distribution flags. Note: Catalog interfaces use hyphenated identifiers (e.g. `compatibility_status`), while ingestion reports use underscored keys mapping to the same enum.
 
 ## Connectors
 
-A connector (an MCP server) is the kind of component where **the host holds the connection and its credentials and runs the tool for the caller**. Its surface — and therefore its permissions — splits in two:
+Connectors (MCP Servers) are managed by the local host, which owns network connections and credentials to invoke tools on behalf of callers. Interfaces and permissions are strictly bifurcated into two planes:
 
 | Face | Methods | Needs host authorization? |
 | --- | --- | --- |
-| **Read face** (catalog / status / probe) | `connector/list`, `connector/get`, `connector/status`, `connector/test` | No. `get` / `test` carry each tool's parameter schema, so you can see how to call it before calling it |
-| **Call face** (actually runs a tool) | `connector/call` | **Yes.** The host's `[connector_proxy]` is off by default; once on, **the connectors that are enabled are callable**, and `allow` / `deny` are the operator's optional narrowing and subtraction — see [Configuration file](/en-US/docs/configuration) |
+| **Read face** (catalog / status / probe) | `connector/list`, `connector/get`, `connector/status`, `connector/test` | No. `connector/get` and `connector/test` provide JSON Schemas for tool parameter validation |
+| **Call face** (actually runs a tool) | `connector/call` | **Yes.** The host `[connector_proxy]` setting is disabled by default; when enabled, active connectors become invocable, subject to granular `allow` / `deny` filtering (see [Configuration file](/en-US/docs/configuration)) |
 
-- **All three transports are supported**: stdio, Streamable HTTP and legacy SSE.
-- **Credentials never leave the host**: OAuth uses standard PKCE Loopback, tokens go to secure storage and are injected at call time; `env` / `headers` in `mcp.json` declarations use `secret:NAME` references, resolved into memory only when the child process starts.
-- **A caller cannot name anything else**: only a **registered** connector id — no URL, command or header, because the address always comes from the host's own configuration.
+- **Supported Transports**: Full support for stdio, Streamable HTTP, and standard SSE transports.
+- **Credential Isolation**: OAuth flows implement standard PKCE Loopback; access tokens reside in secure storage. Environmental secrets configured in `mcp.json` (`env`/`headers`) use `secret:NAME` references, injected only into child process memory during startup.
+- **Invocation Addressing**: Callers reference connectors exclusively via registered identifiers, preventing arbitrary upstream URLs, shell commands, or injected request headers.
 
 ### Runtime status
 
-The `status` in `connector/status` has only these values, and the order below is the order they are decided in (`connector/list` reports a **summary view** of the same facts and the two can disagree — see below):
+`connector/status` returns the precise operational lifecycle state, evaluated deterministically according to the following precedence:
 
 | Order | Condition | Status |
 | --- | --- | --- |
-| 1 | The connector is disabled | `installed` |
-| 2 | The last probe failed | `error` |
-| 3 | OAuth is required and not yet authorized | `authorization_required` |
-| 4 | The last probe succeeded | `connected` |
-| 5 | Anything else (enabled, authorized, never probed successfully) | `configured` |
+| 1 | Connector is explicitly disabled | `installed` |
+| 2 | Most recent physical probe failed | `error` |
+| 3 | Requires OAuth authentication that is not yet granted | `authorization_required` |
+| 4 | Most recent physical probe succeeded | `connected` |
+| 5 | Other states (enabled and authenticated, but not yet verified by a probe) | `configured` |
 
-> **`connected` needs both**: authorization ready **and** the last probe successful. One of the two is not enough — "login worked but calls do not" has no in-between status; it shows up as `configured` (the probe never succeeded) or `error` (the probe failed).
+> The `connected` state requires both valid authentication and a successful physical probe. If authenticated but communication fails, the status falls back to `configured` or `error`.
 >
-> To decide "can I call this?", use `connector/status`: the `status` in `connector/list` is a summary view of the same facts and does not check OAuth state live, so on a connector that is authorized but whose last probe did not succeed it can read more pessimistically than `connector/status` does.
+> Invocations should rely on `connector/status` for real-time readiness; `connector/list` provides a lightweight summary without active OAuth verification.
 
 ## Non-goals (V1)
 
-Cloud execution, multi-tenancy, HA, a full Marketplace review backend, a signed-update system, and arbitrary Hook/bin execution are all out of V1 scope.
+Cloud execution, multi-tenancy, high-availability clusters (HA), marketplace administrative portals, signed hot-update systems, and arbitrary untrusted Hook or executable execution are outside the scope of V1.

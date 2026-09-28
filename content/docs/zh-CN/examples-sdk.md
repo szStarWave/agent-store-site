@@ -1,635 +1,580 @@
 # TypeScript SDK 实战示例
 
-本文是 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) 的配套**示例集**：类型、逐方法对照表与运行契约在那边，这里只放**可直接复制运行**的代码。
+本文档为 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) 的配套实战代码示例集，按场景划分模块，集中提供开箱即用的工程实现范式。
 
-> 三个包的分工：`@flowy-agent-store/protocol` 只有类型与错误模型；`@flowy-agent-store/client` 是传输无关的 `AppServerClient` + 子客户端；`@flowy-agent-store/sdk` 额外提供 `launchHarness`（spawn 二进制 + 回环建连 + 握手）。**实时事件与订阅只能走 `WebSocketTransport`**，纯请求-响应可以用 `HttpTransport`。
+> 三个包的架构分工：`@flowy-agent-store/protocol` 提供纯类型契约与错误模型；`@flowy-agent-store/client` 提供传输解耦的 `AppServerClient` 及业务子客户端；`@flowy-agent-store/sdk` 封装 Node.js 宿主进程生命周期管理（`launchHarness`）。**实时事件订阅需使用 `WebSocketTransport`**，无状态请求响应可选用 `HttpTransport`。
 
-## 1. 三个包与运行环境对照
+## 1. 包分工与运行环境架构
 
-| 包 | 用在什么场景 | 运行环境 |
+| 包名 | 职责与适用场景 | 运行环境 |
 | --- | --- | --- |
-| `@flowy-agent-store/protocol` | 只要类型与错误模型，或自己实现传输 | 任意（零运行时代码） |
-| `@flowy-agent-store/client` | 连一个**已经跑起来**的 App Server（桌面端、自建宿主） | 任意（Node / 浏览器都行） |
-| `@flowy-agent-store/sdk` | 由你的进程**自己拉起**运行时 | Node.js ≥ 22 或 Bun |
-
-## 2. 运行前准备
+| `@flowy-agent-store/protocol` | 纯类型契约、错误定义与编解码工具函数 | 通用环境（Node.js / 浏览器 / 零运行时依赖） |
+| `@flowy-agent-store/client` | 传输解耦的 `AppServerClient` 客户端及各业务子模块 | 通用环境（Node.js / 浏览器 / Electron 渲染进程） |
+| `@flowy-agent-store/sdk` | Node.js 宿主进程生命周期管理、端口分配与测试编排 | Node.js ≥ 22 或 Bun |
 
 ```bash
-node -v                      # Node.js >= 22（依赖全局 WebSocket），或改用 Bun
-bun add @flowy-agent-store/sdk   # 或 npm install / pnpm add
+# 确认 Node.js 版本（依赖全局 WebSocket 支持），或改用 Bun
+node -v
 
-# 运行时二进制：SDK 不下载，按 bin 参数 → AGENT_STORE_BIN → 平台运行时包的 vendor/ → PATH 查找
+# 安装 SDK 核心包
+bun add @flowy-agent-store/sdk # 或 npm install @flowy-agent-store/sdk
+
+# 声明预构建二进制路径（未指定时按规则自动检索系统 PATH 及平台依赖包）
 export AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store
 ```
 
-## 3. Node：一行拉起 + 完整生命周期
+## 2. 传输层与通信协议选型
 
-最小用法——spawn 运行时、回环建连、握手都在一次调用里完成：
+系统提供两种传输通道实现，二者的功能边界与选型依据如下：
+
+| 关键特性 | WebSocketTransport | HttpTransport |
+| --- | --- | --- |
+| 实时事件订阅（`follow` / `onNotification`） | **支持**（双向长连接，流式推送） | **不支持**（调用将抛出 `TransportError`） |
+| 握手与连接生命周期 | 单次握手建立会话，复用长连接通道 | 每次调用独立建立 HTTP 请求并认证 |
+| 推荐应用场景 | 桌面 GUI、Web 前端界面、持续任务执行监听 | 运维脚本、CI 单次检查、一次性数据查询 |
+
+```ts
+import { AppServerClient, HttpTransport, WebSocketTransport, httpRouteTable } from "@flowy-agent-store/client";
+
+// 模式 A：WebSocketTransport（适用于实时交互界面与流式事件监听）
+const wsTransport = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", {
+  token: process.env.AGENT_STORE_TOKEN,
+  requestTimeoutMs: 30_000,
+});
+const wsClient = new AppServerClient({
+  transport: wsTransport,
+  client: { name: "desktop-ui", version: "1.0.0" },
+});
+await wsClient.connect();
+
+// 模式 B：HttpTransport（适用于轻量无状态脚本与一次性查询）
+const httpTransport = new HttpTransport({
+  baseUrl: "http://127.0.0.1:8787",
+  token: process.env.AGENT_STORE_TOKEN,
+});
+const httpClient = new AppServerClient({
+  transport: httpTransport,
+  client: { name: "cli-tool", version: "1.0.0" },
+});
+await httpClient.connect(); // HTTP 模式下 connect() 为空操作（No-op）
+const store = await httpClient.listStore();
+
+// 可调用的 HTTP 路由可通过路由表自查（不支持流式订阅方法）
+console.log(`HTTP 支持的方法数: ${Object.keys(httpRouteTable()).length}`);
+```
+
+## 3. 运行时接入与宿主进程托管
+
+### 3.1 Node.js 托管模式（launchHarness 单生命周期）
+
+通过单次调用完成运行时进程启动、动态端口探测、回环建连与协议握手：
+
+```ts
+import { launchHarness } from "@flowy-agent-store/sdk";
+
+// 单命令启动宿主进程、完成握手并获取初始化的客户端实例
+const harness = await launchHarness({
+  client: { name: "my-service", version: "1.0.0" },
+  capabilities: { events: true, approvals: true, team_runtime: true },
+});
+
+try {
+  console.log(`服务端就绪地址: ${harness.server.readiness.url}`);
+  console.log(`协议版本: ${harness.handshake.protocol_version}`);
+
+  const store = await harness.listStore();
+  console.log(`已就绪市场条目数: ${store.items.length}`);
+} finally {
+  // 必须在 finally 中关闭：安全终止子进程并清理临时数据目录
+  await harness.close();
+}
+```
+
+`launchHarness` 内部执行流程：
+1. 按顺序检索运行时二进制（`bin` $\to$ `AGENT_STORE_BIN` $\to$ 平台依赖包 $\to$ 系统 `PATH`）；
+2. 携带 `--host 127.0.0.1 --port 0 --no-open` 及自动生成的临时 `--data-dir` 启动子进程；
+3. 监听标准输出中的 JSON 就绪报文（包含 `"agent_store":"listening"`）获取动态分配的端口；
+4. 校验就绪通知中的 `protocol_version` 与 SDK 版本一致性，版本冲突时立即终止子进程并报错；
+5. 建立回环 WebSocket 通道并完成握手，返回初始化的 `AppServerClient`。完整参数规则见 [接口参考](/zh-CN/docs/typescript-sdk) §4。
+
+### 3.2 自定义配置与自持数据目录（生产与测试部署）
 
 ```ts
 import { launchHarness } from "@flowy-agent-store/sdk";
 
 const harness = await launchHarness({
-  client: { name: "my-app", version: "0.1.0" },
+  bin: "/opt/flowy-agent-store/flowy-agent-store", // 显式锁定二进制制品
+  dataDir: "/var/lib/my-app/agent-store",          // 自持目录：进程关闭时不被删除，持久化复用
+  readyTimeoutMs: 180_000,                         // 冷启动建库超时预算（180 秒）
+  requestTimeoutMs: 120_000,                       // 单次请求超时预算（120 秒）
+  extraArgs: ["--agent-store-config", "/etc/my-app/agent-store.toml"],
+  client: { name: "ci-worker", version: "1.0.0" },
+  onExit: (info) => console.warn(`运行时退出: code=${info.code}, signal=${info.signal}`),
 });
-const store = await harness.listStore();
-await harness.close();
-```
 
-`launchHarness` 完成的事：
-
-1. 按 `bin` → `AGENT_STORE_BIN` → 平台运行时包的 `vendor/` → `PATH` 定位 `flowy-agent-store` 可执行文件；
-2. 以 `--host 127.0.0.1 --port 0 --no-open` 并携带自动创建的临时 `--data-dir` 启动子进程；
-3. 扫描 stdout 就绪行（`{"agent_store":"listening",...}`），取得实际端口；
-4. **校验就绪行 `protocol_version` 与 SDK 一致**，不一致则杀进程并报错（含两端版本）；
-5. 建立回环 WebSocket、执行 `initialize` → `initialized` 握手，返回可用的 `AppServerClient`。
-
-> 选项的完整语义（`token` / `capabilities` / `requestTimeoutMs` 与 `SpawnOptions`）和失败清理口径见[接口参考](/zh-CN/docs/typescript-sdk) §4；下面几段只给可直接复制的配方。
-
-### 3.1 装专家 → 跑一次 → 取结果
-
-```ts
-import { launchHarness } from "@flowy-agent-store/sdk";
-
-const harness = await launchHarness({ client: { name: "demo", version: "1.0.0" } });
-try {
-  // 目录（Store）
-  const items = await harness.listStore();
-  console.log(`${items.items.length} items in the store`);
-
-  // 安装并运行一个 Agent
-  await harness.installStoreEntry("experts", "frontend-backend-experts");
-  const receipt = await harness.runs.agent({
-    agentId: "frontend-backend-experts",
-    goal: "Generate a todo REST API",
-  });
-  const result = await harness.runs.result(receipt.run_id);
-  console.log(result.status);
-} finally {
-  await harness.close(); // 终止子进程 + 删除临时 data-dir
-}
-```
-
-### 3.2 会话 + 实时事件
-
-```ts
-import { launchHarness } from "@flowy-agent-store/sdk";
-
-const harness = await launchHarness({ client: { name: "my-tool", version: "1.0.0" } });
-try {
-  const conversation = await harness.conversations.create({ name: "demo" });
-  const subscription = await harness.conversations.follow(conversation.conversation_id);
-  subscription.onEvent((event) => console.log(event.event_type));
-  await harness.conversations.send(conversation.conversation_id, "你好", crypto.randomUUID());
-} finally {
-  await harness.close(); // 终止子进程 + 删除临时 data-dir
-}
-```
-
-### 3.3 固定二进制 + 自持 data-dir（CI / 多实例 / 复用库）
-
-```ts
-import { launchHarness } from "@flowy-agent-store/sdk";
-
-const harness = await launchHarness({
-  bin: "/opt/flowy-agent-store/flowy-agent-store", // 省略则按 §2 的四条途径自动查找
-  dataDir: "/var/lib/my-app/agent-store",          // 自持目录 ⇒ 不删除，跨调用复用同一个库
-  readyTimeoutMs: 180_000,                         // 冷启动要建库
-  requestTimeoutMs: 120_000,                       // store/list 不等市场注册；空目录看 markets_pending
-  extraArgs: ["--agent-store-config", "/etc/my-app/agent-store.toml"], // 换一份宿主配置
-  client: { name: "ci-smoke", version: "1.0.0" },
-  onExit: (info) => console.error("runtime exited", info.code, info.signal),
-});
 try {
   const store = await harness.listStore();
-  console.log(store.items.length, store.markets_pending);
+  console.log(`市场条目: ${store.items.length}, 市场更新中: ${store.markets_pending}`);
 } finally {
-  await harness.close(); // 自持目录不会被删除
+  await harness.close(); // 优雅关闭进程，自持数据目录保持完整
 }
 ```
 
-> 端口默认 `0`（系统分配）不必指定；**并发要用不同的 `dataDir`**——同一个目录有单实例锁，后启动的那个会 fail-fast。
+### 3.3 独立进程托管（spawnAppServer 与客户端解耦）
 
-### 3.4 带 token 的宿主与 capabilities
-
-```ts
-const harness = await launchHarness({
-  client: { name: "internal-ui", version: "2.0.0" },
-  // 宿主以 --auth 启动时必需；本地模式（server.readiness.auth === "disabled-local"）可省略
-  token: process.env.AGENT_STORE_TOKEN ?? "",
-  // 声明会消费哪些能力：events / approvals / team_runtime / artifacts
-  capabilities: { events: true, approvals: true, team_runtime: true, artifacts: false },
-});
-console.log(harness.server.readiness.url, harness.handshake.protocol_version);
-```
-
-### 3.5 启动失败怎么兜
-
-```ts
-import { launchHarness } from "@flowy-agent-store/sdk";
-
-try {
-  const harness = await launchHarness({ client: { name: "my-app", version: "1.0.0" } });
-  // … 正常使用 harness（业务面直接挂在返回对象上）
-} catch (error) {
-  // 三类启动失败都从这里抛出，message 已含可行动信息：
-  // 1) 找不到二进制        → "cannot find the flowy-agent-store runtime binary: …"（逐条列出四条途径）
-  // 2) 就绪超时 / 启动即退  → "timed out after …ms waiting for the runtime readiness line"
-  // 3) 协议指纹不一致      → "protocol version mismatch: runtime speaks X, SDK expects Y"
-  console.error(String(error));
-}
-```
-
-失败路径由 SDK 自己兜底：先 `child.kill()`，2 秒宽限后 `SIGKILL`，并删除自动创建的 data-dir；子进程 stderr 的尾部 50 行会附在错误信息里。已就绪之后子进程再崩溃**不会**走这条路——那只能通过 `harness.server.exited` / `onExit` 观察，SDK 不自动重启。
-
-### 3.6 只要进程、不要客户端：`spawnAppServer`
+仅托管运行时进程生命周期，由外部自行管理网络连接：
 
 ```ts
 import { spawnAppServer } from "@flowy-agent-store/sdk";
 import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
 
-const server = await spawnAppServer({ dataDir: "/var/lib/my-app/agent-store" });
+// 仅拉起并托管独立服务端进程，不绑定内建客户端
+const server = await spawnAppServer({
+  dataDir: "/var/lib/my-app/agent-store",
+  host: "127.0.0.1",
+  port: 0, // 由操作系统动态分配可用端口
+});
+
 try {
-  const url = `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`;
+  const wsUrl = `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`;
   const client = new AppServerClient({
-    transport: new WebSocketTransport(url),
-    client: { name: "my-app", version: "1.0.0" },
+    transport: new WebSocketTransport(wsUrl),
+    client: { name: "external-client", version: "1.0.0" },
   });
   await client.connect();
-  // … 也可以换成 HttpTransport，或自己接别的传输
+
+  const catalog = await client.connectors.list();
+  console.log(`连接器数量: ${catalog.length}`);
 } finally {
-  await server.close();
+  await server.close(); // 终止服务端进程
 }
 ```
 
-> 这些配方都走 `launchHarness` / `spawnAppServer`：省略 `dataDir` 时自动创建临时目录并在 `close()` 时删除；要跨调用复用同一个库（会话、已装组件都留着），显式传 `dataDir`——见 §12。
-
-## 4. 浏览器：只连已运行的服务端
-
-浏览器不 spawn 进程，只连 WebSocket；`WebSocketTransport` 会把 `token` 追加为 `?token=` 查询参数（浏览器 WebSocket 不能设自定义头）。
+### 3.4 Web 浏览器长连接模式（直接连接运行中服务端）
 
 ```ts
 import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
 
-const transport = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", { token });
-const client = new AppServerClient({ transport, client: { name: "web", version: "1.0.0" } });
-await client.connect();
-```
-
-> 宿主是本地可信模式（就绪行 `auth: "disabled-local"`）时不需要 token。纯请求-响应也可以走 `HttpTransport`——见 §13。
-
-## 5. Electron：主进程 spawn，渲染进程连回环
-
-主进程持二进制与数据目录；渲染进程只拿回环 URL 与（可选的）token。凭据放主进程的系统凭据存储，不要进渲染进程或配置文件明文。
-
-**Electron：主进程 spawn，渲染进程连回环**（凭据留主进程，不进渲染进程）：
-
-```ts
-import { spawnAppServer } from "@flowy-agent-store/sdk";
-
-const server = await spawnAppServer({ dataDir: app.getPath("userData") });
-win.webContents.send("app-server-ready", {
-  url: `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`,
+// 浏览器运行环境中无法执行进程 spawn，仅作为客户端连接既有服务端
+const token = window.sessionStorage.getItem("agent_store_token") ?? undefined;
+const transport = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", {
+  token, // 在带鉴权模式下，token 将作为 URL 查询参数自动附加
+  requestTimeoutMs: 15_000,
 });
-app.on("before-quit", () => void server.close());
+
+const client = new AppServerClient({
+  transport,
+  client: { name: "web-dashboard", version: "1.0.0" },
+});
+
+await client.connect();
+const experts = await client.agents.list();
+console.log(`已就绪专家数量: ${experts.length}`);
 ```
 
-> **Electron 完整接入（主进程 / 预加载 / 渲染进程）**
->
-> 上面是最小骨架。真实 Electron 应用要把「运行时拉起与凭据」留在主进程，渲染进程只拿到回环 URL（和可选的 token）。凭据（OAuth 令牌、系统凭据存储）永远不要进渲染进程或配置文件明文。
+### 3.5 Electron 混合架构（主进程 spawn 与渲染进程安全直连）
 
-**主进程 `main.ts`** — spawn 运行时、经 IPC 把连接信息交给渲染进程、退出时清理：
+主进程管理运行时二进制与数据存储目录；渲染进程仅接收回环连接地址及鉴权令牌。私有密钥仅保存在主进程受控的安全存储中。
 
 ```ts
-import { app, BrowserWindow, ipcMain } from "electron";
+// 1. Electron 主进程 (main.ts)：管理后台进程与数据存储
+import { app, ipcMain } from "electron";
 import { spawnAppServer, type SpawnedServer } from "@flowy-agent-store/sdk";
 import { join } from "node:path";
 
 let server: SpawnedServer | null = null;
 
-async function startBackend() {
+async function bootstrap() {
   server = await spawnAppServer({
     dataDir: join(app.getPath("userData"), "agent-store"),
   });
 
-  // 回环 WS 地址（loopback 下 auth 通常为 disabled-local，无需 token）
   const wsUrl = `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`;
-  const token = server.readiness.auth === "disabled-local" ? undefined : await getHostToken();
+  const token = server.readiness.auth === "disabled-local" ? undefined : process.env.AGENT_STORE_TOKEN;
 
-  // 渲染进程主动来取
   ipcMain.handle("agent-store:get-connection", () => ({ url: wsUrl, token }));
 
-  // 崩溃可见：进程意外退出时记日志（SDK 不自动重启）
   server.exited.then((info) => {
-    console.warn("agent-store runtime exited:", info.code, info.signal);
+    console.warn(`运行时退出: code=${info.code}, signal=${info.signal}`);
   });
 }
 
-app.whenReady().then(startBackend);
-
+app.whenReady().then(bootstrap);
 app.on("before-quit", async (event) => {
   if (server) {
-    event.preventDefault(); // 先等清理完成再退出
+    event.preventDefault();
     await server.close();
     server = null;
   }
   app.exit();
 });
-```
 
-> `getHostToken()` 由宿主自己实现——只有服务端要求 token（非 `disabled-local`）时才需要；token 由主进程生成 / 获取，绝不写入渲染进程可访问的明文。
-
-**预加载 `preload.ts`** — 用 `contextBridge` 安全地暴露给渲染进程（不暴露整个 `ipcRenderer`）：
-
-```ts
-import { contextBridge, ipcRenderer } from "electron";
-
-contextBridge.exposeInMainWorld("agentStore", {
-  getConnection: () => ipcRenderer.invoke("agent-store:get-connection"),
-});
-```
-
-**渲染进程 `renderer.ts`** — 拿到 URL 后自建 `AppServerClient` 并握手：
-
-```ts
+// 2. 渲染进程 (renderer.ts)：通过 IPC 获取连接凭据并建立 WebSocket 通信
 import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
 
-const { url, token } = await window.agentStore.getConnection();
-const transport = new WebSocketTransport(url, { token, requestTimeoutMs: 30_000 });
-const client = new AppServerClient({ transport, client: { name: "electron-ui", version: "1.0.0" } });
+const { url, token } = await (window as any).agentStore.getConnection();
+const client = new AppServerClient({
+  transport: new WebSocketTransport(url, { token }),
+  client: { name: "electron-renderer", version: "1.0.0" },
+});
 await client.connect();
-
-// 之后即可使用全部子客户端
-const catalog = await client.connectors.list();
 ```
 
-> 渲染进程走 `WebSocketTransport` 的 `token` 选项会被自动追加为 `?token=` 查询参数（浏览器 / Electron 的 WebSocket 不能设自定义头）。纯请求-响应场景可用 `HttpTransport`。
+## 4. 会话交互与多 Agent 编排
 
-## 6. Store：浏览 → 安装 → 就绪 → 卸载
-
-顶层平方法适合一次性脚本：
-
-```ts
-// 列出全市场统一目录（首次可能为空，含 markets_pending 标志，见接口参考 §3.3）
-const store = await client.listStore();
-for (const item of store.items) {
-  console.log(item.marketplace_id, item.entry_name, item.kind, item.installed);
-}
-
-// 一键安装：缺导入就导入 + 注册
-const receipt = await client.installStoreEntry("experts", "frontend-backend-experts");
-console.log("installed:", receipt.installed);
-
-// 市场源管理
-const markets = await client.listMarketplaces();
-const added = await client.addMarketplace({ source_kind: "url", source: "https://example.com/market.json" });
-await client.refreshMarketplace(added.marketplace_id);
-await client.removeMarketplace(added.marketplace_id, /* cascade */ true);
-```
-
-`client.store` 子客户端把同一批 wire 方法编排成一条状态机（`search → install → … → uninstall`），并默认**等到可用**：
-
-```ts
-// 找到目标条目（分类过滤可选）
-const items = await client.store.search("frontend", { kind: "agent" });
-
-const outcome = await client.store.install(items[0]); // 默认 waitForReady: true
-if (!outcome.ok) console.warn("components failed:", outcome.components.filter((c) => !c.ok));
-if (outcome.ready === false) {
-  // 需要授权的连接器会立刻返回，不会把就绪超时预算烧光
-  if (outcome.readyIssue === "authorization_required") {
-    await client.connectors.authStart(outcome.readyComponentId!);
-  } else {
-    console.warn("not ready:", outcome.readyIssue);
-  }
-}
-
-// 已安装清单与版本提示（没有「更新」动词）
-const installed = await client.store.installed();
-const behind = await client.store.checkUpdates();
-if (behind.length > 0) console.log(client.store.updateHint(behind[0])); // "uninstall_reinstall"
-
-await client.store.setEnabled(items[0], false); // 技能只翻目录标记，见下
-await client.store.uninstall(items[0]);         // 真的释放运行时产物
-```
-
-几条实测结论：
-
-- 技能拷完即可用；连接器注册出来是 **disabled** 的既定默认，所以就绪检查会先 enable 再探针。
-- 就绪超时**不丢安装结果**：返回成功安装 + `ready: false` / `readyIssue: "ready_timeout"`。
-- 没有更新动词：`checkUpdates()` / `updateHint()` 只告诉你该「卸载后重装」。
-- 卸载是**可重入**的：产物已不在算成功；部分失败时那些组件保持已安装、`ok: false`、并点名到组件。
-- `setEnabled(item, false)` 对技能只翻一个目录层标记，返回 `code: "skill_disable_flag_only"`——要让技能离开运行时只能 `uninstall`。
-
-## 7. 会话与 Run
-
-### 7.1 会话：创建 → 发送 → 实时接收
+### 4.1 基础会话交互（创建、流式事件订阅与幂等发送）
 
 ```ts
 import { decodeConversationEvent } from "@flowy-agent-store/protocol";
 
-const conv = await client.conversations.create({ name: "demo" });
-const sub = await client.conversations.follow(conv.conversation_id);
-sub.onEvent((event) => {
-  const decoded = decodeConversationEvent(event);
-  if (decoded.kind === "message.delta") render(decoded.delta, decoded.replace);
-});
-sub.onBackfill((snapshot) => resetTranscript(snapshot.messages));
-sub.onError((error) => report(error));
+// 1. 创建新会话
+const conversation = await client.conversations.create({ name: "技术方案调研" });
+const conversationId = conversation.conversation_id;
 
+// 2. 订阅流式事件流
+const subscription = await client.conversations.follow(conversationId);
+subscription.onEvent((rawEvent) => {
+  const event = decodeConversationEvent(rawEvent);
+  if (event.kind === "message.delta") {
+    process.stdout.write(event.delta);
+  }
+});
+subscription.onError((error) => console.error("流式接收异常:", error));
+
+// 3. 发送消息（必须显式指定客户端生成的 UUID 作为幂等键）
 const receipt = await client.conversations.send(
-  conv.conversation_id,
-  "帮我写个 REST API",
-  crypto.randomUUID(), // 必须显式幂等键
+  conversationId,
+  "请评估单二进制架构的利弊并输出分析大纲",
+  crypto.randomUUID(),
+);
+console.log(`消息已受理: ${receipt.accepted}`);
+```
+
+### 4.2 动态挂载原子技能（单轮请求能力注入）
+
+技能挂载仅对当前对话轮次生效，不影响会话快照：
+
+```ts
+// 检索本地可用的技能组件
+const skills = await client.skills.list();
+const gitSkill = skills.find((item) => item.name === "git-workflow");
+
+if (!gitSkill) throw new Error("未安装 git-workflow 技能");
+
+// 在特定对话轮次中通过 mentions 注入技能，仅对当前轮生效，不污染会话快照
+await client.conversations.send(
+  conversationId,
+  "请根据 Git 规范检查当前分支提交历史",
+  crypto.randomUUID(),
+  {
+    mentions: [{ kind: "skill", id: gitSkill.id }],
+    // attachments: ["/absolute/path/to/diff.patch"], // 可选挂载工作区内的文件附件
+  },
 );
 ```
 
-### 7.2 给单独一轮挂技能（`fp-3`）
-
-技能只在这一轮生效，会话创建时的快照不受影响。
+### 4.3 角色化会话与专家团编排（专家与团队绑定）
 
 ```ts
-const skills = await client.skills.list();
-const releaseNotes = skills.find((skill) => skill.name === "release-notes");
-
-await client.conversations.send(conv.conversation_id, "按这个技能的步骤发版", crypto.randomUUID(), {
-  mentions: [{ kind: "skill", id: releaseNotes!.id }],
-});
-// 同一轮也可以带图片附件（会话工作区内的绝对路径）：
-// { attachments: ["/abs/path/inside/workspace.png"] }
-```
-
-> `mentions` 只认 `skill`：专家与连接器在 `conversation/send` 上没有载体（专家是会话身份、连接器是宿主级开关），传进去会得到 `invalid_request`，**不会**被静默忽略。
-
-### 7.3 以专家开场（`fp-4`）
-
-专家的身份写在**创建**那一刻，之后不可改写。
-
-```ts
+// 模式 A：单专家会话绑定（从首轮起受专家的 Instructions、技能与连接器栅栏约束）
 const experts = await client.agents.list();
-const architect = experts.find((agent) => agent.name === "software-architect");
+const architect = experts.find((item) => item.name === "software-architect");
 
 const expertChat = await client.conversations.create({
-  name: "重构讨论",
-  agentId: architect!.id, // 未安装会得到 agent_not_installed
+  name: "架构设计会话",
+  agentId: architect!.id, // 未安装时抛出 agent_not_installed 错误
 });
-// 之后照常 send：每一轮都在这个专家的身份、技能与连接器栅栏下运行。
-await client.conversations.send(expertChat.conversation_id, "先看模块边界", crypto.randomUUID());
-```
+await client.conversations.send(expertChat.conversation_id, "规划微内核扩展架构", crypto.randomUUID());
 
-> 想换专家只能**新建会话**——`conversation/update` 拒绝 preset / 技能 / 连接器三类键。这是刻意的：会话的 preset 快照是冻结的，否则「同一个会话里前后两轮是两个不同的人」。
-
-### 7.4 以专家团开场（`fp-5`）
-
-走 `team/run` 的同一段编排，但不代你说第一句话。
-
-```ts
+// 模式 B：专家团队（Team）会话绑定（由 Team Leader 统筹并分发协作任务）
 const teams = await client.teams.list();
-const leader = await client.conversations.create({ teamId: teams[0].id });
-
-// 你的第一条消息就是 Leader 的首轮：它在这里调用 nomi_delegate 把活分下去。
-await client.conversations.send(leader.conversation_id, "把这版需求拆成计划", crypto.randomUUID());
-```
-
-> 想直接「给目标、拿 run_id」，还是用 `client.runs.team({ teamId, goal })`；`create({ teamId })` 给的是**可继续对话的 Leader 会话**。`teamId` 与 `agentId` 互斥。**带 `teamId` 时不要传 `name`**——Leader 的名字由服务端定为「<团名> (leader)」，传了不起作用。
-
-### 7.5 一个宿主里同时管多个会话
-
-`create()` 没有数量上限：**同一个宿主（同一个 `dataDir`）里可以并存任意多个会话**——§3 的 `launchHarness` 起一次就够，不必、也不能为每个会话再起一个宿主。下面沿用上面的 `client`（连的是同一个宿主），做四件事：
-
-1. **并存**：一次开三个普通会话，各有自己的 `conversation_id`；
-2. **一条连接全订上**：一条 WS 连接同时 `follow()` 三个，事件按 `conversation_id` 分流；
-3. **并发跑轮**：两个会话同时各跑一轮，互不阻塞；
-4. **枚举续聊**：`conversations.list()` 拿回这个宿主里的全部会话。
-
-```ts
-// ① 并存：三个普通会话（要用专家 / 团 Leader，给 create 加 agentId / teamId 即可，见 §7.3 / §7.4）
-const explain = await client.conversations.create({ name: "解释报错" });
-const review = await client.conversations.create({ name: "评审 A 分支" });
-const notes = await client.conversations.create({ name: "写发布说明" });
-const chats = [explain, review, notes];
-
-// ② 一条 WS 连接把它们全订上：服务端按连接维护订阅集合，事件按 conversation_id 分流
-for (const view of chats) {
-  const sub = await client.conversations.follow(view.conversation_id);
-  // 分流就是这一行：闭包记住是哪个会话，同一根连接上三个会话的事件不会串
-  sub.onEvent((event) => render(view.conversation_id, event));
-}
-
-// ③ 并发：两个会话同时各跑一轮，互不阻塞（忙判定按会话，没有宿主级并发闸）
-const receipts = await Promise.all([
-  client.conversations.send(explain.conversation_id, "解释一下这个报错", crypto.randomUUID()),
-  client.conversations.send(review.conversation_id, "评审 A 分支的改动", crypto.randomUUID()),
-]);
-// 回执是「已受理」不是「已跑完」（§14）：两轮在后台流式跑，终态从 ② 的事件里拿
-console.log(receipts.map((r) => ({ accepted: r.accepted, completed: r.completed })));
-
-// ④ 枚举续聊：list 默认 100，返回的都是这个宿主里的会话
-for (const view of await client.conversations.list()) {
-  console.log(view.conversation_id, view.name, view.is_processing);
-}
-```
-
-> 忙判定（`conflict`）**按会话**生效：两个会话能同时各跑一轮，同一个会话不能并发跑两轮。真正的**进程级**隔离不是「多开会话」，而是多个 `dataDir`（同一个目录有单实例锁，见 §14）。
-
-> 这段刻意**只用普通会话**：专家与团 Leader 都必须**先装**（否则创建时就是 `agent_not_installed`；团还要求它绑的连接器都可用，否则 `connector_unavailable`），把它们混进来会让例子在没装过的机器上直接失败。三种身份的会话**可以并存**，多会话的机制不变——身份的写法见 §7.3 / §7.4。
-
-### 7.6 Run：发起 → 等待结果 → 处理审批
-
-```ts
-const run = await client.runs.agent({
-  agentId: "frontend-backend-experts",
-  goal: "Generate a todo REST API",
+const teamChat = await client.conversations.create({
+  teamId: teams[0].id, // teamId 与 agentId 严格互斥
 });
-const result = await client.runs.result(run.run_id); // 终态后才成功
-console.log(result.status);
+await client.conversations.send(teamChat.conversation_id, "对当前重构需求制定跨角色执行计划", crypto.randomUUID());
+```
 
-// 若 Agent 需要人决策，follow 实时事件并回答
-const sub = await client.runs.follow(run.run_id);
-sub.onEvent((event) => {
-  if (event.event_type !== "approval.requested") return;
-  client.runs.answerDecision({
-    runId: run.run_id,
-    stepId: event.step_id!,
-    attemptId: event.attempt_id!,
-    answer: "批准，继续执行",
-    expectedExecutionVersion: event.expected_execution_version!,
-    expectedStepVersion: event.expected_step_version!,
-    expectedAttemptVersion: event.expected_attempt_version!,
+### 4.4 多会话并发与单 WebSocket 连接多路复用
+
+单一宿主支持管理多个独立会话，单条 WebSocket 连接即可实现事件流多路分发：
+
+```ts
+// 1. 并发创建多个独立业务会话
+const chatA = await client.conversations.create({ name: "错误日志分析" });
+const chatB = await client.conversations.create({ name: "API 接口设计" });
+const activeChats = [chatA, chatB];
+
+// 2. 在同一条 WebSocket 连接上并行订阅各个会话，通过闭包实现事件分流
+for (const chat of activeChats) {
+  const sub = await client.conversations.follow(chat.conversation_id);
+  sub.onEvent((event) => {
+    console.log(`[会话 ${chat.name} 收到事件]`, event.event_type);
   });
-});
-```
-
-> `answerDecision` 的三个 `expected*Version` 是必填 CAS 令牌，任一变化即返回 `conflict`（见[接口参考](/zh-CN/docs/typescript-sdk) §5.4）。带 `idempotency_key` 的写操作可安全重放。
-
-## 8. Connector OAuth 全流程
-
-典型链路：`list` 取 `connectorId` → `authStart` 发起浏览器流 → 轮询 `authStatus` 至 `authenticated` → 用完 `logout` 吊销。
-
-```ts
-// 1) 从目录取得 connectorId
-const catalog = await client.connectors.list();
-const github = catalog.find((c) => c.id === "github");
-if (!github) throw new Error("github connector not found in catalog");
-
-// 2) 先看认证态：已认证则可跳过授权
-const before = await client.connectors.authStatus(github.id);
-if (before.state !== "authenticated") {
-  // 3) 发起宿主浏览器 OAuth 流（立即返回 started，不阻塞）
-  const started = await client.connectors.authStart(github.id);
-  if (started.state !== "started") {
-    throw new Error(started.error ?? "auth start failed");
-  }
-
-  // 4) 轮询直到 authenticated（或超时 / 需要重新授权）
-  const deadline = Date.now() + 5 * 60_000; // 5 分钟宽限
-  let authenticated = false;
-  while (Date.now() < deadline) {
-    const status = await client.connectors.authStatus(github.id);
-    if (status.state === "authenticated") { authenticated = true; break; }
-    if (status.state === "reauthorization_required") {
-      throw new Error("reauthorization required");
-    }
-    await new Promise((r) => setTimeout(r, 1_500)); // 1.5s 间隔
-  }
-  if (!authenticated) throw new Error("oauth timed out");
 }
 
-// 5) 授权后连接器状态应为 connected（认证就绪 + 最近探测成功）
-const status = await client.connectors.status(github.id);
-console.log(status.status);
+// 3. 同时向多个会话发起并发请求（服务端按会话隔离判定，互不阻塞）
+const receipts = await Promise.all([
+  client.conversations.send(chatA.conversation_id, "分析日志异常原因", crypto.randomUUID()),
+  client.conversations.send(chatB.conversation_id, "生成用户中心 API 定义", crypto.randomUUID()),
+]);
+console.log("并发受理状态:", receipts.map((r) => r.accepted));
 
-// 6) 用完吊销令牌
-await client.connectors.logout(github.id);
+// 4. 查询当前宿主中的全量会话视图及执行中状态
+const allViews = await client.conversations.list();
+for (const view of allViews) {
+  console.log(`会话: ${view.name}, 执行中: ${view.is_processing}`);
+}
 ```
 
-> `authStart` 只返回 `started`，**不返回授权 URL 或 token**——浏览器流程由可信宿主持有，客户端只触发与轮询（见[接口参考](/zh-CN/docs/typescript-sdk) §3.4）。stdio 类型连接器不支持 OAuth，服务端会报 `OAuth is not supported for stdio connectors`。
-
-### 8.1 调用工具：先读签名，再调用
-
-`connector/get` 与 `connector/test` 返回的每个工具都带 `input_schema`（上游 `tools/list` 的 `inputSchema` **逐字**），所以**不需要猜参数**：
+### 4.5 独立任务（Run）编排与人机交互审批
 
 ```ts
-// 1) 现场探针：真连接一次（stdio 会 spawn 子进程），结果落库——get() 随后读的就是它
-const probe = await client.connectors.test(github.id);
-if (!probe.success) throw new Error(probe.error ?? "probe failed");
+// 1. 发起单次独立的 Agent 批处理任务
+const receipt = await client.runs.agent({
+  agentId: "frontend-backend-experts",
+  goal: "为订单服务编写 OpenAPI 规范与 Mock 数据",
+});
+const runId = receipt.run_id;
+
+// 2. 订阅运行状态与实时审批请求
+const runSub = await client.runs.follow(runId);
+runSub.onEvent(async (event) => {
+  if (event.event_type === "approval.requested") {
+    // 捕获决策请求并向服务端提交批准判定（携带版本乐观锁字段）
+    await client.runs.answerDecision({
+      runId,
+      stepId: event.step_id!,
+      attemptId: event.attempt_id!,
+      answer: "确认批准，准许写文件操作",
+      expectedExecutionVersion: event.expected_execution_version!,
+      expectedStepVersion: event.expected_step_version!,
+      expectedAttemptVersion: event.expected_attempt_version!,
+    });
+  }
+});
+
+// 3. 阻塞等待终态并提取执行结果
+const result = await client.runs.result(runId);
+console.log(`任务终态: ${result.status}`);
+```
+
+## 5. 市场资源与连接器集成
+
+### 5.1 市场条目检索与生命周期状态机
+
+```ts
+// 1. 统一目录列表检索与一键快速安装
+const store = await client.listStore();
+const targetItem = store.items.find((item) => item.entry_name === "frontend-backend-experts");
+
+if (targetItem && !targetItem.installed) {
+  await client.installStoreEntry(targetItem.marketplace_id, targetItem.entry_name);
+}
+
+// 2. 高阶状态机安装编排（内置就绪等待与 OAuth 认证引导）
+const searchResults = await client.store.search("github", { kind: "connector" });
+const outcome = await client.store.install(searchResults[0], { waitForReady: true });
+
+if (!outcome.ok) {
+  console.warn("部分依赖组件安装失败:", outcome.components.filter((c) => !c.ok));
+}
+if (outcome.ready === false && outcome.readyIssue === "authorization_required") {
+  console.log("连接器需要完成用户授权，请跳转授权流程");
+}
+
+// 3. 查询已安装组件与版本更新提示
+const installedEntries = await client.store.installed();
+const outdated = await client.store.checkUpdates();
+for (const entry of outdated) {
+  console.log(`更新策略: ${client.store.updateHint(entry)}`); // 输出 "update"
+  // 原地原子升级：先装新版本，就绪后安全释放旧版本产物；中途失败保留旧安装
+  const updateOutcome = await client.store.update(entry, { waitForReady: true });
+  console.log(`升级结果: ${updateOutcome.ok ? "成功" : "失败"}`);
+}
+
+// 4. 停用与彻底卸载
+await client.store.setEnabled(searchResults[0], false); // 变更目录启用标记
+await client.store.uninstall(searchResults[0]);         // 彻底清理并释放运行时磁盘快照
+```
+
+### 5.2 市场源动态管理
+
+```ts
+// 1. 列出当前已配置的所有市场源
+const marketplaces = await client.listMarketplaces();
+
+// 2. 动态注册新的第三方市场源
+const added = await client.addMarketplace({
+  source_kind: "url",
+  source: "https://example.com/custom-market.json",
+});
+
+// 3. 强制触发市场源远端索引刷新
+await client.refreshMarketplace(added.marketplace_id);
+
+// 4. 级联移除市场源（cascade: true 将同步注销来自该市场的未持久化快照）
+await client.removeMarketplace(added.marketplace_id, /* cascade */ true);
+```
+
+### 5.3 连接器 OAuth 授权全流程
+
+```ts
+const connectorId = "github";
+
+// 1. 检查当前认证状态，已处于 authenticated 时无需重复授权
+const initialStatus = await client.connectors.authStatus(connectorId);
+
+if (initialStatus.state !== "authenticated") {
+  // 2. 发起宿主浏览器 OAuth 授权流（此调用立即返回 started 状态，非阻塞）
+  const startResult = await client.connectors.authStart(connectorId);
+  if (startResult.state !== "started") {
+    throw new Error(startResult.error ?? "启动 OAuth 浏览器窗口失败");
+  }
+
+  // 3. 等待用户在浏览器中完成授权（默认 120 秒超时预算）
+  const authResult = await client.connectors.waitForAuth(connectorId);
+  if (authResult.state === "error") {
+    throw new Error(`OAuth 授权失败: ${authResult.error}`);
+  }
+  if (authResult.state === "timeout") {
+    throw new Error("用户浏览器授权超时");
+  }
+}
+
+// 4. 验证连接器健康状态（期望处于 connected 状态）
+const health = await client.connectors.status(connectorId);
+console.log(`连接器运行状态: ${health.status}`);
+
+// 5. 任务结束后安全吊销凭据
+await client.connectors.logout(connectorId);
+```
+
+### 5.4 连接器工具探针与动态调用
+
+```ts
+// 1. 执行连通性测试并探针获取可用工具签名
+const probe = await client.connectors.test("github");
+if (!probe.success) {
+  throw new Error(probe.error ?? "连接器探针测试失败");
+}
 if (probe.tools_truncated) {
-  // 名字与描述永不省略；只有 schema 会为控制体积被整份略去
-  console.warn("host omitted some schemas to stay inside its size budget");
+  console.warn("由于响应包体预算限制，部分工具的 JSON Schema 已省略");
 }
 
-// 2) 挑一个工具，读它收什么参数
-const tool = probe.tools?.find((t) => t.name === "create_issue");
-console.log(tool?.description, tool?.input_schema);
+// 2. 检索指定工具及其输入参数契约
+const targetTool = probe.tools?.find((tool) => tool.name === "create_issue");
+console.log("工具描述:", targetTool?.description);
+console.log("参数模式:", targetTool?.input_schema);
 
-// 3) 按签名传参调用
-const call = await client.connectors.call(github.id, "create_issue", {
-  owner: "acme",
-  repo: "site",
-  title: "flush the docs",
+// 3. 结构化传参调用外部工具
+const invocation = await client.connectors.call("github", "create_issue", {
+  owner: "flowy-org",
+  repo: "agent-store",
+  title: "SDK 文档示例同步",
 });
-if (call.is_error) {
-  // 参数不对 / 服务器自己拒绝：promise 仍然 resolve，错误在结果对象里
-  console.error(call.result);
+
+if (invocation.is_error) {
+  // 外部调用被拒绝或参数不符时，Promise 正常返回，错误承载在 result 对象中
+  console.error("工具执行返回错误:", invocation.result);
+} else {
+  console.log("工具执行成功:", invocation.result);
 }
 ```
 
-> **参数不做客户端校验**：`input_schema` 是任意 JSON Schema，客户端只负责把它交给你。传错参数得到的是 `is_error: true` 与服务器自己的报错，**而不是 promise 拒绝**——只有「根本没够着工具」才 reject。`policy_denied` 表示宿主**没开代理**，或这一对被 `allow` 收窄出局 / 被 `deny` 明确排除，不再是「你漏写了白名单」。
-
-## 9. 目录类短例：agents / teams / skills / models / workspaces
+### 5.5 连接器用户凭据表单与私有服务注册
 
 ```ts
-const agents = await client.agents.list();          // AgentSummary[]
-const one = await client.agents.get(agents[0].id);  // AgentDetail：含声明式 skills / connectors
-console.log(one.name, one.skills, one.preset_id);   // preset_id 在 install/* 之后才有
+// 1. 查询连接器所需的凭据配置表单（来自 token-schema 声明）
+const credForm = await client.connectors.credentials("weather-service");
+console.log(`认证模式: ${credForm.mode}`); // "token" | "oauth" | "none"
+console.log(`获取密钥链接: ${credForm.doc_url?.zh}`);
 
-const teams = await client.teams.list();            // TeamSummary[]
-const team = await client.teams.get(teams[0].id);   // TeamDetail：成员 + 可绑定的 Connector 面
+if (credForm.status === "missing") {
+  console.warn(`缺失必需凭据: ${credForm.missing.join(", ")}`);
 
-const skills = await client.skills.list();          // SkillSummary[]
-console.log(skills.filter((s) => s.writable).map((s) => s.name)); // 可写的用户技能
+  // 2. 定向安全写入敏感凭据（单向加密落盘，网络回包中值永不越界）
+  await client.connectors.setCredentials("weather-service", {
+    WEATHER_API_KEY: "sk-live-mock-api-key-9988",
+  });
+}
 
-const models = await client.models.list();          // ModelSummary[]：当前宿主可用模型
+// 3. 动态注册私有 MCP 模板服务（由 ${secret:NAME} 模板自动派生凭据字段）
+const registered = await client.connectors.register({
+  name: "custom-internal-db",
+  transport: {
+    sse: {
+      url: "https://internal.corp/db/sse",
+      headers: { Authorization: "Bearer ${secret:INTERNAL_DB_TOKEN}" },
+    },
+  },
+});
 
-const workspaces = await client.workspaces.list();  // WorkspaceView[]
-const created = await client.workspaces.create("/abs/path/to/project"); // 服务端 canonicalize
-await client.workspaces.revoke(created.workspace_id); // 软删除，既有会话保留
+// 4. 重置或清除不再需要的凭据
+await client.connectors.clearCredentials("weather-service", ["WEATHER_API_KEY"]);
 ```
 
-**读技能的全部文件**（技能是目录：`SKILL.md` 之外还有 `references/` / `scripts/` 等；
-`skills.get()` 的正文摘要约 1200 字截断，所以附属文件只能这样读）：
+## 6. 资源导出与宿主管控
+
+### 6.1 工作区管理与技能内部文件读取
 
 ```ts
-if (client.initializeInfo?.capabilities.skill_files) {   // 宿主可以只接目录不接文件面
+// 1. 工作区（Workspaces）声明周期管理
+const workspaces = await client.workspaces.list();
+const newWorkspace = await client.workspaces.create("/abs/path/to/project");
+await client.workspaces.revoke(newWorkspace.workspace_id); // 软删除，既有会话保留引用
+
+// 2. 技能内部文件读取（受宿主 skill_files 能力门禁管控）
+if (client.initializeInfo?.capabilities.skill_files) {
   const inventory = await client.skills.files("release-notes");
   for (const file of inventory.files) {
-    console.log(file.path, file.size, file.digest);
+    console.log(`文件: ${file.path}, 大小: ${file.size}, 摘要: ${file.digest}`);
   }
-  console.log("tree digest:", inventory.content_digest); // 该技能目录的摘要，不是快照摘要
-  if (inventory.truncated) console.warn("inventory incomplete");
 
-  const bytes = await client.skills.readFile("release-notes", "references/guide.md");
-  console.log(new TextDecoder().decode(bytes));
+  // 读取技能包内的相对路径文件字节流并转码
+  const fileBytes = await client.skills.readFile("release-notes", "references/guide.md");
+  const content = new TextDecoder().decode(fileBytes);
+  console.log("文件内容:", content);
 }
 ```
 
-### 9.1 导出专家 / 专家团给外部 runtime（`fp-8`）
-
-`agents.get()` / `teams.get()` 是**目录面**：结构化字段，**永远不带 persona 正文**。要拿到专家**定义本身**
-（在你自己的 runtime 里跑它），用 `export()`：
+### 6.2 专家与团队打包导出至本地目录
 
 ```ts
-if (client.initializeInfo?.capabilities.expert_export) {  // 报的是「这个面接没接」，不是「这个 id 能不能导」
-  const pack = await client.agents.export("wb-…");         // ExpertPack
-  console.log(pack.pack_format, pack.kind, pack.persona.instructions);
-  console.log(pack.model, pack.skills, pack.provenance.content_digest);
+import { exportAgent, exportTeam, materializePack } from "@flowy-agent-store/sdk";
 
-  const team = await client.teams.export("wb-…", "1.0.0"); // 第二参是可选的版本钉；不匹配即 version_mismatch
-  for (const member of team.team!.members) console.log(member.id, member.name); // 团长在首位
+// 模式 A：使用 SDK 高阶函数 exportTeam 完整物化团队及跨成员技能
+const teamId = "frontend-backend-experts";
+const exportResult = await exportTeam(client, teamId, "./exported-team");
+console.log(`已物化技能数: ${exportResult.writtenSkills.length}`);
+if (exportResult.danglingSkills.length > 0) {
+  console.warn("缺失引用的悬空技能:", exportResult.danglingSkills);
 }
+
+// 模式 B：使用 exportAgent 高阶函数物化单专家
+const agentResult = await exportAgent(client, "wb-architect", "./exported-expert");
+console.log(`单专家物化路径: ${agentResult.dir}`);
+
+// 模式 C：内存中处理 ExpertPack 并调用 materializePack 落盘
+const pack = await client.agents.export("wb-architect");
+const customResult = await materializePack(client, pack, "./exported-custom");
+console.log(`自定义物化技能: ${customResult.writtenSkills.join(", ")}`);
 ```
 
-**一个包是「定义」，不是「执行语义」。** 团的编排、步骤调度、工具与凭据策略、事件形状都由运行时执行，
-**不在包里**。接入前请逐条回答方案 §5 的 **R1–R11 责任清单**——一张标了 N/A 的清单本身就是答案，
-比让某个语义在沉默中失效好。
+### 6.3 宿主工具域裁剪与策略控制
 
-**物化成一个目录**。pack 里的技能是**引用**（正文走既有的技能文件面），所以这一步是消费方自己的代码，
-不是我们的 API——公开原语拼起来 11 行：
+通过环境变量动态重载宿主工具策略：
 
 ```ts
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { launchHarness } from "@flowy-agent-store/sdk";
 
-const pack = await client.agents.export(agentId);
-await mkdir(dir, { recursive: true });
-await writeFile(join(dir, "expert-pack.json"), JSON.stringify(pack, null, 2));
-await writeFile(join(dir, "persona.md"), pack.persona.instructions);
-for (const skill of pack.skills) {
-  for (const file of (await client.skills.files(skill.id)).files) {
-    const target = join(dir, "skills", skill.name, file.path); // path 是技能目录内的 POSIX 相对路径
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, await client.skills.readFile(skill.id, file.path));
-  }
-}
-```
-
-**三个错误码要分得清**：`policy_denied`（宿主 `[expert_export]` 关了、或这个 id 在 `deny` 里）、
-`agent_not_installed` / `agent_disabled`（没装 / 装了就关；**团成员缺任一个即整包失败**并指名该成员）、
-`not_found`（没有这个 id）。`capabilities.expert_export` 只说明方法存在，**不要只靠它灰按钮**。
-两个方法都是 **WebSocket-only**（与 `agent/*` · `team/*` 整族一致），`HttpTransport` 上没有绑定。
-
-## 10. 工具面控制：`AGENT_STORE_TOOLS`
-
-宿主的工具面来自 `~/.agent-store/config.toml` 的 `[tools]` 表。**自己 spawn 宿主时不必改那份文件**——用环境变量 `AGENT_STORE_TOOLS` 传 JSON，`launchHarness` 会把它合并进子进程环境：
-
-```ts
+// 通过环境变量 AGENT_STORE_TOOLS 注入工具策略配置，覆盖宿主默认行为
 const harness = await launchHarness({
-  client: { name: "basic-only", version: "1.0.0" },
+  client: { name: "sandboxed-client", version: "1.0.0" },
   env: {
     AGENT_STORE_TOOLS: JSON.stringify({
-      web: true,       // 联网检索 / 读页面：保留为基础能力
-      computer: false, // 桌面控制（键鼠 / UIA）
-      browser: false,  // 浏览器自动化（带操作者 profile 与登录态）
+      web: true,       // 允许联网检索与只读网页抓取
+      computer: false, // 禁用键鼠桌面控制
+      browser: false,  // 禁用带登录态的浏览器自动化
       domains: {
         cron: false,
         meeting: false,
@@ -642,111 +587,70 @@ const harness = await launchHarness({
     }),
   },
 });
-```
 
-| 事实 | 行为 |
-| --- | --- |
-| 值 | JSON，形状同 `[tools]` 表；`{}` = 全部默认开 |
-| 优先级 | 环境变量**整份替换**文件里的 `[tools]`，不是合并 |
-| 生效范围 | 只有采纳 `[tools]` 的宿主（`apps/agent-store`）；桌面 / Web 宿主不采纳 |
-| 不可解析 | 打 warning 后回落文件；**空值 = 未设置**（不是「全禁」） |
-| 生效时机 | 宿主启动时读一次；`launchHarness` 每次都是新进程，天然生效 |
-
-> 环境变量一旦存在，文件里的 `[tools]` 就被忽略——包括宿主自己经设置写进去的值。字段与坑的完整口径见仓库 `docs/agent-store/20-tool-injection-policy.zh.md`。
-
-## 11. 错误与重试
-
-四个错误类与 `isRetryableError` / `formatError` 都从 `@flowy-agent-store/protocol` 导出，`withRetry` 按稳定 `retryable` 指数退避：
-
-```ts
-import { withRetry } from "@flowy-agent-store/client";
-
-const view = await withRetry(() => client.runs.get(runId), {
-  maxAttempts: 4,
-  onRetry: ({ attempt, delayMs }) => log(`retry ${attempt} in ${delayMs}ms`),
-});
-```
-
-按错误类型分支时**只认稳定 `code`，不要解析 message**：
-
-```ts
-import { AppServerError, formatError, isRetryableError } from "@flowy-agent-store/protocol";
-
-try {
-  await client.runs.result(runId);
-} catch (error) {
-  if (error instanceof AppServerError && error.code === "connector_unavailable") {
-    await enableConnector(); // 稳定 code 是唯一可分支的契约
-  } else if (isRetryableError(error)) {
-    // 交回 withRetry，或自行退避后重试
-  }
-  console.error(formatError(error)); // 唯一的人读文案
-}
-```
-
-带 `idempotency_key` / `command_id` 的写操作可安全重放：服务端对同键请求去重，不会重复执行。
-
-## 12. 在 CI / 测试里用
-
-```ts
-const harness = await launchHarness({
-  bin: process.env.AGENT_STORE_BIN, // 预构建二进制；省略则按四条途径自动查找
-  dataDir: process.env.CI_DATA_DIR, // 自持目录 → 不删除；省略 = 临时目录 + close 时删除
-  readyTimeoutMs: 180_000,          // 冷启动建库
-  requestTimeoutMs: 120_000,        // store/list 不等市场注册（zip 归档在后台下载）
-  client: { name: "ci-smoke", version: "1.0.0" },
-  onExit: (info) => console.error("runtime exited", info.code, info.signal),
-});
 try {
   const store = await harness.listStore();
-  // 冷启动时目录可能是空的：markets_pending 为 true 表示内置市场仍在后台注册
-  if (store.items.length === 0) console.warn("store still warming:", store.markets_pending);
+  console.log(`受限环境下已加载条目: ${store.items.length}`);
 } finally {
   await harness.close();
 }
 ```
 
-- 二进制定位顺序 `bin` → `AGENT_STORE_BIN` → 平台运行时包的 `vendor/` → `PATH`；**找不到就报错，不会下载**，CI 里请固定一份预构建产物。
-- 同一 `dataDir` 有**单实例锁**：并行跑测试要各用各的目录，否则后启动的那个会 fail-fast。
-- 冷启动的首次 `store/list` **不等**市场注册（默认市场是每个市场一个 zip 归档，在后台下载），所以**不必**放宽 `requestTimeoutMs`；它返回空目录**不是错误**——那是 `markets_pending: true`。
-- 子进程异常退出**不会自动重启**：用 `server.exited` / `onExit` 观测，并用 `try/finally`（或测试框架的 `afterAll`）保证 `close()`。
+| 属性规则 | 运行机制与约束 |
+| --- | --- |
+| 值格式规范 | 合法 JSON 字符串，对象结构与 `config.toml` 中的 `[tools]` 严格一致 |
+| 配置优先级 | 环境变量**整份完全替换**配置文件中的 `[tools]` 配置，不执行递归合并 |
+| 容错回退机制 | 若 JSON 字符串解析失败，服务端记录告警日志并自动回落使用配置文件 |
+| 作用生命周期 | 宿主进程启动初始化时读取一次；`launchHarness` 每次拉起新进程天然生效 |
 
-## 13. 自建传输：WebSocket 还是 HTTP
+## 7. 生产实践与故障恢复
+
+### 7.1 结构化错误处理与指数退避重试
 
 ```ts
-import { AppServerClient, HttpTransport, WebSocketTransport, httpRouteTable } from "@flowy-agent-store/client";
+import { withRetry } from "@flowy-agent-store/client";
+import { AppServerError, formatError, isRetryableError } from "@flowy-agent-store/protocol";
 
-// 实时事件 / 订阅：只能 WebSocket
-const ws = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", { token });
-const live = new AppServerClient({ transport: ws, client: { name: "ui", version: "1.0.0" } });
-await live.connect();
-const sub = await live.conversations.follow(conversationId); // 只有 WS 绑定的传输能订阅
+// 模式 A：使用 withRetry 自动执行幂等操作的指数退避重试
+const runDetails = await withRetry(() => client.runs.get("run-12345"), {
+  maxAttempts: 4,
+  initialDelayMs: 500,
+  maxDelayMs: 5000,
+  onRetry: ({ attempt, delayMs, error }) => {
+    console.warn(`执行第 ${attempt} 次重试，等待 ${delayMs}ms, 原因: ${formatError(error)}`);
+  },
+});
 
-// 纯请求-响应：HTTP 够用（每次调用独立握手，connect() 是 no-op）
-const http = new HttpTransport({ baseUrl: "http://127.0.0.1:8787" });
-const plain = new AppServerClient({ transport: http, client: { name: "cli", version: "1.0.0" } });
-await plain.connect();
-await plain.listStore();
-
-// 有 25 个方法没有 HTTP 绑定：调用会抛 TransportError；路由表可自查
-console.log(Object.keys(httpRouteTable()).length);
+// 模式 B：捕获 AppServerError 依据结构化 code 进行确定性业务分流
+try {
+  await client.runs.result("run-12345");
+} catch (error) {
+  if (error instanceof AppServerError) {
+    switch (error.code) {
+      case "connector_unavailable":
+        console.error("连接器离线或未完成认证，请引导用户重新连接");
+        break;
+      case "agent_not_installed":
+        console.error("目标专家未安装至本地存储");
+        break;
+      default:
+        console.error(`服务端业务异常 [${error.code}]:`, formatError(error));
+    }
+  } else if (isRetryableError(error)) {
+    console.warn("网络层瞬时异常，可择机重试");
+  } else {
+    throw error;
+  }
+}
 ```
 
-| | `WebSocketTransport` | `HttpTransport` |
-| --- | --- | --- |
-| 实时事件与订阅（`follow`、`onNotification`） | 支持 | **不支持**（`notify()` 抛错、`onNotification()` 返回空订阅） |
-| 连接方式 | 长连接，一次握手 | 每次调用独立握手 |
-| 适合 | UI、长会话、Run 事件 | 脚本、CI、一次性查询 |
+### 7.2 生产环境核心规范与避坑要点
 
-## 14. 常见坑（实测结论）
-
-- **临时 data-dir**：省略 `dataDir` → 每次 `launchHarness` 新建临时目录并在 `close()` 时删除；进程被强杀时目录会残留。
-- **单实例锁**：同一个 data-dir 不能并发跑两个宿主。
-- **`send()` 的回执是「已受理」不是「已跑完」**：`accepted: true` 只代表消息落库，`completed: false` 是常态——这一轮还有活要流式收。终态从 `follow()` 的事件拿，或读 `conversation/get` 的 `is_processing`；§7 那个把多个会话的轮次一起丢进 `Promise.all` 的例子，靠的就是这层异步。
-- **首个 `store/list` 不慢**：它不等市场注册；返回空目录且带 `markets_pending: true` 表示仍在后台注册，**不是错误**——轮询这个字段即可，不要靠加大 `requestTimeoutMs`。
-- **连接器装完是 disabled**：`store.install` 会先 enable 再探针；用顶层 `installStoreEntry` 则要自己 `enableInstall`。
-- **没有更新动词**：`checkUpdates()` / `updateHint()` → `uninstall_reinstall`。
-- **技能禁用只是目录标记**：`store.setEnabled(item, false)` 对技能返回 `code: "skill_disable_flag_only"`；要让技能离开运行时只能 `uninstall`。
-- **协议指纹**：就绪行的 `protocol_version` 与 SDK 不一致时，SDK 直接杀掉子进程并报错——它是契约指纹，**不是版本号、也不是日期**（现行形状是 `fp-<n>` 计数器；早期用过日期戳，那个日期只是标签，不代表变更日或发布日）。
-- **二进制不下载**：`bin` → `AGENT_STORE_BIN` → 平台运行时包的 `vendor/` → `PATH`，找不到直接报错。
-- **实时事件尽力而为**：会丢、会乱序；持久性靠 `run/events` 游标重放，`rearm()` 会重放全部历史（自行按 `sequence` 去重）。
+- **数据目录互斥排他锁**：同一 `dataDir` 具有独占文件锁，禁止并发多个进程挂载同一目录；自动化测试或多实例场景需分配独立隔离路径。
+- **异步消息受理语义**：`conversations.send` 返回的 `accepted: true` 仅代表任务已入库排队，不能视为处理完毕；流式回复必须通过 `follow` 订阅或轮询 `is_processing`。
+- **市场后台异步预热**：冷启动时首个 `store/list` 不阻塞等待市场包解压；空列表时需持续检查 `markets_pending` 标志直至为 `false`。
+- **连接器初始状态控制**：新导入的连接器默认处于禁用（`disabled`）状态；通过高阶 API `store.install` 会自动完成启用及探针连通性校验。
+- **版本演进与升级规约**：系统未提供原地补丁升级操作，统一遵循卸载后重新安装（`uninstall_reinstall`）生命周期规范。
+- **技能停用与卸载区别**：技能无运行时热卸载机制，`store.setEnabled(item, false)` 仅置目录状态标记，完全移除需执行 `uninstall`。
+- **协议版本全等校验**：运行时进程与 SDK 之间的 `protocol_version` 必须完全一致，存在版本差异时子进程启动阶段将立即主动退出并报错。
+- **临时目录安全回收**：在测试或脚本中使用 `launchHarness` 且未指定 `dataDir` 时，必须确保在 `finally` 块中调用 `close()`，以防进程强制退出遗留孤儿文件。

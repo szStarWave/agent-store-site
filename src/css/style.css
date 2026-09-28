@@ -1,0 +1,2109 @@
+/* ── 设计令牌已抽到 `src/css/tokens.css` ────────────────────────────────
+   令牌是**全局**的（导航栏与页脚在文档页也要用同一套），而本文件的规则被
+   `src/plugins/scope-site-css.ts` 加了 `html:not(.docs-wrapper)` 守卫、只作用于非文档页。
+   若把令牌留在本文件，文档页就取不到 `--bg` / `--ink` / `--maxw`，全站统一的导航与页脚
+   会退化成无色。所以令牌移到不带守卫的 `tokens.css`，本文件只保留站点组件样式。 */
+
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-feature-settings: "liga" 1;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+::selection {
+  background: var(--primary-soft);
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+p {
+  margin: 0;
+}
+button {
+  font: inherit;
+  cursor: pointer;
+}
+/**
+ * 抹掉 Infima 给**裸 `<code>`** 加的「胶囊框」。
+ *
+ * Infima（theme-classic 的默认主题）对元素级 `code` 定义了：
+ * ```css
+ * code {
+ *   background-color: var(--ifm-code-background);   // 浅灰底
+ *   border: 0.1rem solid rgba(0, 0, 0, 0.1);        // 细边框
+ *   border-radius: var(--ifm-code-border-radius);
+ *   font-size: var(--ifm-code-font-size);           // 90%，字号也被缩小
+ *   padding: ...;
+ * }
+ * ```
+ * 文档页不受影响（`pre code` 会把它显式复位，且文档页本就该用 Infima）。
+ * 但落地页的组件早于 Infima 存在、自带等宽排版，裸 `<code>` 因此被套上边框与内边距。
+ *
+ * 站点组件自己负责代码块的观感（`.install-cmd` 等各自定义），
+ * 所以这里把 Infima 的元素级装饰整体复位，只保留「等宽字体」这一条语义。
+ * 用 `:where()` 把特异性压到 0，任何组件规则都能轻松覆盖。
+ */
+:where(code):not(pre code) {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font-size: inherit;
+  font-family: var(--mono);
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+section[id],
+div[id] {
+  scroll-margin-top: calc(var(--nav-h) + 20px);
+}
+
+/* ── Navbar / Footer 的样式已交回 theme-classic ─────────────────────────
+   本站曾有自己的 NavBar / Footer / ThemeToggle 组件（类名 `.navbar`、`.navbar-inner`、
+   `.brand`、`.nav-link`、`.icon-btn`、`.footer`、`.footer-inner` …）。改用原生
+   `@theme/Navbar` 与 `@theme/Footer` 后那些组件已删除，但它们与 theme-classic
+   **同名**的规则还留在这里，会压过原生样式：
+
+   - `.footer { background: var(--bg) }` 把 `footer--dark` 的深底换成浅底，
+     而文字仍是 `.footer--dark` 的浅色 → 浅字配浅底，页脚几乎看不清；
+   - `.navbar { position: fixed }` 把 Infima 的 `position: sticky` 顶掉。
+
+   两份 CSS 在同一个 `styles.css` 里（Docusaurus 强制合并所有 CSS），而本文件排在
+   Infima **之后**，同特异性下本文件胜出，所以这些遗留规则确实会生效。
+   原生的导航与页脚现在完全由 Infima + theme-classic 负责，这里不再需要任何覆盖。 */
+
+/* ── Buttons: black pill CTAs, quiet outline ────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.14s ease;
+}
+.btn:hover {
+  border-color: var(--muted-2);
+}
+.btn:active {
+  transform: scale(0.98);
+}
+.btn-primary {
+  background: var(--cta);
+  border-color: var(--cta);
+  color: var(--cta-ink);
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover {
+  background: var(--cta-hover);
+  border-color: var(--cta-hover);
+}
+.btn-quiet {
+  background: transparent;
+}
+.btn-quiet:hover {
+  background: var(--bg-soft);
+}
+.btn-lg {
+  min-height: 48px;
+  padding: 0 28px;
+  font-size: 15px;
+}
+
+/* ── Generic section ────────────────────────────────────── */
+.section-inner,
+.hero-inner,
+.docs-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.eyebrow-center {
+  justify-content: center;
+}
+.eyebrow-index {
+  color: var(--muted-2);
+}
+.subtle {
+  color: var(--muted);
+  font-size: 16px;
+  max-width: 640px;
+}
+
+/* ── Hero: warm tinted band, ink display, product shot ───── */
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 104px 0 88px;
+  background: linear-gradient(180deg, var(--hero-tint) 0%, var(--bg) 82%);
+  color: var(--ink);
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(600px 320px at 50% -80px, rgba(240, 78, 62, 0.14), transparent 70%),
+    radial-gradient(480px 300px at 85% 110%, rgba(245, 158, 80, 0.12), transparent 70%);
+  pointer-events: none;
+}
+.hero-inner {
+  position: relative;
+  text-align: center;
+}
+.hero .eyebrow {
+  justify-content: center;
+  color: var(--muted);
+}
+.hero h1 {
+  color: var(--ink);
+  font-size: clamp(40px, 5.6vw, 64px);
+  font-weight: 700;
+  /* 行高不能压到 1 附近：`.hero-title` 用 background-clip: text 上色，
+     末行字形（如 g 的下伸部）超出元素盒的部分没有背景可显示，会被「裁掉」。 */
+  line-height: 1.16;
+  letter-spacing: -0.045em;
+  max-width: 18ch;
+  margin: 0 auto;
+}
+.hero-sub {
+  margin: 24px auto 0;
+  max-width: 640px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.7;
+}
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+.hero-actions .btn-quiet {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+.hero-actions .btn-quiet:hover {
+  background: var(--surface);
+  border-color: var(--muted-2);
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 auto 24px;
+  padding: 7px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  transition: color 0.14s ease, border-color 0.14s ease;
+}
+.hero-badge:hover {
+  color: var(--primary-strong);
+  border-color: var(--primary);
+}
+.hero-badge svg {
+  color: var(--primary);
+}
+
+/* 产品实拍轮播：与 Octop 一致，hero 底部放真实界面截图，多张自动轮换。 */
+.hero-shot {
+  position: relative;
+  width: min(880px, 100%);
+  margin: 56px auto 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow:
+    0 40px 90px -40px rgba(63, 34, 24, 0.35),
+    var(--shadow-sm);
+  overflow: hidden;
+  padding-bottom: 46px;
+}
+/* 截图点击热区：整块舞台可点，悬停/聚焦出现「点击放大」角标。 */
+.hero-shot-zoom {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.hero-shot-zoom:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.hero-shot-hint {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: rgba(34, 21, 18, 0.72);
+  color: #ffffff;
+  font-size: 12px;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.hero-shot-zoom:hover .hero-shot-hint,
+.hero-shot-zoom:focus-visible .hero-shot-hint {
+  opacity: 1;
+}
+@media (hover: none) {
+  .hero-shot-hint {
+    opacity: 1;
+  }
+}
+
+/* 截图舞台：固定宽高比，切换不引起回流；各张绝对定位堆叠、透明度过渡。 */
+.hero-shot-stage {
+  position: relative;
+  aspect-ratio: 1080 / 522;
+}
+.hero-shot-img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+.hero-shot-img.is-active {
+  opacity: 1;
+}
+.hero-shot-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.hero-shot-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--line-strong);
+  cursor: pointer;
+  transition: background 0.2s ease, width 0.2s ease;
+}
+.hero-shot-dot:hover {
+  background: var(--muted-2);
+}
+.hero-shot-dot.is-active {
+  width: 22px;
+  background: var(--primary);
+}
+
+/* ── 截图 lightbox（原生 <dialog>：Esc、焦点圈定与背景遮罩免费获得）── */
+.shot-lightbox {
+  width: min(94vw, 1280px);
+  max-width: none;
+  max-height: 92vh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+}
+.shot-lightbox::backdrop {
+  background: rgba(23, 16, 16, 0.74);
+  backdrop-filter: blur(6px);
+}
+.shot-lightbox-inner {
+  position: relative;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.55);
+  animation: fx-lightbox-in 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.shot-lightbox-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 76vh;
+  object-fit: contain;
+  border-radius: 10px;
+  background: var(--bg-soft);
+}
+.shot-lightbox-cap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.shot-lightbox-cap strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.shot-lightbox-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.shot-lightbox-close:hover {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+.shot-lightbox-close:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+@keyframes fx-lightbox-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-shot-img {
+    transition: none;
+  }
+  .shot-lightbox-inner {
+    animation: none;
+  }
+}
+
+/* ── Features / Workflow / Download（已并入 install / why 区块）── */
+.copy-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.copy-btn:hover {
+  background: var(--bg-soft);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+.copy-btn-dark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #333333;
+  border-radius: 8px;
+  background: transparent;
+  color: #a1a1a1;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.copy-btn-dark:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+/* ── Docs ───────────────────────────────────────────────── */
+.docs {
+  padding: 64px 0 96px;
+}
+.docs-inner {
+  max-width: 760px;
+}
+.docs-header .eyebrow {
+  margin-bottom: 12px;
+}
+.docs-header h1 {
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  margin-bottom: 10px;
+}
+.docs-header .subtle {
+  margin-bottom: 32px;
+}
+.doc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.doc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-weight: 500;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.doc-row:hover {
+  border-color: var(--ink);
+  background: var(--bg-soft);
+}
+.doc-row-arrow {
+  color: var(--muted-2);
+}
+
+.docs-detail {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 64px 24px 96px;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 48px;
+  align-items: start;
+}
+.docs-sidebar {
+  position: sticky;
+  top: calc(var(--nav-h) + 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.docs-back {
+  color: var(--muted);
+  font-size: 14px;
+}
+.docs-back:hover {
+  color: var(--ink);
+}
+.docs-toc {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid var(--line);
+}
+.docs-toc a {
+  padding: 8px 16px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  border-left: 2px solid transparent;
+  margin-left: -1px;
+  transition: color 0.14s ease, border-color 0.14s ease;
+}
+.docs-toc a:hover {
+  color: var(--ink);
+}
+.docs-toc a.is-active {
+  color: var(--primary-strong);
+  border-left-color: var(--primary-strong);
+  font-weight: 600;
+}
+.docs-content {
+  min-width: 0;
+  max-width: 760px;
+}
+
+/* ── In-page table of contents (docs) ───────────────────── */
+.docs-page-toc {
+  margin: 0 0 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 14px;
+}
+.docs-page-toc > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+  list-style: none;
+}
+.docs-page-toc > summary::-webkit-details-marker {
+  display: none;
+}
+.docs-page-toc > summary::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  transition: transform 0.15s ease;
+}
+.docs-page-toc[open] > summary::after {
+  transform: rotate(180deg);
+}
+.docs-page-toc-count {
+  color: var(--muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.docs-page-toc-list {
+  margin: 0;
+  padding: 0 16px 14px;
+  list-style: none;
+}
+.docs-page-toc-list ol {
+  margin: 0;
+  padding-left: 18px;
+  list-style: none;
+}
+.docs-page-toc-list li {
+  margin: 2px 0;
+}
+.docs-page-toc-list a {
+  color: var(--muted);
+}
+.docs-page-toc-list a:hover {
+  color: var(--ink);
+}
+/* Right rail on wide screens: the same list without the disclosure widget.
+   Hidden by default, so below the breakpoint the collapsible block above the
+   prose remains the only in-page navigation (`display: none` also keeps the
+   hidden copy out of the accessibility tree). */
+.docs-page-toc-rail {
+  display: none;
+  position: sticky;
+  top: calc(var(--nav-h) + 24px);
+  align-self: start;
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+  font-size: 14px;
+}
+.docs-page-toc-rail-title {
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.docs-page-toc-rail .docs-page-toc-list {
+  padding: 0;
+}
+@media (min-width: 1200px) {
+  /* A third column only fits if the page gets more room: 240 + gap + 1fr + gap
+     + 200 still leaves the prose column near its 760px cap. */
+  .docs-detail {
+    max-width: 1320px;
+    grid-template-columns: 240px minmax(0, 1fr) 200px;
+    gap: 40px;
+  }
+  .docs-page-toc {
+    display: none;
+  }
+  .docs-page-toc-rail {
+    display: block;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .docs-page-toc > summary::after {
+    transition: none;
+  }
+}
+
+/* ── Markdown (docs): Vercel docs prose ─────────────────── */
+.markdown-body {
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+/* Anchors from the in-page TOC must clear the sticky header. */
+.markdown-body :is(h1, h2, h3, h4) {
+  scroll-margin-top: calc(var(--nav-h) + 20px);
+}
+.markdown-body h1 {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  margin: 8px 0 20px;
+}
+.markdown-body h2 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 40px 0 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: calc(var(--nav-h) + 20px);
+}
+.markdown-body h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 28px 0 10px;
+  scroll-margin-top: calc(var(--nav-h) + 20px);
+}
+.markdown-body p {
+  margin: 0 0 14px;
+  color: var(--muted);
+}
+.markdown-body p strong,
+.markdown-body li strong,
+.markdown-body td strong {
+  color: var(--ink);
+}
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0 0 14px;
+  padding-left: 22px;
+  color: var(--muted);
+}
+.markdown-body li {
+  margin: 4px 0;
+}
+.markdown-body li::marker {
+  color: var(--muted-2);
+}
+.markdown-body a {
+  color: var(--primary);
+}
+.markdown-body a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.markdown-body blockquote {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--ink);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--bg-soft);
+  color: var(--muted);
+}
+.markdown-body blockquote > :last-child {
+  margin-bottom: 0;
+}
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 28px 0;
+}
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+.markdown-body th,
+.markdown-body td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.markdown-body th {
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.markdown-body tr:nth-child(even) td {
+  background: var(--bg-soft);
+}
+.markdown-body :not(pre) > code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.markdown-body pre {
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+  overflow-x: auto;
+}
+.markdown-body pre code {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* highlight.js tokens (theme-aware) */
+.hljs-keyword,
+.hljs-built_in,
+.hljs-type {
+  color: var(--primary);
+}
+.hljs-string,
+.hljs-number {
+  color: var(--green);
+}
+.hljs-comment {
+  color: var(--muted-2);
+}
+.hljs-title,
+.hljs-function .hljs-title {
+  color: var(--amber);
+}
+
+/* ── Footer 的样式已交回 theme-classic ──────────────────────────────────
+   原 `.footer` / `.footer-inner` / `.footer-brand` / `.footer-tagline` /
+   `.footer-cols` / `.footer-col` / `.footer-bottom` 等规则属于**已删除的自定义 Footer**。
+   它们与 theme-classic 的 `.footer` 同名且排在 Infima 之后，会把 `footer--dark` 的深底
+   覆盖成 `var(--bg)`（浅色），导致浅色文字落在浅色背景上、页脚几乎看不清。
+   页脚现在完全由原生组件 + Infima 渲染，这里不再保留任何相关规则。 */
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 820px) {
+  .docs-detail {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .docs-sidebar {
+    position: static;
+  }
+  .docs-toc {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-left: none;
+  }
+  .docs-toc a {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    margin-left: 0;
+    padding: 7px 14px;
+  }
+  .docs-toc a.is-active {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--bg);
+  }
+  .docs-back {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .hero {
+    padding: 72px 0 64px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Market catalog ─────────────────────────────────── */
+.market {
+  padding: 72px 0 96px;
+}
+.market-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.market-header h1 {
+  margin: 12px 0 8px;
+  font-size: 40px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.market-header .subtle {
+  margin: 0;
+}
+.market-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 28px 0 16px;
+}
+.market-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.market-tab:hover {
+  border-color: var(--ink);
+}
+.market-tab.is-active {
+  background: var(--cta);
+  border-color: var(--cta);
+  color: var(--cta-ink);
+}
+.market-tab-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  opacity: 0.75;
+}
+.market-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 560px;
+  margin-bottom: 28px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+}
+.market-search input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+.market-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+.market-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.market-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+.market-kind {
+  align-self: flex-start;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.market-card h3 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.4;
+}
+.market-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.market-head h3 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.4;
+}
+.market-avatar,
+.market-avatar-fallback {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+.market-avatar {
+  object-fit: cover;
+  background: var(--bg-soft);
+}
+.market-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: hsl(var(--avatar-h, 12) 55% 38%);
+  background: hsl(var(--avatar-h, 12) 85% 93%);
+}
+[data-theme="dark"] .market-avatar-fallback {
+  color: hsl(var(--avatar-h, 12) 80% 80%);
+  background: hsl(var(--avatar-h, 12) 50% 18%);
+}
+.market-version {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.market-card p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.market-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+.market-tag {
+  font-size: 12px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.market-empty {
+  padding: 48px 0;
+  font-size: 17px;
+}
+.market-empty .subtle {
+  display: block;
+  margin-top: 8px;
+  font-size: 14px;
+}
+@media (max-width: 720px) {
+  .market {
+    padding: 48px 0 64px;
+  }
+  .market-header h1 {
+    font-size: 30px;
+  }
+}
+
+/* ══ Premium motion & gradient layer (landing) ════════════
+   Pure-CSS/JS-driven decorations. Everything collapses under
+   `prefers-reduced-motion: reduce` (see the override at the end). */
+
+/* ── Scroll progress hairline (fixed, top of viewport) ──── */
+.scroll-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 40;
+  pointer-events: none;
+}
+.scroll-progress::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 50%;
+  transform: scaleX(var(--progress, 0));
+  background: var(--primary);
+}
+
+/* ── Reveal on scroll (gated by .js-fx so no-JS keeps content visible) ── */
+.js-fx [data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.js-fx [data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+/* Stats cascade 与 term-line 交错入场已随旧区块移除。 */
+
+/* ── Hero entrance choreography (pure animation, inline delays) ── */
+.js-fx .hero-badge,
+.js-fx .hero h1,
+.js-fx .hero-sub,
+.js-fx .hero-actions,
+.js-fx .hero-shot {
+  opacity: 0;
+  transform: translateY(22px);
+  animation: fx-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+@keyframes fx-rise {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Hero aurora: three drifting gradient blobs ─────────── */
+.hero-aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.5;
+  will-change: transform;
+}
+.aurora-a {
+  width: 640px;
+  height: 640px;
+  left: max(-180px, calc(50% - 900px));
+  top: -300px;
+  background: radial-gradient(closest-side, rgba(240, 78, 62, 0.45), transparent 72%);
+  animation: fx-drift-a 26s ease-in-out infinite alternate;
+}
+.aurora-b {
+  width: 720px;
+  height: 720px;
+  right: max(-200px, calc(50% - 920px));
+  top: -180px;
+  background: radial-gradient(closest-side, rgba(245, 158, 80, 0.4), transparent 72%);
+  animation: fx-drift-b 32s ease-in-out infinite alternate;
+}
+.aurora-c {
+  width: 560px;
+  height: 560px;
+  left: calc(50% - 280px);
+  bottom: -360px;
+  background: radial-gradient(closest-side, rgba(255, 124, 104, 0.26), transparent 72%);
+  animation: fx-drift-c 24s ease-in-out infinite alternate;
+}
+@keyframes fx-drift-a {
+  to {
+    transform: translate3d(150px, 70px, 0) scale(1.15);
+  }
+}
+@keyframes fx-drift-b {
+  to {
+    transform: translate3d(-130px, 100px, 0) scale(1.1);
+  }
+}
+@keyframes fx-drift-c {
+  to {
+    transform: translate3d(70px, -90px, 0) scale(1.18);
+  }
+}
+
+/* ── Hero grid + center glow ────────────────────────────── */
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 30%, transparent 75%);
+}
+.hero-glow {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: min(860px, 92vw);
+  height: 420px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(240, 78, 62, 0.14), transparent 70%);
+}
+
+/* ── Misc helpers ───────────────────────────────────────── */
+.subtle-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ── Mobile: lighter blobs ──────────────────────────────── */
+@media (max-width: 640px) {
+  .aurora-blob {
+    filter: blur(60px);
+    opacity: 0.4;
+  }
+}
+
+/* ── Hero title: warm sheen sweep ───────────────────────── */
+.hero-title {
+  background: linear-gradient(
+    100deg,
+    var(--ink) 24%,
+    #ff8a70 44%,
+    #ffb59f 50%,
+    #ff8a70 56%,
+    var(--ink) 76%
+  );
+  background-size: 250% 100%;
+  background-position: 85% 0;
+  color: var(--ink);
+  /* 兜底：给末行下伸部留出渐变背景，避免字形底部被裁。 */
+  padding-bottom: 0.08em;
+  animation: fx-sheen 9s ease-in-out infinite;
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .hero-title {
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+@keyframes fx-sheen {
+  0%,
+  100% {
+    background-position: 85% 0;
+  }
+  50% {
+    background-position: 15% 0;
+  }
+}
+
+/* ── Reduced motion: keep everything visible, stop motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .js-fx [data-reveal],
+  .js-fx .hero-badge,
+  .js-fx .hero h1,
+  .js-fx .hero-sub,
+  .js-fx .hero-actions,
+  .js-fx .hero-shot {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+  .aurora-blob {
+    animation: none !important;
+  }
+  .hero-title {
+    animation: none !important;
+  }
+}
+
+/* ── FAQ ─────────────────────────────────────────────────── */
+.faq {
+  padding: 96px 0;
+  background: var(--bg-soft);
+  border-top: 1px solid var(--line);
+}
+.faq h2 {
+  font-size: clamp(28px, 3.4vw, 40px);
+  letter-spacing: -0.03em;
+}
+.faq-list {
+  max-width: 760px;
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.faq-item {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.faq-item summary {
+  padding: 16px 20px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+  list-style: none;
+  position: relative;
+  padding-right: 44px;
+}
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+.faq-item summary::after {
+  content: "+";
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 16px;
+  color: var(--muted-2);
+  transition: transform 0.2s ease;
+}
+.faq-item[open] summary::after {
+  content: "−";
+}
+.faq-item > p {
+  padding: 0 20px 16px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+
+/* ── Responsive: FAQ ─────────────────────────────────────── */
+@media (max-width: 640px) {
+  .faq {
+    padding: 64px 0;
+  }
+  .hero-actions .btn-lg {
+    min-height: 44px;
+    padding: 0 20px;
+    font-size: 14px;
+  }
+}
+
+
+/* ══ Market page: gradient title / toolbar / card motion ═══ */
+
+/* Shared gradient display title (hero has its own dark-band variant;
+   light pages get the ink→blue drift). */
+.page-title-gradient {
+  background: linear-gradient(120deg, var(--ink) 30%, var(--primary) 72%);
+  background-size: 200% 100%;
+  background-position: 0% 0;
+  animation: fx-title-drift 12s ease-in-out infinite alternate;
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .page-title-gradient {
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+@keyframes fx-title-drift {
+  to {
+    background-position: 100% 0;
+  }
+}
+
+.market {
+  position: relative;
+  overflow: hidden;
+}
+.market::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -260px;
+  width: 760px;
+  height: 520px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(240, 78, 62, 0.07), transparent 70%);
+  pointer-events: none;
+}
+[data-theme="dark"] .market::before {
+  background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(240, 78, 62, 0.13), transparent 70%);
+}
+.market-updated {
+  margin-top: 6px;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.market-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin: 28px 0 20px;
+}
+.market-toolbar .market-tabs {
+  margin: 0;
+}
+.market-toolbar .market-search {
+  flex: 1 1 320px;
+  max-width: 560px;
+  margin: 0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.market-toolbar .market-search:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.market-search-clear {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--bg-soft);
+  color: var(--muted);
+}
+.market-search-clear:hover {
+  color: var(--ink);
+}
+.market-kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted-2);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 1px 7px;
+  background: var(--bg-soft);
+}
+
+.market-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  animation: fx-card-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(min(var(--card-i, 0), 11) * 55ms);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+@keyframes fx-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.market-card:hover {
+  border-color: transparent;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.market-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), var(--primary-soft), transparent 70%);
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.market-card:hover::before {
+  opacity: 1;
+}
+.market-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--primary) 55%, transparent),
+    color-mix(in srgb, var(--primary) 28%, transparent)
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.market-card:hover::after {
+  opacity: 1;
+}
+
+.market-avatar {
+  opacity: 0;
+  transform: scale(0.94);
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.market-avatar.is-loaded {
+  opacity: 1;
+  transform: none;
+}
+.market-head h3 {
+  transition: color 0.15s ease;
+}
+.market-card:hover .market-head h3 {
+  color: var(--primary);
+}
+
+.market-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 72px 0;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  color: var(--muted);
+  text-align: center;
+}
+.market-empty svg {
+  color: var(--muted-2);
+}
+.market-empty .subtle {
+  font-size: 14px;
+}
+.market-count {
+  margin-top: 20px;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .market-toolbar .market-search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+
+/* ── Reduced motion additions (market) ──────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .market-card {
+    animation: none !important;
+  }
+  .market-avatar {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .page-title-gradient {
+    animation: none !important;
+  }
+}
+
+/* ══ 新版落地页（Octop 五段式）：install / why / cta ═══════ */
+
+/* ── 三步上手（安装方式标签卡）──────────────────────────── */
+.install {
+  padding: 96px 0;
+}
+.install-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 48px;
+  align-items: center;
+}
+.install-copy h2 {
+  font-size: clamp(30px, 3.8vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.install-copy .subtle {
+  margin-top: 14px;
+}
+.install-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--hero-tint) 40%, var(--surface)), var(--surface) 70%);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.install-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.install-tab {
+  padding: 10px 16px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.14s ease, border-color 0.14s ease;
+}
+.install-tab[aria-selected="true"] {
+  color: var(--primary-strong);
+  border-bottom-color: var(--primary);
+}
+.install-tab:hover {
+  color: var(--ink);
+}
+.install-panel {
+  padding: 22px 24px 24px;
+}
+.install-hint {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+  margin-bottom: 14px;
+}
+.install-cmd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+}
+.install-cmd code {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.install-note {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.install-note a {
+  color: var(--primary);
+}
+.install-note a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.install-platforms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.install-platform {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 14px;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.install-platform:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.install-platform-arch {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* ── 为什么选择（卖点按钮 + 详情面板）───────────────────── */
+.why {
+  padding: 96px 0;
+  background: var(--bg-soft);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.why-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.why-inner h2 {
+  font-size: clamp(30px, 3.8vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.why-inner .subtle {
+  margin-top: 14px;
+}
+.why-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 40px;
+  margin-top: 40px;
+  align-items: start;
+}
+.why-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.why-tab {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  transition: border-color 0.14s ease, color 0.14s ease, background 0.14s ease;
+}
+.why-tab:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+.why-tab[aria-selected="true"] {
+  color: var(--primary-strong);
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.why-tab-icon {
+  display: inline-flex;
+  color: var(--primary);
+}
+.why-detail {
+  position: sticky;
+  top: calc(var(--nav-h) + 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.why-detail-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+.why-detail h3 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.why-detail p {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.75;
+  margin: 0;
+}
+
+/* ── 尾部 CTA ───────────────────────────────────────────── */
+.cta {
+  position: relative;
+  overflow: hidden;
+  padding: 120px 0 128px;
+  background: linear-gradient(180deg, var(--bg) 0%, var(--hero-tint) 100%);
+}
+.cta-inner {
+  position: relative;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 24px;
+  text-align: center;
+}
+.cta-inner h2 {
+  font-size: clamp(30px, 4vw, 48px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  max-width: 22ch;
+  margin: 0 auto;
+}
+.cta-inner .subtle {
+  margin: 16px auto 0;
+}
+.cta-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 36px;
+  flex-wrap: wrap;
+}
+
+/* ── Metrics strip ──────────────────────────────────────── */
+.metrics {
+  padding: 48px 0 72px;
+  position: relative;
+}
+.metrics-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+}
+.metric-card {
+  position: relative;
+  padding: 24px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.metric-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+}
+.metric-val {
+  font-size: clamp(28px, 3.2vw, 38px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+.metric-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.metric-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ── Reusable Section Header ────────────────────────────── */
+.section-head {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 52px;
+}
+.section-head .eyebrow {
+  justify-content: center;
+}
+.section-head h2 {
+  font-size: clamp(28px, 3.6vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+.section-head .subtle {
+  margin: 14px auto 0;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* ── Workflow Steps ─────────────────────────────────────── */
+.workflow {
+  padding: 96px 0;
+  border-top: 1px solid var(--line);
+  position: relative;
+  overflow: hidden;
+}
+.workflow-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.workflow-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.workflow-step:hover {
+  transform: translateY(-3px);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+}
+.workflow-step-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-soft);
+  margin-bottom: 20px;
+}
+.workflow-step h3 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+  color: var(--ink);
+}
+.workflow-step p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.workflow-step-slot {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--line);
+}
+
+/* ── Features Grid (Architecture Pillars) ───────────────── */
+.features {
+  padding: 96px 0;
+  background: var(--bg-soft);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+.features-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.feature-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.feature-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+}
+.feature-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.feature-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+.feature-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  background: var(--bg-soft);
+}
+.feature-card h3 {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 10px;
+  color: var(--ink);
+}
+.feature-card p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* ── Ecosystem Section ──────────────────────────────────── */
+.ecosystem {
+  padding: 96px 0;
+  position: relative;
+}
+.ecosystem-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.ecosystem-groups {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 40px;
+}
+.ecosystem-group {
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ecosystem-group-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+.ecosystem-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ecosystem-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  transition: border-color 0.14s ease, transform 0.14s ease;
+}
+.ecosystem-chip:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+.ecosystem-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+/* ── 新版落地页响应式 ───────────────────────────────────── */
+@media (max-width: 1024px) {
+  .metrics-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .workflow-grid,
+  .features-grid,
+  .ecosystem-groups {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .install-inner,
+  .why-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .why-detail {
+    position: static;
+  }
+}
+@media (max-width: 680px) {
+  .metrics-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .workflow-grid,
+  .features-grid,
+  .ecosystem-groups {
+    grid-template-columns: 1fr;
+  }
+  .metrics {
+    padding: 24px 0 48px;
+  }
+  .workflow,
+  .features,
+  .ecosystem {
+    padding: 64px 0;
+  }
+}
+@media (max-width: 640px) {
+  .install,
+  .why {
+    padding: 64px 0;
+  }
+  .cta {
+    padding: 88px 0 96px;
+  }
+}

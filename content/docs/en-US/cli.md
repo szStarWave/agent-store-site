@@ -1,6 +1,6 @@
 # CLI usage
 
-`flowy-agent-store` is the entry point of the packaged single-file runtime: the backend and the embedded Web UI are served on the **same port**. Most interaction happens in the browser workbench; the CLI only takes launch options — running it starts the server, and there is one optional `init` subcommand (the first-run setup wizard).
+`flowy-agent-store` serves as the entry point for the single-binary runtime: the backend service and the embedded Web UI are hosted on the same port. The CLI manages startup parameters and defaults directly into server mode, providing an optional `init` command for setup assistance.
 
 ## Launch the Web UI
 
@@ -9,63 +9,63 @@ flowy-agent-store
 flowy-agent-store --port 8787
 ```
 
-By default it listens on `http://127.0.0.1:8787/` and opens the workbench in your default browser.
+Listens on `http://127.0.0.1:8787/` by default and automatically launches the workbench in the default browser.
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| `--port <n>` | Listen port (shared by the API and the embedded Web UI); `--port 0` lets the OS pick a free one | `8787` |
-| `--host <ip>` | Bind address; keep `127.0.0.1` for local-only | `127.0.0.1` |
-| `--data-dir <dir>` | Backend data directory (database + storage). The default is **per channel** (e.g. `%LOCALAPPDATA%\Flowy\Nomi-dev` on the `dev` channel) | Per-user Flowy/Nomi directory |
-| `--auth` | Require login; without it the local trusted mode needs no login | Off |
-| `--no-open` | Don't open the browser after start | Opens |
-| `--admin-user <name>` | Admin username provisioned on first run (authenticated mode) | `admin` |
-| `--admin-password <pw>` | Admin password provisioned on first run; if omitted, the first workbench visitor creates it | None |
-| `-h, --help` / `-V, --version` | Show help / version | — |
+| `--port <n>` | Listening port (shared between API and embedded Web UI); `--port 0` dynamically binds an available port | `8787` |
+| `--host <ip>` | Bind address; keep `127.0.0.1` for local-only isolation | `127.0.0.1` |
+| `--data-dir <dir>` | Backend data storage directory (database and snapshots); defaults to per-channel user data path (e.g. `%LOCALAPPDATA%\Flowy\Nomi-dev` on the `dev` channel) | Per-user Flowy/Nomi data directory |
+| `--auth` | Enable password authentication; disabled by default for trusted local execution | Disabled |
+| `--no-open` | Prevent opening the browser upon service startup | Auto-open |
+| `--admin-user <name>` | Pre-seeded administrator username in authenticated mode | `admin` |
+| `--admin-password <pw>` | Pre-seeded administrator password in authenticated mode; prompts on first Web UI access if omitted | None |
+| `-h, --help` / `-V, --version` | Display help information / version number | — |
 
 ## Subcommands
 
-Exactly one; anything else is the serve mode described above:
+In addition to direct execution, the CLI provides the following subcommand:
 
 | Subcommand | What it does |
 | --- | --- |
-| `flowy-agent-store init` | First-run setup wizard: writes the builtin marketplace sources into `~/.agent-store/config.toml` (and optionally collects one API provider). Running it is optional — the `[default_marketplaces]` defaults shown in the [Configuration file](/en-US/docs/configuration) are exactly what it writes |
+| `flowy-agent-store init` | Interactive setup wizard: writes default marketplace sources into `~/.agent-store/config.toml` and guides the initial API provider setup. This step is optional; default built-in sources apply automatically if skipped, as documented in [Configuration file](/en-US/docs/configuration) |
 
 ## The line it prints on stdout at startup
 
-Once the socket is bound the host **always** prints one machine-readable JSON line to stdout (tracing logs also go to stdout, so it is not guaranteed to be the first line):
+Upon successfully binding the socket, the host process emits a single-line machine-readable JSON readiness event to standard output (system tracing also writes to stdout; this line is not guaranteed to be the first emitted line):
 
 ```json
 {"agent_store":"listening","host":"127.0.0.1","port":8787,"url":"http://127.0.0.1:8787/","protocol_version":"…","version":"…","auth":"disabled-local"}
 ```
 
-- This is the **SDK spawn contract**: the SDK scans lines and takes only the object carrying `"agent_store": "listening"`; it contains **no secrets**.
-- `auth` is either `disabled-local` (local trusted mode) or `required` (authenticated mode).
-- `protocol_version` is the protocol **fingerprint**, and the SDK compares it for **strict equality** — a client built against an old value cannot connect to a new host. Upgrade the binary and the client together; see the [Upgrade and migration guide](/en-US/docs/upgrade).
+- **SDK Process Contract**: The SDK parses stdout line by line and matches only the JSON payload containing `"agent_store": "listening"`. This payload exposes no secret credentials.
+- The `auth` field declares the access mode: `disabled-local` (trusted local mode) or `required` (password authentication).
+- `protocol_version` represents the protocol contract fingerprint. The client verifies it via strict equality during handshake. Refer to the [Upgrade and migration guide](/en-US/docs/upgrade) for version compatibility details.
 
 ## Examples
 
 ```bash
-# Port taken? Pick another (the UI follows the page origin, no manual change needed)
+# Bind an alternate port if default is occupied (Web UI auto-connects to same origin)
 flowy-agent-store --port 8788
 
-# Access from other machines on the LAN (pair with --auth)
+# Enable access across local network (recommended with --auth enabled)
 flowy-agent-store --host 0.0.0.0 --auth
 
-# Login-required setup with a pre-seeded admin
+# Seed administrator credentials in authenticated mode
 flowy-agent-store --auth --admin-user admin --admin-password <pw>
 
-# Custom data directory / headless server without opening a browser
+# Headless server deployment with custom data directory
 flowy-agent-store --data-dir /data/agent-store --no-open
 ```
 
 ## Environment variables
 
-Every option also has an env equivalent: `AGENT_STORE_HOST`, `AGENT_STORE_PORT`, `AGENT_STORE_AUTH` (`1`/`true`/`yes`/`on` enables), `NOMIFUN_DATA_DIR` / `FLOWY_DATA_DIR` (data directory), `NOMIFUN_ADMIN_USERNAME` / `NOMIFUN_ADMIN_PASSWORD` (first-run admin in authenticated mode).
+All command-line arguments support environment variable equivalents: `AGENT_STORE_HOST`, `AGENT_STORE_PORT`, `AGENT_STORE_AUTH` (set to `1`/`true`/`yes`/`on` to enable), `NOMIFUN_DATA_DIR` / `FLOWY_DATA_DIR` (custom data directory), and `NOMIFUN_ADMIN_USERNAME` / `NOMIFUN_ADMIN_PASSWORD` (initial admin credentials for authenticated mode).
 
 ## Notes
 
-- Fixed port by design: if it's taken, the process exits with an error — stop the other holder (desktop app or a previous instance) or pass another `--port`. **The one exception is `--port 0`** (the OS picks a free port; read the JSON line above for the real address) — the easiest option for parallel instances and CI.
-- Zero-config UI: the embedded workbench connects to the same origin it was served from, so changing `--port` / `--host` needs no manual address change; Settings can still override it.
-- Exclusive data-directory lock: it shares state with the desktop app by default, so running both at once fails fast — that write-protection is intentional, not a bug.
-- Binding a non-loopback address (`--host 0.0.0.0`) without `--auth` gives anyone who can reach the port full host access — use a trusted network or require login.
-- Import, runs and status all live in the Web UI workbench. The CLI and Web UI share the same App Server protocol boundary — neither touches the internal database or credential storage directly.
+- **Port Conflict Handling**: The process terminates with an error if the specified port is already bound. Terminate the conflicting process or supply an alternative via `--port`. Specifying `--port 0` allows dynamic allocation by the OS, with the assigned port reported via the stdout JSON line (recommended for CI and multi-instance concurrency).
+- **Web UI Origin Discovery**: The embedded frontend automatically binds to the origin serving it. Modifying `--port` or `--host` requires no manual configuration updates in the client, while custom API overrides remain supported via Settings.
+- **Data Directory Mutual Exclusion**: The backend acquires an exclusive file lock on the data directory. Concurrent instances targeting the same directory fail fast to protect against database corruption.
+- **Network Security Constraints**: Binding to a non-loopback interface (such as `--host 0.0.0.0`) without `--auth` grants full administrative host access to all reachable network clients. Always enable `--auth` in non-trusted networks.
+- **Architectural Boundary**: Resource import, execution scheduling, and state inspection are strictly mediated by the App Server protocol. Direct filesystem access to internal databases or secret storage is forbidden.

@@ -1,26 +1,24 @@
 #!/usr/bin/env node
 /**
- * 把已提交的市场树拷进构建产物，落点为 `/source/<market>/…`。
+ * 把已提交的市场树里**目录页引用的头像**拷进构建产物，落点为 `/source/<market>/…`。
  *
- * 这棵树刻意不放在 `public/`：Vite 会在构建期拷贝 `publicDir`，而约 8.9k 文件的树
- * 放在那里会让 React Router 的预渲染步骤失败（dev server 在准备 out dir 时卡住），
- * 还会拖慢每次 HMR 重载。在 `react-router build` 之后再拷贝，既保住了开发循环与
- * 预渲染的速度，对外 URL 也仍然是 `/source/…`。
+ * 这棵树刻意不放在 `static/`：Docusaurus 会在构建期拷贝整个静态目录，而约 22.6k 文件的树
+ * 放在那里会让构建卡在拷贝阶段（旧站同理，只是那时叫 `public/`）。因此本脚本在
+ * `docusaurus build` **之后**运行，只把产物需要的文件放进去，对外 URL 仍是 `/source/…`。
  *
  * 由 `package.json` → `build` 串起来，所以 EdgeOne Makers 也会跑到它。
  *
- * 从 2026-09-17 起还支持**按市场选择性产物**（`SITE_HOSTED_MARKETS`）：不整树托管的市场
- * 只保留目录页引用的图片。背景是 EdgeOne Makers 的两条产物上限——20,000 个文件与单文件
- * 25 MiB——而三个市场合计 22,612 个文件，**默认全托管必然超限，部署因此常年是红的**。
+ * 支持**按市场选择性托管**（`SITE_HOSTED_MARKETS`）：不整树托管的市场只保留目录页引用的图片。
+ * 背景是 EdgeOne Makers 的两条产物上限——20,000 个文件与单文件 25 MiB——而三个市场合计
+ * 22,612 个文件，**全托管必然超限**。
  *
  * 现状（doc 30）：**三个市场都迁到了 ModelScope 的 zip 归档**（`pack:market` 打包、
- * `publish:market` 上传），本站不再整树托管任何一个。客户端改成一次请求取一个归档，
- * 官方源也不再指向本站的 `/source/<market>/…`。于是本站只留目录页头像（约 648 个文件），
- * 产物从 22,706 降到约 742。「只托管部分市场」这条能力仍留着：将来若要回退，
- * 改 `HOSTED` 这一个常量即可。
+ * `publish:market` 上传），本站不再整树托管任何一个，`HOSTED_DEFAULT` 是空数组。客户端改成
+ * 一次请求取一个归档，官方源也不再指向本站的 `/source/<market>/…`。于是本站只留目录页头像
+ * （约 648 个文件）。「只托管部分市场」这条能力仍留着：将来若要回退，改这一个常量即可。
  *
- * 注意开发态与它不一致：`vite.config.ts` 的 `marketSourcePlugin()` 直接从 `market-source/`
- * 托管 `/source/**`、不看这个开关，所以本地永远能看到完整树。
+ * 注意开发态与它不一致：`src/plugins/market-source-dev.ts` 直接把 `market-source/` 托管在
+ * `/source/**` 上、不看这个开关，所以本地永远能看到完整树（仅 dev，不进产物）。
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -31,8 +29,9 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const siteRoot = path.resolve(here, "..");
 const sourceRoot = path.join(siteRoot, "market-source");
-const clientRoot = path.join(siteRoot, "build", "client");
-const outRoot = path.join(clientRoot, "source");
+// Docusaurus 的产物目录是 `build/`（旧站是 React Router 的 `build/client/`）。
+const outRoot = path.join(siteRoot, "build", "source");
+const clientRoot = path.join(siteRoot, "build");
 const SNAPSHOT = path.join(siteRoot, "content", "market.json");
 const MARKETS = ["experts", "skills", "connectors"];
 
@@ -86,7 +85,7 @@ if (!existsSync(sourceRoot)) {
   process.exit(1);
 }
 if (!existsSync(clientRoot)) {
-  console.error("[copy-market-tree] build/client not found — run `bun run build` first");
+  console.error("[copy-market-tree] build/ 不存在 —— 先跑 `bun run build`");
   process.exit(1);
 }
 
@@ -142,4 +141,4 @@ for (const market of MARKETS) {
   }
   console.log(`[copy-market-tree] ${market.padEnd(11)} files=${n}`);
 }
-console.log(`[copy-market-tree] → build/client/source (${total} files；整树托管：${HOSTED.join(" / ")}）`);
+console.log(`[copy-market-tree] → build/source (${total} files；整树托管：${HOSTED.join(" / ")}）`);

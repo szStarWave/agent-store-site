@@ -3,6 +3,13 @@
 更新时间：2026-09-16（第 2 版：纳入 `user-experience-architect` 核验结果与最新预检数字）  
 状态：方案与基线记录，尚未同步或修改专家市场生成物。
 
+> **迁移说明（2026-09-20 补注）**：本文记录的是迁移到 Docusaurus **之前**的一次批次导入，
+> 其中的体积与路径基线（`build/client`、`build/client/source/experts/`）描述的是旧站的
+> React Router 产物形态。本站现在的产物目录是 `build/`，且三个市场已改由 ModelScope 的
+> zip 归档分发，站点不再整树托管。**保留这些数字原样作为历史记录**，现值见
+> [`market-maintenance.md`](market-maintenance.md) 的文末基线表与
+> [`docusaurus-migration.md`](docusaurus-migration.md)。
+
 ## 0. 给后续 agent 的背景与执行摘要
 
 ### 0.1 为什么要做这件事
