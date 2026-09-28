@@ -69,12 +69,12 @@ The core execution engine `allo` is built entirely in Rust and distributed as a 
 The presentation tier (Web UI, TypeScript SDK, CLI) communicates with the `allo` runtime via the standardized **App Server Protocol**:
 
 - **Transport Medium**: Uses a bidirectional WebSocket connection for primary event streams (session lifecycles, real-time token streams, tool confirmations, DAG step transitions), supplemented by HTTP endpoints for binary uploads, health checks, and readiness probes;
-- **JSON-RPC 2.0 Specification**: All control commands (such as `session/create`, `session/prompt`, `run/cancel`) adhere to JSON-RPC 2.0, providing strict request-response matching and strongly typed error codes;
-- **Opaque Identifiers**: All identifiers exposed to clients (e.g. `sess_...`, `run_...`, `snap_...`) are obfuscated opaque strings, hiding database auto-increment keys and physical host file paths;
+- **JSON-RPC 2.0 Specification**: All control commands (such as `conversation/create`, `conversation/send`, `run/cancel`) adhere to JSON-RPC 2.0, providing strict request-response matching and strongly typed error codes;
+- **Opaque Identifiers**: All identifiers exposed to clients (e.g. `conv_...`, `run_...`, `snap_...`) are obfuscated opaque strings, hiding database auto-increment keys and physical host file paths;
 - **Protocol Version Fingerprint Handshake**: Upon port binding, the host outputs a single JSON notification to stdout containing the protocol fingerprint and authentication status. Clients must verify exact equality of `protocol_version` before proceeding:
 
 ```json
-{"agent_store":"listening","host":"127.0.0.1","port":8787,"url":"http://127.0.0.1:8787/","protocol_version":"2026.03.v1","version":"0.8.2","auth":"disabled-local"}
+{"agent_store":"listening","host":"127.0.0.1","port":8787,"url":"http://127.0.0.1:8787/","protocol_version":"fp-12","version":"0.8.2","auth":"disabled-local"}
 ```
 
 ### 2.3 Asset Ingestion & Immutable Snapshot Engine

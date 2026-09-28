@@ -126,29 +126,34 @@ With assets installed, you can start your first interactive Agent run:
 Developers can also drive executions programmatically via the TypeScript SDK:
 
 ```typescript
-import { AgentStoreClient } from "@flowy-agent-store/sdk";
+import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
 
 // Connect to the local App Server instance
-const client = new AgentStoreClient({ endpoint: "ws://127.0.0.1:8787" });
+const client = new AppServerClient({
+  transport: new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws"),
+  client: { name: "my-quickstart-app", version: "1.0.0" },
+});
 await client.connect();
 
-// Create a session and bind an expert
-const session = await client.sessions.create({
-  title: "Quick Start Session",
-  expert_id: "expert_general_assistant",
+// Create a conversation and bind an expert
+const conv = await client.conversations.create({
+  name: "Quick Start Session",
+  agentId: "expert_general_assistant",
 });
 
-// Dispatch a streaming prompt Run
-const run = await client.sessions.prompt(session.session_id, {
-  prompt: "Explain Flowy Agent Store's local-first architecture in three sentences.",
-});
-
-// Stream real-time events
-for await (const event of client.runs.streamEvents(run.run_id)) {
-  if (event.event_type === "message/delta") {
-    process.stdout.write(event.payload.delta);
+// Subscribe to real-time conversation event stream
+client.conversations.subscribe(conv.id, (event) => {
+  if (event.kind === "text_delta") {
+    process.stdout.write(event.delta);
   }
-}
+});
+
+// Dispatch inference prompt
+await client.conversations.send(
+  conv.id,
+  "Explain Flowy Agent Store's local-first architecture in three sentences.",
+  crypto.randomUUID(),
+);
 ```
 
 For more SDK methods and streaming patterns, see [TypeScript SDK Reference](/en-US/docs/typescript-sdk) and [SDK Examples](/en-US/docs/examples-sdk).

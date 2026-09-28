@@ -160,7 +160,7 @@ client.teams.list(): Promise<TeamSummary[]>;
 client.teams.get(teamId: string): Promise<TeamDetail>;
 
 // 3. Export complete team definition package (supports optional semver validation)
-client.teams.export(teamId: string, teamVersion?: string): Promise<TeamExportResult>;
+client.teams.export(teamId: string, teamVersion?: string): Promise<ExpertPack>;
 ```
 
 #### `skills` — Skill discovery and file inspection
@@ -173,10 +173,10 @@ client.skills.list(): Promise<SkillSummary[]>;
 client.skills.get(skillId: string): Promise<SkillDetail>;
 
 // 3. List static file inventory within a skill directory
-client.skills.files(skillId: string): Promise<SkillInventory>;
+client.skills.files(skillId: string): Promise<SkillFileList>;
 
 // 4. Read binary file bytes from skill package
-client.skills.readFile(skillId: string, filePath: string): Promise<Uint8Array>;
+client.skills.readFile(skillId: string, path: string): Promise<Uint8Array>;
 ```
 
 #### `connectors` — Connector management, registration, and tool proxying
@@ -214,8 +214,9 @@ client.store.installed(): Promise<StoreItem[]>;
 
 // 2. State-machine installation and update tracking
 client.store.install(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
+client.store.update(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
 client.store.checkUpdates(): Promise<StoreItem[]>;
-client.store.updateHint(item: StoreItem): "none" | "uninstall_reinstall" | "unknown";
+client.store.updateHint(item: StoreItem): "none" | "update" | "unknown";
 
 // 3. Toggle activation and complete uninstallation
 client.store.setEnabled(item: StoreItem, enabled: boolean): Promise<StoreOperationOutcome>;
@@ -244,6 +245,7 @@ client.conversations.cancel(conversationId: string): Promise<ConversationView>;
 
 // 3. Streaming subscriptions and model metadata
 client.conversations.follow(conversationId: string): Promise<ConversationSubscription>;
+client.conversations.subscribe(conversationId: string, onEvent: (event: ConversationEvent) => void): () => void;
 client.conversations.modelOptions(): Promise<ConversationModelOptions>;
 ```
 
@@ -261,8 +263,9 @@ client.runs.result(runId: string): Promise<RunResult>;
 client.runs.events(query: RunEventsQuery): Promise<RunEvent[]>;
 
 // 3. Task intervention, approvals, and streaming
-client.runs.cancel(input: RunCancelInput): Promise<RunView>;
-client.runs.answerDecision(input: DecisionAnswerInput): Promise<RunView>;
+client.runs.cancel(input: CancelRunInput): Promise<RunView>;
+client.runs.steer(input: SteerRunInput): Promise<RunView>;
+client.runs.answerDecision(input: AnswerDecisionInput): Promise<RunView>;
 client.runs.follow(runId: string): Promise<EventSubscription>;
 ```
 
