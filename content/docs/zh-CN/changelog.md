@@ -156,10 +156,10 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-**规划中功能特性（尚未随版本发布）**：
-- **连接器凭据表单解耦（fp-9 至 fp-11）**：连接器元数据增加 `credential` 配置块，新增凭据管理接口（`connector/credential/*`）；敏感字段在传输中双向脱敏。
-- **模板动态注册能力（fp-11）**：新增 `connector/register` 接口，支持通过配置模板直接注册私有 MCP Server，由模板占位符派生凭据字段；协议指纹更新为 `fp-11`。
-- **SDK 资源物化助手（0.1.0-beta.8）**：提供 `exportAgent`、`exportTeam` 与 `materializePack` 工具函数，用于将资产定义与引用文件写入本地磁盘目录。
+**近期落地与规划中功能特性（已完成方案落地或准备发版）**：
+- **连接器用户凭据体系（fp-9 至 fp-11）**：连接器元数据增加 `credential` 配置块与 `token-schema.json` 声明支持；新增 `connector/credential/{get,set,clear}` 凭据管理接口与 `connector/register` 私有 MCP 服务动态模板注册；敏感字段在网络传输中双向脱敏（`[REDACTED]`），值单向加密存储于安全金库。
+- **SDK 资源物化助手（0.1.0-beta.8）**：`@flowy-agent-store/sdk` 提供 `exportAgent`、`exportTeam` 与 `materializePack` 工具函数，支持将资产定义与引用技能文件规范化物化写入本地磁盘目录（`members/<id>/persona.md` 与去重后的 `skills/<name>/...`）。
+- **商店条目原地安全更新（fp-12）**：新增 `store/update-entry` 协议动词（线协议升级为 `fp-12`，协议方法总数扩充至 **78**，HTTP 路由映射数扩充至 **53**）；提供原子升级语义（先装新版、验证通过后才释放旧版、失败安全回退）；专家保预设 ID 原地升级；客户端增加 `store.update()` 与 `updateHint` 策略判断。
 
 当前稳定发布版本为 `0.1.0-beta.7`（对应线协议 `fp-8`）。未收录于本页的版本特性不应假定为已生效。
 

@@ -102,6 +102,7 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 - **写一次只读（Write-Once Read-Only）**：快照一旦完成物理归档并写入本地数据库，其目录属性设为只读。来源内容的任何修改或上游更新均触发生成全新的快照实体；
 - **运行期执行版本锁定**：执行中的会话（Session）与运行实例（Run）强绑定启动时的 `snapshot_id`，杜绝因外部源或本地库动态更新导致的运行时漂移；
 - **确定性溯源与审计**：执行事件流中记录完整的快照 ID、定义版本与 SHA-256 摘要，支持 100% 确定性历史审计与场景重放；
+- **原地安全原子更新（store/update-entry）**：当条目发布新版本后，宿主支持通过 `store.update` 执行原子升级。升级管线遵循「先装新版、验证通过后才释放旧版运行时」原则；若新版本构建或探针失败，旧版本物理产物完整保留，绝不破坏现有会话。专家的预设 ID 在升级时保持不变（不重复产生同名预设），技能完成新目录物化后清理旧目录，连接器在校验共享物理记录后平滑过渡；
 - 系统的执行引擎分层与快照隔离原理详见 [架构设计与系统规范](/zh-CN/docs/architecture)。
 
 ---
@@ -133,6 +134,29 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
     "url": "https://mcp.example.com/sse",
     "headers": { "X-Api-Key": "secret:MY_API_KEY" }
   }
+}
+```
+
+### 5.1 凭据声明与表单解耦（token-schema.json）
+
+连接器支持三种标准认证模式（`credential.mode`）：`none`（无需凭据）、`oauth`（浏览器 OAuth 流程）与 `token`（用户填写 Key/Token）。对于 `token` 模式，连接器目录需提供 `token-schema.json` 声明字段契约：
+
+```json
+{
+  "title": { "zh": "高德地图密钥配置", "en": "AMap Key Setup" },
+  "description": { "zh": "请输入高德开放平台 Web 服务 API Key", "en": "Enter AMap Web Service API Key" },
+  "doc_url": { "zh": "https://lbs.amap.com/dev/key", "en": "https://lbs.amap.com/dev/key" },
+  "doc_label": { "zh": "前往获取高德 Key", "en": "Get AMap Key" },
+  "fields": [
+    {
+      "key": "AMAP_API_KEY",
+      "label": { "zh": "API Key", "en": "API Key" },
+      "placeholder": { "zh": "请输入 Web 服务 Key", "en": "e.g. 88374f..." },
+      "required": true,
+      "sensitive": true,
+      "type": "string"
+    }
+  ]
 }
 ```
 

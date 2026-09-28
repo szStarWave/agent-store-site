@@ -102,6 +102,7 @@ The primary output of ingestion is a **PluginSnapshot**, representing a frozen, 
 - **Write-Once Read-Only**: Once archived to disk and registered in the database, directory permissions are locked as read-only. Any change in source files mandates generating a new snapshot;
 - **In-Flight Execution Version Pinning**: Running sessions and Runs bind to the specific `snapshot_id` active at creation time, insulating active executions from concurrent catalog refreshes;
 - **Deterministic Audit & Replay**: Execution event streams record Snapshot IDs, schema revisions, and SHA-256 digests, supporting 100% reproducible historical replays;
+- **In-Place Atomic Updates (store/update-entry)**: When new upstream versions are published, the host executes atomic upgrades via `store.update`. The pipeline adheres to an "install new version first, release old runtime only upon full verification" strategy; if the new version fails initialization or probing, the old physical assets are fully preserved without disrupting in-flight sessions. Expert preset IDs remain stable across updates (avoiding duplicate presets), skills cleanly replace directories, and connectors verify shared database rows before seamless handoff;
 - For execution engine layering and snapshot isolation details, refer to [Architecture & System Specification](/en-US/docs/architecture).
 
 ---
@@ -133,6 +134,29 @@ Three transport configurations are supported within the `transport` object:
     "url": "https://mcp.example.com/sse",
     "headers": { "X-Api-Key": "secret:MY_API_KEY" }
   }
+}
+```
+
+### 5.1 Credential declarations and decoupled forms (token-schema.json)
+
+Connectors support three standard authentication modes (`credential.mode`): `none` (no authentication needed), `oauth` (browser OAuth 2.0 flow), and `token` (user-supplied key or token). For `token` mode, connector packages supply a `token-schema.json` declaring the field contract:
+
+```json
+{
+  "title": { "zh": "高德地图密钥配置", "en": "AMap Key Setup" },
+  "description": { "zh": "请输入高德开放平台 Web 服务 API Key", "en": "Enter AMap Web Service API Key" },
+  "doc_url": { "zh": "https://lbs.amap.com/dev/key", "en": "https://lbs.amap.com/dev/key" },
+  "doc_label": { "zh": "前往获取高德 Key", "en": "Get AMap Key" },
+  "fields": [
+    {
+      "key": "AMAP_API_KEY",
+      "label": { "zh": "API Key", "en": "API Key" },
+      "placeholder": { "zh": "请输入 Web 服务 Key", "en": "e.g. 88374f..." },
+      "required": true,
+      "sensitive": true,
+      "type": "string"
+    }
+  ]
 }
 ```
 

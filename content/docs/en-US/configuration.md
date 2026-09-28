@@ -417,7 +417,7 @@ disabled = ["mcp__<key>__*"]
 
 ### Sensitive credential references (`secret:NAME`)
 
-The `env` and `headers` sections support `secret:NAME` syntax. During process initialization, the host resolves references against `[credentials]` (or process environment variables) directly into memory, preventing plain-text token exposure.
+The `env`, `headers`, and `url` template sections support `secret:NAME` or `${NAME}` syntax. During process execution, the host resolves references against `~/.agent-store/config.toml`'s `[credentials]` table (or process environment variables), preventing plain-text token exposure.
 
 ```toml
 # Adjacent config.toml
@@ -425,7 +425,7 @@ The `env` and `headers` sections support `secret:NAME` syntax. During process in
 UPSTREAM_TOKEN = "…"    # Injected into secret:UPSTREAM_TOKEN
 ```
 
-> The `[credentials]` table is inaccessible via management APIs. Unresolved secret references emit system warnings and omit the corresponding parameter.
+> **Security isolation notice**: Standard management endpoints (such as `config/get` and `config/set`) strictly mask the `[credentials]` table to protect against network scanning and credential dumping. For connectors requiring API Keys or tokens, the host exposes a principal-scoped directed write surface (`connector/credential/set`) that accepts only declared keys from `token-schema.json`. Stored secrets are permanently masked in network payloads (write-only, never echoed); unresolved secret references trigger fail-closed omission and system warnings.
 
 ### Web UI management and persistent editing
 

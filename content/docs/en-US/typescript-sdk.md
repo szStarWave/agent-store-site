@@ -383,15 +383,28 @@ try {
 The SDK provides higher-level utilities to materialize expert and team configurations directly to local disk:
 
 ```ts
-import { exportAgent, exportTeam, materializePack } from "@flowy-agent-store/sdk";
+import { exportAgent, exportTeam, materializePack, type ExportResult } from "@flowy-agent-store/sdk";
 
-// Export individual expert definition and referenced skill files to disk
-const result = await exportAgent(client, "software-architect", "./dist/architect");
+// 1. Export individual expert definition and referenced skill files to disk
+const result: ExportResult = await exportAgent(client, "software-architect", "./dist/architect");
 console.log(`Exported skills: ${result.writtenSkills.join(", ")}`);
+if (result.danglingSkills.length > 0) {
+  console.warn("Unresolved dangling skill references:", result.danglingSkills);
+}
 
-// Export complete multi-agent team package
+// 2. Export complete multi-agent team package (Leader member positioned first)
 await exportTeam(client, "dev-team", "./dist/dev-team");
+
+// 3. Materialize in-memory ExpertPack structure directly to disk directory
+const pack = await client.agents.export("software-architect");
+await materializePack(client, pack, "./dist/architect-manual");
 ```
+
+Materialized assets adhere to the following standard directory tree layout:
+- `expert-pack.json`: Complete serialized `ExpertPack` specification (including `pack_format`, metadata, and dependency lists);
+- `persona.md`: Individual agent Prompt instructions (generated only when `kind === "agent"`);
+- `members/<member.id>/persona.md`: Member-specific Persona instructions (generated only when `kind === "team"`);
+- `skills/<name>/...`: Referenced skill file trees, automatically deduplicated and aggregated at top level.
 
 ---
 
