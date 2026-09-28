@@ -1,31 +1,31 @@
 # 插件与市场
 
-Agent Store 原生支持**插件**与**插件市场**：插件是打包好的能力集合（专家、团队、技能、连接器、命令），市场则是这些能力的分发渠道。与运行时一致，插件体系同样遵循**本地优先**——市场只负责发现与分发，导入后的一切（快照、凭据、运行）都发生在本机。
+Flowy Agent Store 原生支持插件（Plugin）与插件市场（Marketplace）：插件是预打包的功能资产集合（包含专家、专家团、技能、连接器及命令），市场则提供这些资产的发现与分发通道。系统遵循**本地优先（Local-First）**架构原则——市场负责资产编排与分发，导入后的数据快照、凭据托管与执行调度完全在本地进行。
 
 ## 1. 插件包含什么
 
-一个插件（Plugin）可以携带以下组件，导入后成为 Catalog 中可复用的标准化定义：
+插件导入后转换为资源目录（Catalog）中标准化、可复用的组件定义：
 
 | 组件 | 说明 |
 | --- | --- |
-| 专家（AgentDefinition） | 可复用的专家配置，在运行时通过 Preset 机制承载 |
-| 专家团（AgentTeamDefinition） | 固定成员名册 + 协作规则 |
-| 技能（SkillDefinition) | 原子能力，被 Agent 调用，不独立对话 |
-| 连接器（ConnectorDefinition） | 与外部系统交互的受管能力，附凭据 Schema |
-| 命令（CommandDefinition） | 用户可调用的提示/命令 |
-| 钩子 / LSP | 生命周期钩子与语言服务器（元数据级） |
+| 专家（AgentDefinition） | 可复用的 Agent 角色配置，运行时基于 Preset 机制挂载 |
+| 专家团（AgentTeamDefinition） | 多 Agent 协作编排定义，包含成员名册与协作策略 |
+| 技能（SkillDefinition） | 原子功能扩展，由 Agent 按需调用，不独立建立会话 |
+| 连接器（ConnectorDefinition） | 外部系统集成组件（MCP），附带凭据模式声明（Token Schema） |
+| 命令（CommandDefinition） | 用户交互指令与预置 Prompt 模板 |
+| 钩子 / LSP | 运行时生命周期钩子与语言服务扩展（元数据定义） |
 
 ## 2. 市场从哪里来
 
-市场来源在 [`~/.agent-store/config.toml`](/zh-CN/docs/configuration) 中声明，支持五种 `source_kind`：
+市场源通过 [`~/.agent-store/config.toml`](/zh-CN/docs/configuration) 进行声明，支持五种 `source_kind` 协议：
 
 | source_kind | source | 说明 |
 | --- | --- | --- |
-| `zip` | HTTP(S) 归档地址 | **官方三个市场用的就是这一种**：一个归档，**归档根目录即市场根**（清单在归档根，不套一层目录），一次请求取回整棵条目树 |
-| `url` | HTTPS/HTTP 清单地址 | 建议同时提供目录枚举（`_files.txt`）以支持条目树镜像 |
-| `github` | GitHub 仓库 | 从 GitHub 拉取市场清单 |
-| `git` | Git 仓库地址 | 通过 Git 协议同步 |
-| `directory` | 本地目录路径 | 直接指向本地市场/插件根 |
+| `zip` | HTTP(S) 归档地址 | **官方市场标准格式**：采用单归档分发，归档根目录即市场清单根路径，单次请求即可同步全量元数据 |
+| `url` | HTTPS/HTTP 清单地址 | 远程清单目录，建议提供文件索引清单（`_files.txt`）以支持增量树形镜像 |
+| `github` | GitHub 仓库 | 通过 GitHub 仓库分发市场清单 |
+| `git` | Git 仓库地址 | 基于 Git 协议克隆与同步 |
+| `directory` | 本地目录路径 | 直接映射本地文件系统的市场开发目录 |
 
 ```toml
 # 官方三个市场各是一个托管在 ModelScope 上的 zip 归档；
@@ -43,15 +43,15 @@ source_kind = "zip"
 source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
 ```
 
-`zip` 源的新鲜度与完整性都用归档自身的 sha256：客户端对稳定 URL 发 `HEAD`，读 `X-Linked-Etag`（就是内容 sha256）；摘要没变就不下载，下载下来的字节也按同一个摘要校验。`.zip` 在 ModelScope 上走 LFS，稳定地址会 **302** 到带临时签名（`auth_key`）的 CDN 地址——**只写稳定地址，永远不要把 CDN 地址抄进配置或文档**。
+`zip` 格式的缓存更新基于内容摘要：客户端发起 HTTP `HEAD` 请求获取响应头 `X-Linked-Etag`（即归档文件 sha256 摘要）；摘要未变更时跳过下载，下载后通过校验该摘要确保文件完整性。注意：ModelScope LFS 稳定下载地址会自动 302 重定向至附带时效签名的 CDN 节点，配置与文档中**必须始终使用官方持久稳定 URL**，禁止硬编码临时 CDN 地址。
 
-`url` / `git` / `github` / `directory` 全部保留，第三方源可以继续用整树镜像：`url` 源的市场根目录下可以放一份预生成的 `_files.txt`（一行一个相对路径），客户端据此逐文件镜像整棵条目树。
+`url` / `git` / `github` / `directory` 等源类型支持全树镜像同步：对于 `url` 类型，服务端可在根目录提供预编译的 `_files.txt`（包含相对路径清单），客户端据此同步镜像文件。
 
-启动时运行时会拉取并解析这些市场清单，Web UI 的 **市场** 页面（顶部导航 / 页脚入口）即可浏览全部条目：专家、技能与连接器。
+启动时运行时自动解析已配置的市场清单，通过 Web UI 顶部导航的 **市场** 入口即可检索专家、技能与连接器。
 
 ## 3. 导入：从市场到 Catalog
 
-在市场中安装一个条目（`store/install-entry`）后，导入器（Importer）按固定顺序处理：
+通过市场触发安装（`store/install-entry`）时，导入引擎（Importer）执行以下标准化流程：
 
 ```text
 1. 定位来源（市场清单条目 / 插件根 / 技能或连接器目录）
@@ -62,70 +62,70 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 6. 按组件类型产出标准化定义，注册到本地 Catalog
 ```
 
-支持的来源格式：
+受支持的清单来源格式包括：
 
-- **CodeBuddy / WorkBuddy 插件**：`.codebuddy-plugin/plugin.json` + 组件目录
-- **WorkBuddy Skill 市场**：`.codebuddy-skill/marketplace.json` + `skills/<slug>/`（单个含 `SKILL.md` 的目录同样支持）
-- **WorkBuddy Connector 市场**：`.codebuddy-connector/connectors.json` + `connectors/<slug>/`
+- **CodeBuddy / WorkBuddy 插件包**：`.codebuddy-plugin/plugin.json` 与附属组件目录
+- **WorkBuddy Skill 市场包**：`.codebuddy-skill/marketplace.json` 与 `skills/<slug>/` 结构（同时兼容包含 `SKILL.md` 的独立目录）
+- **WorkBuddy Connector 市场包**：`.codebuddy-connector/connectors.json` 与 `connectors/<slug>/` 结构
 
 ## 4. PluginSnapshot：不可变快照
 
-导入的核心产出是 **PluginSnapshot**——来源内容的一次不可变镜像：
+资产导入的核心产物为 **PluginSnapshot**，代表资源内容在特定时间点的不可变镜像：
 
-- 包含来源类型、来源 URI、声明版本、`content_digest`、组件清单与兼容性报告；
-- 来源内容一旦变化，必须生成**新**快照，历史快照永不原地修改；
-- 运行中的 Agent / Team 冻结其目标快照，不受 Catalog 后续更新影响；
-- 历史运行可追溯到具体 snapshot、definition version 与 content digest。
+- 记录来源类型、来源 URI、声明版本、`content_digest`、组件元数据清单与兼容性评估报告；
+- 来源内容更新时必须生成新快照实例，既有快照保持只读不可变；
+- 执行中的 Agent / Team 强绑定执行快照版本，不受后续 Catalog 变动影响；
+- 审计与复盘可精确溯源至具体 Snapshot ID、定义版本与内容摘要。
 
-未通过兼容性校验的组件会被标记状态而不是静默丢弃；许可证不明的资源不会进入公开分发。
+未通过静态兼容性检查的组件将记录降级状态而非静默丢弃；未明确版权或再分发授权的资源禁止加入公开分发。
 
 ## 5. 凭据与安全
 
-- 导入连接器时**只建立凭据 Schema**，不读取真实密钥；
-- 真实凭据只在运行时进入本地安全存储，Web / SDK 仅接触状态、账号标识与过期时间；
-- 市场同步与导入全程不做远程执行，执行语义唯一归属本地 `allo` Runtime。
+- **凭据模式隔离**：连接器导入时仅注册凭据 Schema 结构，不读取或持久化敏感密钥；
+- **运行时动态注入**：敏感凭据仅留存于本地受控安全存储，外部接口（Web / SDK）仅暴露凭据配置状态与脱敏标识；
+- **本地执行闭环**：市场同步与导入解析全程不执行远程非受信代码，工具执行语义严格受限在本地 `allo` Runtime 沙箱内。
 
 ## 6. 自研 MCP Server / 自定义技能怎么接入
 
-**自研 MCP Server 不需要走 Marketplace 注册接口。** 市场只是分发渠道。MCP server 的来源其实有**三条**，落点与生效范围各不相同：
+开发者接入自定义 MCP Server 无需发布到官方市场。MCP Server 支持三种接入路径：
 
 | 来源 | 落点 | 生效范围 | 适合 |
 | --- | --- | --- | --- |
-| `~/.agent-store/mcp.json` 声明文件 | **不写库**；宿主启动时读一次 | 该宿主的会话 | 本机固定的私有 server。文件格式、字段与校验见[配置文件](/zh-CN/docs/configuration) |
-| MCP 配置接口（运行时自己的 HTTP 面） | `mcp_servers` 数据行 | 会话 / Run 里显式绑定 | 自研 / 私有部署，且需要连接测试与 OAuth |
-| 市场 / 插件分发 | 安装时自动落到 `mcp_servers` 行 | 同上一行 | 面向公开分发 |
+| `~/.agent-store/mcp.json` 声明文件 | **不写入持久数据库**；宿主启动时加载一次 | 当前宿主的所有会话 | 本机私有服务。配置语法与字段校验详见 [配置文件](/zh-CN/docs/configuration) |
+| MCP 配置接口（HTTP 管理接口） | `mcp_servers` 数据表 | 会话或 Run 中显式绑定 | 自研/私有部署服务，支持连通性探测与 OAuth 鉴权 |
+| 市场 / 插件分发包 | 安装后写入 `mcp_servers` 数据表 | 同上 | 面向组织或公开分发的集成包 |
 
-三者可以并存。同名时**声明文件 > `mcp_servers` 行**，而一次调用里的显式绑定优先级最高；来源优先级与读取时机只在[配置文件](/zh-CN/docs/configuration)那一节定义，本节不重复。
+优先级规则：同名配置下，**`mcp.json` 声明文件优先于 `mcp_servers` 数据表**；而在具体调用时显式指定的绑定拥有最高优先级。
 
-下面两条路径说的是**后两条**（都落 `mcp_servers`）：
+以下详细说明持久化注册的两种实现路径：
 
 ### 路径 A：直接注册（自研 / 私有部署推荐）
 
-通过 MCP 配置接口按名注册（这是运行时自己的 HTTP 接口，宿主就提供它；Agent Store 的 Web UI **不用**这套接口——那个界面读写的是 `mcp.json` 声明文件，见[配置文件](/zh-CN/docs/configuration)）：
+通过宿主提供的 HTTP 管理接口按名称注册：
 
-- `POST /api/mcp/servers` — 注册/更新一个 MCP Server（按名称 upsert）
-- `POST /api/mcp/servers/import` — 批量导入
-- `POST /api/mcp/test-connection` — 连接测试
-- `/api/mcp/oauth/*` — 标准 OAuth（PKCE Loopback）登录
+- `POST /api/mcp/servers` — 注册或更新 MCP Server（按名称 upsert）
+- `POST /api/mcp/servers/import` — 批量导入配置
+- `POST /api/mcp/test-connection` — 执行连通性测试
+- `/api/mcp/oauth/*` — 标准 OAuth（PKCE Loopback）鉴权端点
 
-传输层支持三种，按你的服务器形态选择（下面这段是 `transport` 字段的**取值形状**，整份请求体还要带 `name`；`mcp.json` 用的是另一套写法，见[配置文件](/zh-CN/docs/configuration)）：
+传输层支持三种形态（`transport` 载荷结构）：
 
 ```jsonc
-// 本地进程
+// 本地子进程 (stdio)
 { "stdio": { "command": "./my-mcp-server", "args": [], "env": {} } }
-// Streamable HTTP（远程推荐）
+// Streamable HTTP (远程推荐)
 { "http": { "url": "https://mcp.example.com/mcp", "headers": { "Authorization": "Bearer <token>" } } }
-// SSE（旧式远程）
+// SSE (兼容模式远程)
 { "sse": { "url": "https://mcp.example.com/sse", "headers": {} } }
 ```
 
-API Key / 自定义鉴权直接写在传输层的 `headers`；标准 OAuth 由运行时负责登录、存储与请求注入。注册后在会话/Run 中绑定该 Server（`selected_mcp_server_ids`），运行时 `McpManager` 建连并把工具注入模型。
+静态 API Key 与自定义鉴权头通过 `headers` 注入；OAuth 流程由运行时代理登录、密钥持久化及请求签名。注册完成后，在会话或 Run 启动配置中声明 `selected_mcp_server_ids`，运行时将在执行时按需建连并注入工具定义。
 
 ### 通过 TypeScript SDK 接入
 
-SDK 的连接器客户端是**目录读面 + OAuth 直通 + 调用代理**：`list` / `get` / `status` / `test`（`get` 与 `test` 会带上每个工具的参数 schema，先看清怎么调再调）、`authStart` / `authStatus` / `waitForAuth` / `logout`，以及真正执行工具的 `call`（走宿主自己的连接，需宿主在 `[connector_proxy]` 里放行，见[配置文件](/zh-CN/docs/configuration)）。**但** App Server 协议**没有**「注册 MCP Server」的 WebSocket 方法，所以 SDK 内的自研 MCP Server 接入走协议原生的**导入 → 安装**链路：把 Server 打包为连接器市场目录，`import/run` 导入为不可变 PluginSnapshot，`install/run` 安装时由运行时自动注册进 `mcp_servers`。
+TypeScript SDK 提供目录查询、OAuth 流程代理及工具调用功能（`list` / `get` / `status` / `test` / `call`）。针对自研 MCP Server，可通过原生的**导入 $\to$ 安装**链路实现程序化编排：
 
-1. 写一个最小连接器市场目录——**两级**：市场清单列条目，`source` 指向条目自己的目录，server 声明装在那个目录里：
+1. 组织两级目录结构的连接器市场源：
 
    ```text
    my-market/
@@ -144,7 +144,7 @@ SDK 的连接器客户端是**目录读面 + OAuth 直通 + 调用代理**：`li
    }
    ```
 
-   条目按 `id` 或 `name` 唯一，`source` **必须是相对路径**；`mcp.json` 里 `mcpServers` 的字段与 `~/.agent-store/mcp.json` 是**同一套**（`command` / `url` / `headers` / `env`），导入器按它逐条产出连接器组件——字段与校验见[配置文件](/zh-CN/docs/configuration)。
+   `source` 必须为相对路径；`mcp.json` 内的 `mcpServers` 结构遵循标准规范：
 
    ```json
    {
@@ -154,7 +154,7 @@ SDK 的连接器客户端是**目录读面 + OAuth 直通 + 调用代理**：`li
    }
    ```
 
-2. SDK 会话内导入并安装（`import` / `install` 暂无子客户端封装，用 `transport.request` 透传协议方法）：
+2. 在 SDK 会话中执行导入与安装：
 
    ```ts
    import { launchHarness } from "@flowy-agent-store/sdk";
@@ -181,23 +181,23 @@ SDK 的连接器客户端是**目录读面 + OAuth 直通 + 调用代理**：`li
    await harness.close();
    ```
 
-3. 标准 OAuth 直接用 SDK 的 `connector.authStart(connectorId)` 发起、`connector.waitForAuth(connectorId)` 等到结束（失败原因从它的 `error` 拿）；
-4. Run 时通过 `mentions` 注入：`{ kind: "connector", id }` 追加到 run 的 MCP 列表（须为已启用 Server）；技能则用 `{ kind: "skill", id }` 挂载。安装状态可用 `install/status` 查询、`install/enable` / `install/disable` 管理。
+3. OAuth 鉴权通过 `connector.authStart(connectorId)` 与 `connector.waitForAuth(connectorId)` 完成异步等待；
+4. 运行时通过 `mentions` 动态挂载组件：连接器使用 `{ kind: "connector", id }`，技能使用 `{ kind: "skill", id }`。状态可通过 `install/status` 查询，并支持 `install/enable` / `install/disable` 管理。
 
 ### 路径 B：市场 / 插件分发（面向公开分发）
 
-希望别人能从市场一键安装时，把自研 MCP Server 打包为：
+公开发布资产时，可将 MCP Server 打包为以下形式：
 
-- **连接器市场条目**：`.codebuddy-connector/connectors.json` + `connectors/<slug>/`，发布到一个市场源（`source_kind` 支持 `zip` / `url` / `github` / `git` / `directory`）；
-- **插件级 MCP**：插件包内 `.codebuddy-plugin/` 附带 `.mcp.json`（`mcpServers` 字段）。
+- **独立连接器市场包**：`.codebuddy-connector/connectors.json` 搭配 `connectors/<slug>/`，托管至任一市场源；
+- **组合插件包内置 MCP**：在插件包的 `.codebuddy-plugin/` 目录下提供 `.mcp.json`（配置 `mcpServers` 键值）。
 
-用户安装后同样落到 `mcp_servers`——两条路径最终殊途同归。注意 V1 的 OAuth 仅支持标准 PKCE Loopback，自定义 URI scheme、公网 relay 等复杂授权暂不支持。
+用户安装后自动同步至本地 `mcp_servers` 注册表。
 
 ### 自定义 Skill
 
-- SDK / 协议接入：`import/run`（`source_kind: "workbuddy-skill-market"`，单个含 `SKILL.md` 的目录同样支持）→ `install/run`，随后 Run 中 mention 挂载；
-- 本机接入：`POST /api/skills/import`（目录或 zip）导入为用户技能；
-- 市场分发：按 `.codebuddy-skill/marketplace.json` + `skills/<slug>/` 布局发布到市场源。
+- **SDK / 协议接入**：调用 `import/run`（`source_kind: "workbuddy-skill-market"`）生成快照，调用 `install/run` 完成注册，并在 Run 中通过 `mentions` 挂载；
+- **本机文件导入**：通过 `POST /api/skills/import`（支持本地目录或 ZIP 归档）导入为私有技能；
+- **市场源分发**：按照 `.codebuddy-skill/marketplace.json` + `skills/<slug>/` 标准结构发布。
 
 ## 7. 延伸阅读
 
