@@ -1,24 +1,24 @@
 # Quick start
 
-Flowy Agent Store packages a local-first agent runtime as a **single executable** with a full Web UI embedded. No database, container, or background service to install — download, launch, and open your browser.
+Flowy Agent Store distributes a local-first agent runtime and an embedded Web UI as a **single executable**. The system requires no external database, container orchestration, or background daemon services.
 
 ## 1. Download and launch
 
-Download the archive for your platform from [GitHub Releases](https://github.com/szStarWave/agent-store-site/releases) and run it:
+Download the release archive for the target platform from [GitHub Releases](https://github.com/szStarWave/agent-store-site/releases), extract it, and execute the binary:
 
 ```bash
 flowy-agent-store
 ```
 
-The process starts the local App Server (default `http://localhost:8787`) and opens the workbench in your browser.
+The process initializes the local App Server (default `http://localhost:8787`) and launches the workbench in the default browser.
 
-> Local-first: execution, credentials and run state live only on your machine. The cloud is used solely for definitions, versions and distribution.
+> Local-first architecture: All execution logic, credentials, and session states reside exclusively on the local machine; the cloud is used solely for capability definitions, version metadata, and package distribution.
 
 ## 2. Import an Agent
 
-The workbench imports experts (Agents), Skills and Connectors from CodeBuddy / WorkBuddy directories. Imported content becomes an **immutable snapshot** you can query and run from the catalog.
+The workbench imports experts (Agents), Skills, and Connectors from CodeBuddy / WorkBuddy directory formats. Imported assets are converted into **immutable snapshots** available for catalog querying and execution.
 
-To set up the default marketplace sources and a provider first, run the optional first-run wizard:
+To preconfigure default marketplace sources and initialize model API providers, run the optional setup wizard:
 
 ```bash
 flowy-agent-store init
@@ -26,11 +26,11 @@ flowy-agent-store init
 
 ## 3. Start a run
 
-Pick an Agent from the catalog and choose **Run**. The workbench submits a Run; events, the plan (DAG) and Artifacts stream into the timeline and artifact panels.
+Select an Agent from the catalog and trigger execution to initialize a Run instance. Execution event streams, DAG orchestration plans, and generated artifacts stream into the workbench panels in real time.
 
 ## Next steps
 
-- Read [CLI usage](/en-US/docs/cli) for the full command set.
-- Read [Architecture](/en-US/docs/architecture) to understand the Runtime / App Server layering.
-- Read the [Compatibility matrix](/en-US/docs/compatibility) for platform and source support.
-- Writing your own integration (Node / Electron / browser): read the [TypeScript SDK reference](/en-US/docs/typescript-sdk) and the [TypeScript SDK cookbook](/en-US/docs/examples-sdk). **End users take the installer, developers take the npm packages** — two distinct paths.
+- Read [CLI usage](/en-US/docs/cli) for launch options and environment variables.
+- Read [Architecture](/en-US/docs/architecture) to understand runtime layering and protocol boundaries.
+- Read the [Compatibility matrix](/en-US/docs/compatibility) for platform and source format support.
+- To integrate programmatically within Node.js, Electron, or browser applications, refer to the [TypeScript SDK reference](/en-US/docs/typescript-sdk) and [TypeScript SDK cookbook](/en-US/docs/examples-sdk) (binary installers are recommended for end users; npm packages are provided for developers).

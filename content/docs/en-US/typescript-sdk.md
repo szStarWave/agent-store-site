@@ -1,78 +1,78 @@
 # TypeScript SDK reference
 
-Flowy Agent Store ships three companion TypeScript packages that let Node.js / Electron / browser applications talk to a local App Server in a type-safe way:
+Flowy Agent Store distributes three companion TypeScript packages providing strongly-typed integration with the local App Server across Node.js, Electron, and browser environments:
 
-| Package | Responsibility | Runtime | Depends on |
+| Package | Responsibility | Environment | Dependencies |
 | --- | --- | --- | --- |
-| `@flowy-agent-store/protocol` | Wire types (requests/responses/notifications/errors) | Any — zero runtime, no DOM/Node | — |
-| `@flowy-agent-store/client` | `AppServerClient` + 9 sub-clients + `Transport` abstraction | Any — no HTTP, no DOM, no Node | `@flowy-agent-store/protocol` |
-| `@flowy-agent-store/sdk` | Spawn the `flowy-agent-store` binary → loopback WebSocket → ready client | Node.js (`node:child_process`, …) | `@flowy-agent-store/client`, `@flowy-agent-store/protocol` |
+| `@flowy-agent-store/protocol` | Wire protocol type definitions (requests, responses, notifications, errors) | Universal (zero-runtime, no DOM/Node dependencies) | None |
+| `@flowy-agent-store/client` | `AppServerClient` core client, 9 domain sub-clients, and `Transport` abstractions | Universal (unbound from specific I/O mechanisms) | `@flowy-agent-store/protocol` |
+| `@flowy-agent-store/sdk` | Host runtime process management (binary spawning, loopback socket binding, client bootstrapping) | Node.js (requires `node:child_process` and related modules) | `@flowy-agent-store/client`, `@flowy-agent-store/protocol` |
 
-Mix and match: **types only** → `protocol`; **connect to an already-running App Server** (e.g. a desktop app) → `client` with your own `WebSocketTransport`; **launch the whole runtime yourself** → `launchHarness` from `sdk`.
+Combine packages according to integration context: consume `protocol` for **pure type contracts**; initialize `client` with `WebSocketTransport` to **connect to an active App Server**; or use `sdk`'s `launchHarness` to **manage local runtime lifecycles programmatically**.
 
-Runnable, copy-pasteable examples (Node / browser / Electron / Store / sessions / Runs) live in the [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
+Complete runnable recipes (Node, browser, Electron, store management, sessions, and run execution) are available in the [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
 
-> **This page is for developers.** End users do not need it — grab the installer and follow [Quick start](/en-US/docs/quick-start). Two distinct paths: **end users → installer / `install.ps1`**; **developers → npm packages (this page)**.
+> **Integration Notice**: This document targets software developers. Desktop end-users should install precompiled binary installers directly; see [Quick start](/en-US/docs/quick-start).
 
 ---
 
-## 1. Install
+## 1. Installation
 
 ```bash
-# Usually the sdk alone is enough (it re-exports client capabilities and spawns)
+# Usually sdk alone is sufficient (re-exports client and bundles child process orchestration)
 bun add @flowy-agent-store/sdk        # or npm install / pnpm add
 
-# Declare protocol explicitly when you import wire types
+# Explicitly declare when consuming protocol types standalone
 bun add @flowy-agent-store/protocol
 ```
 
-All packages ship ESM + CJS (`exports` maps `import` / `require` / `types`); they work out of the box in Node and bundlers.
+All packages distribute in dual ESM and CJS formats (providing `import`, `require`, and `types` declarations).
 
-> **Version status**: all three packages are `0.1.0-beta.*` pre-releases (the API is not frozen, and **no backward compatibility is promised during beta**). Pin an **exact** version in production — this page and the repo currently correspond to `0.1.0-beta.7` (the `beta` tag). Do not rely on a bare `bun add`: the registry's `latest` currently points at `0.1.0-beta.2`, **not** the newest `0.1.0-beta.7`. For dist-tag semantics, per-version upgrade steps and self-check commands see the [Upgrade and migration guide](/en-US/docs/upgrade).
-> **Protocol surface scope**: the `APP_SERVER_PROTOCOL_VERSION` example in §2 and the method counts in §5.3 (`52 / 77`) are taken from the **working tree**, which currently **matches the published artifacts** (since `0.1.0-beta.7`; earlier versions led them, and that batch shipped with this release — it is recorded in §8 of the [Upgrade and migration guide](/en-US/docs/upgrade), together with the self-check commands). The fingerprint is compared for **strict equality** (a client built against an old value cannot connect to a new runtime), so when you build your own binary or touch the protocol, read the constant in §2 rather than copying a value out of this page's prose.
-> **Runtime**: Node.js **≥ 22** (relies on the global `WebSocket`) or Bun; the lower bound is declared by each package's `engines.node`.
+> **Version Status**: Packages currently publish under `0.1.0-beta.*` prerelease semantics. Production environments should pin exact package revisions (such as `0.1.0-beta.7` documented here). Consult the [Upgrade and migration guide](/en-US/docs/upgrade) for lifecycle policies.
+> **Protocol Scope**: `APP_SERVER_PROTOCOL_VERSION` in §2 and method coverage metrics in §5.3 reflect current repository contracts. Protocol fingerprints enforce strict equality; cross-version clients and hosts are strictly incompatible.
+> **Runtime Environment**: Node.js **≥ 22** (requires global `WebSocket`) or Bun; version floors declared in respective package `engines.node` manifests.
 
 ---
 
-## 2. `@flowy-agent-store/protocol` — the wire layer
+## 2. `@flowy-agent-store/protocol` — Protocol Layer
 
-### 2.1 Position
+### 2.1 Role
 
-The single TypeScript source of truth for the wire contract: every request/response/notification type, the `APP_SERVER_PROTOCOL_VERSION` constant, and structured errors. **No transport and no I/O** — the only executable code is a handful of pure functions (error predicates and formatters, event decoding, localized text), so anything speaking the protocol can consume it.
+The single source of truth for the wire specification: exports all request, response, and notification contracts, the `APP_SERVER_PROTOCOL_VERSION` constant, and structured error models. The package is zero-I/O and contains only pure validation and utility routines.
 
-### 2.2 Main exports
+### 2.2 Core exports
 
-| Export | Meaning |
+| Export | Description |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | A contract **fingerprint** (**currently** `"fp-11"` in the working tree; the shape is an `fp-<n>` counter, incremented on each wire change and never reusing a past value. It was once a date stamp, but that is a *label, not the day of the change* — consecutive changes advanced it a day each, so it ran ahead of the calendar); the handshake and SDK checks compare it for strict equality |
-| `InitializeRequest` / `InitializeResult` | Handshake request/response (incl. `protocol_version`, server info) |
-| `ClientInfo` / `ClientCapabilities` | Caller self-description |
-| `StoreList` / `StoreInstallResult` | Winget-style unified catalog |
-| `AgentSummary` / `AgentDetail` | AgentDefinition catalog views |
-| `TeamSummary` / `TeamDetail` | AgentTeamDefinition catalog views |
-| `SkillSummary` / `SkillDetail` | Skill catalog views |
-| `ConnectorSummary` / `ConnectorDetail` / `ConnectorStatusView` / `ConnectorProbeResult` | Connector catalog / status / probe |
-| `OAuthStartResult` / `OAuthStatusView` | OAuth browser-flow state |
-| `ConversationView` / `ConversationMessage` / `ConversationEvent` / `ConversationSendReceipt` | Persistent conversations |
-| `RunReceipt` / `RunView` / `RunResult` / `RunEvent` | Run lifecycle |
-| `JsonRpcRequest` / `JsonRpcResponse` / `JsonRpcNotification` | Wire frame types |
-| `ServerNotification` | Server notifications (`event`, `conversation/event`, `conversation/list-changed`, `run/resync-required`, …) |
-| `WireError` | Server error payload |
+| `APP_SERVER_PROTOCOL_VERSION` | Protocol contract fingerprint (format `fp-<n>` monotonic identifier, currently `"fp-11"`). Enforces strict equality during initialization |
+| `InitializeRequest` / `InitializeResult` | Handshake request/response payload models (carrying `protocol_version` and host server metadata) |
+| `ClientInfo` / `ClientCapabilities` | Client self-description and feature negotiation claims |
+| `StoreList` / `StoreInstallResult` | Unified package catalog interfaces |
+| `AgentSummary` / `AgentDetail` | Agent expert catalog views |
+| `TeamSummary` / `TeamDetail` | Agent Team collaboration catalog views |
+| `SkillSummary` / `SkillDetail` | Skill capability catalog views |
+| `ConnectorSummary` / `ConnectorDetail` / `ConnectorStatusView` / `ConnectorProbeResult` | Connector catalog views, lifecycle statuses, and physical probe outcomes |
+| `OAuthStartResult` / `OAuthStatusView` | OAuth authorization flow lifecycle states |
+| `ConversationView` / `ConversationMessage` / `ConversationEvent` / `ConversationSendReceipt` | Persistent conversation session and message contracts |
+| `RunReceipt` / `RunView` / `RunResult` / `RunEvent` | Execution run lifecycle and event stream models |
+| `JsonRpcRequest` / `JsonRpcResponse` / `JsonRpcNotification` | Core wire framing types |
+| `ServerNotification` | Downstream server push notifications (events, list changes, resync signals) |
+| `WireError` | Standardized server error payloads |
 
-> There is **exactly one** protocol surface (`16` §7 decision 4): before a release there is no separate stable and experimental export set, and no `experimental` marker exists in the source. Full Team collaboration (`TeamRunInput` / `TeamSummary` / `TeamDetail`, …) and event cursor catch-up live on that same surface.
+> The protocol exposes a unified interface without experimental branches. Team orchestration and event cursor catch-up mechanics ship across the standard export surface.
 
-### 2.3 Error model (`errors.ts`)
+### 2.3 Error models (package `errors.ts`)
 
-**Branch on the stable `code`, never parse the human-readable message:**
+Callers must branch on stable `code` identifiers rather than human-readable `message` strings:
 
-| Class | Trigger | Key fields |
+| Type | Trigger | Key fields |
 | --- | --- | --- |
-| `AppServerError` | Server returned a JSON-RPC error | `code`, `requestId` (wire: `request_id`), `retryable`, `details` |
-| `TransportError` | Transport layer (connect/send/close) | `phase` (`connect`/`send`/`receive`/`close`), `retryable` |
-| `ProtocolError` | Local protocol validation failed | `kind` (`invalid_message` / `version_mismatch` / `unexpected_response`) |
-| `RequestTimeoutError` | Request timed out | `method`, `timeoutMs` |
+| `AppServerError` | Server-returned JSON-RPC error payload | `code`, `requestId` (`request_id` on the wire), `retryable`, `details` |
+| `TransportError` | Transport socket failure (connect, send, receive, close) | `phase` (`connect`/`send`/`receive`/`close`), `retryable` |
+| `ProtocolError` | Client-side protocol contract validation failure | `kind` (`invalid_message` / `version_mismatch` / `unexpected_response`) |
+| `RequestTimeoutError` | Request timeout exceeded | `method`, `timeoutMs` |
 
-Helpers:
+Utility error helpers:
 
 ```ts
 import { isAppServerError, isRetryableTransportError, formatError } from "@flowy-agent-store/protocol";
@@ -81,141 +81,69 @@ try {
   await client.runs.agent({ agentId, goal });
 } catch (error) {
   if (isAppServerError(error)) {
-    // stable code (e.g. version_mismatch / marketplace_not_found) — not the message
+    // Branch on stable code; do not parse message text
     console.log(error.code, error.retryable);
   } else if (isRetryableTransportError(error)) {
-    // connection dropped, safe to retry
+    // Socket disconnected; retryable
   }
-  console.log(formatError(error)); // the one shared UI rendering
+  console.log(formatError(error)); // Canonical UI error formatting
 }
 ```
 
-> Idempotency conflicts and policy denials are **never auto-retried** (`retryable: false`) — replaying them stacks side effects.
+> Idempotency conflicts (`conflict`) and policy denials (`policy_denied`) are strictly non-retryable (`retryable: false`).
 
 ---
 
-## 3. `@flowy-agent-store/client` — the transport-agnostic client
+## 3. `@flowy-agent-store/client` — Transport-Agnostic Client
 
-### 3.1 Position
+### 3.1 Role
 
-Pure business layer: every method goes through the injected `Transport`. No HTTP, no DOM, no Node in the package. The connection lifecycle (`connect → initialize → version check → initialized → ready`) lives here, so business code never knows whether the channel is WebSocket, stdio, or a future one-shot HTTP binding.
+Domain client abstraction: all methods execute across an injected `Transport` interface without binding to concrete I/O implementations. Lifecycle state transitions (`connect → initialize → version check → initialized → ready`) are encapsulated within this layer.
 
-### 3.2 The `Transport` interface
+### 3.2 `Transport` interface
 
 ```ts
 export interface Transport {
-  connect(): Promise<void>;                          // open the channel (idempotent)
-  request<T>(method: string, params: unknown): Promise<T>;  // request-response
-  notify(method: string, params: unknown): void;     // fire-and-forget
-  onNotification(listener: NotificationListener): () => void; // subscribe; returns unsubscribe
+  connect(): Promise<void>;                          // Idempotent socket setup
+  request<T>(method: string, params: unknown): Promise<T>;  // Request-response
+  notify(method: string, params: unknown): void;     // Unidirectional notification
+  onNotification(listener: NotificationListener): () => void; // Event subscription returning unsubscribe fn
   close(): void;
-  onLifecycle?(listener: (state: "open" | "closed") => void): () => void; // optional channel lifecycle
+  onLifecycle?(listener: (state: "open" | "closed") => void): () => void; // Optional socket state hooks
 }
 ```
 
-Built-in `WebSocketTransport` (browser + Node 22+/Bun, uses the global `WebSocket`):
+Built-in `WebSocketTransport` (compatible with modern browsers, Node 22+, and Bun via global `WebSocket`):
 
 ```ts
 import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
 
-const transport = new WebSocketTransport(
-  "ws://127.0.0.1:8787/api/app-server/ws",
-  { requestTimeoutMs: 30_000, connectTimeoutMs: 10_000, token: "optional-bearer" } // token becomes ?token= in browsers
-);
-const client = new AppServerClient({ transport, client: { name: "my-app", version: "0.1.0" } });
-await client.connect(); // initialize handshake + version check
+const transport = new WebSocketTransport({ url: "ws://127.0.0.1:8787/api/app-server/ws" });
+const client = new AppServerClient(transport);
+await client.connect();
 ```
 
-`WebSocketTransport` implementation contract (A2 / T8):
+### 3.3 Domain Sub-Clients
 
-- **`connect()` is idempotent and concurrency-safe**: concurrent calls share one dial (no second socket is opened); after `connectTimeoutMs` (default 10s) without opening it rejects `TransportError(phase: "connect", retryable: true)` and closes that socket.
-- **`close()` is terminal cleanup**: it settles every pending request and any in-flight `connect()` (`TransportError(phase: "close")`) and clears the listeners registered through `onNotification`. So **after closing, a new `connect()` must re-register its listeners** (`AppServerClient` re-arms its notification bridge automatically; custom transports must do it themselves).
-- **Stale-connection isolation**: events arriving late from a replaced or closed socket are ignored and never touch the current connection.
-- **No auto-reconnect**: a dropped connection only fails pending requests with `TransportError(retryable: true)`; the reconnect policy belongs to the caller.
-- **Reconnect is observable (T8)**: `onLifecycle` reports `open` after every successful dial, and `closed` only when an **established** connection is lost (a failed first dial is not a disconnect, and neither is a caller-initiated `close()`). `closed → open` is one reconnect. These listeners **survive `close()`** — they exist to drive the reconnection.
-- **After a reconnect you must re-handshake and re-subscribe**: a new socket means the server-side subscriptions and the local `onNotification` listeners are gone, so the flow is `transport onLifecycle("open")` → `client.connect()` (re-runs the `initialize` handshake) → `rearm()` every live subscription.
-
-Bring your own transport by implementing the interface: an in-memory fake for tests, stdio for CLIs, Node WebSocket in Electron main — business code does not change.
-
-### 3.3 `AppServerClient` top-level methods
-
-| Method | Wire method | Meaning |
-| --- | --- | --- |
-| `connect()` | `initialize` + `initialized` | Handshake; after success `ready === true`. Version mismatch throws `ProtocolError(version_mismatch)` |
-| `close()` | — | Close the transport; the server revokes the connection immediately |
-| `onNotification(listener)` | — | Global notification subscription (returns unsubscribe) |
-| `ready` / `initializeInfo` | — | Whether ready / handshake result |
-| `runImport(input)` · `listImports()` · `getImport(snapshotId)` | `import/*` | Import local CodeBuddy/WorkBuddy dirs |
-| `runInstall(input)` · `getInstallStatus(snapshotId)` | `install/run` / `install/status` | Snapshot install |
-| `disableInstall(snapshotId, ids)` · `enableInstall(...)` · `uninstallInstall(...)` | `install/*` | Component enable/disable/uninstall |
-| `addMarketplace(input)` · `listMarketplaces()` · `getMarketplace(id)` | `market/*` | Marketplace source management |
-| `removeMarketplace(id, cascade)` | `market/remove` | `cascade=true` uninstalls snapshots installed from it |
-| `setMarketplaceAutoUpdate(id, enabled)` | `market/auto-update` | Auto-update toggle (DB flag) |
-| `refreshMarketplace(id)` | `market/refresh` | Re-fetch source, rebuild entries when revision changed |
-| `importMarketplaceEntry(mkt, entry)` | `market/entry-import` | Import one entry (provenance-linked) |
-| `listStore()` | `store/list` | Unified catalog across marketplaces (with install state) |
-| `installStoreEntry(mkt, entry)` | `store/install-entry` | One-click install: import (if missing) + register |
-
-> ℹ️ **The first `listStore()` may come back empty or partial — by design, not an error**: the built-in default marketplaces register in the **background** (D-SDK-1 ①). The first `store/list` only kicks that off and then answers from whatever is registered *right now*; it never waits for the mirror.
-> Registration runs **in the background** and `store/list` does not wait for it. Since `fp-7` the built-in default markets are **one `zip` archive per market** (a single request; it replaced the old per-file whole-tree mirror — measured at 14,714 requests / 611 MiB), so on a fresh data dir the first call returns `items: 0` almost **immediately** with `markets_pending: true` (§3.3), and the same call returns the catalogue once registration completes.
-> Measured (2026-09-10, fresh local data dir): `first store/list: 1ms items=0` → after 130s `store/list: 133ms items=438`, `market/list count=3`.
-> So **you do not need a larger `requestTimeoutMs` for the first call**; re-list after the warm-up for the full catalog (the WebUI has an explicit refresh). If a mirror is unreachable, that warm-up counts as incomplete and the next store/market call retries automatically.
-> To tell "no markets at all" from "still loading": `listStore()` (that is, `store/list`) now returns `markets_pending` — `true` means the builtin markets are still registering in the background and the catalog may be incomplete.
-> If you own a fixed `dataDir`, later calls on it short-circuit idempotently and do no network I/O.
-
-### 3.4 Sub-clients
-
-All constructed on the same transport; every method returns `Promise<T>`.
-
-#### `agents` — AgentDefinition catalog
-
-```ts
-client.agents.list(): Promise<AgentSummary[]>;
-client.agents.get(agentId: string): Promise<AgentDetail>;
-client.agents.export(agentId: string): Promise<ExpertPack>;
-```
-
-#### `teams` — AgentTeamDefinition catalog
-
-```ts
-client.teams.list(): Promise<TeamSummary[]>;
-client.teams.get(teamId: string): Promise<TeamDetail>;
-client.teams.export(teamId: string, teamVersion?: string): Promise<ExpertPack>;
-```
-
-#### `skills` — catalog / file tree
-
-```ts
-client.skills.list(): Promise<SkillSummary[]>;
-client.skills.get(skillId: string): Promise<SkillDetail>;
-client.skills.files(skillId: string): Promise<SkillFileList>;          // inventory + directory digest
-client.skills.readFile(skillId: string, path: string): Promise<Uint8Array>; // WebSocket binding, base64 decoded for you
-client.skills.readFileWithType(skillId: string, path: string): Promise<SkillFileContent>;
-```
-
-> A Skill is a **directory**, not a single document: alongside `SKILL.md` it ships `references/` / `scripts/` / `templates/` / `assets/`. `skills.get()`'s `instructions_summary` is a **bounded summary** (~1200 chars, truncated), so companion files are only reachable through these three methods. Check `capabilities.skill_files` first — a host may wire the catalog without the file face, in which case they answer `unsupported_operation`. `path` accepts only a skill-relative path (absolute paths, `..`, drive letters and backslashes are refused), and a single file is capped at 2 MiB. `SkillFileList.content_digest` is the digest of **that skill directory**, and is **not** the snapshot's `content_digest` (which covers the whole imported source tree) — do not compare it against `import/get`.
-
-#### `connectors` — catalog / status / OAuth
+#### `connectors` — Connector Management and Invocation
 
 ```ts
 client.connectors.list(): Promise<ConnectorSummary[]>;
-client.connectors.get(connectorId: string): Promise<ConnectorDetail>;        // namespaced tools + auth state
-client.connectors.status(connectorId: string): Promise<ConnectorStatusView>; // connected only when auth ready AND last probe OK
-client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;  // run probe (really connects; result persisted); tool schemas come from here
-client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>; // the reason lives in `error`; `state` never becomes "failed"
-client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // start the host browser OAuth flow; only confirms the browser was opened
-client.connectors.waitForAuth(connectorId: string, options?: { timeoutMs?, pollMs? }): Promise<WaitForAuthOutcome>; // wait for the end, and bring back the reason
-client.connectors.logout(connectorId: string): Promise<void>;                // revoke token
-client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // call proxy
-client.connectors.register(registration: ConnectorRegistration): Promise<ConnectorDetail>; // hand over an MCP server this host never imported (your own key, `fp-11`)
-client.connectors.credentials(connectorId: string): Promise<ConnectorCredential>;      // the form a connector needs filled in (`fp-11`)
-client.connectors.setCredentials(connectorId: string, values: Record<string, string>): Promise<ConnectorCredential>; // store, and get the new state back
-client.connectors.clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;              // `keys` omitted = every secret field
+client.connectors.get(connectorId: string): Promise<ConnectorDetail>;        // Namespaced tools and auth state
+client.connectors.status(connectorId: string): Promise<ConnectorStatusView>; // Connected requires active auth and successful probe
+client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;  // Physical socket test; tool signatures resolved here
+client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>; // Diagnostic failure details in error field
+client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // Initiates host browser OAuth flow
+client.connectors.waitForAuth(connectorId: string, options?: { timeoutMs?, pollMs? }): Promise<WaitForAuthOutcome>; // Polls until resolution
+client.connectors.logout(connectorId: string): Promise<void>;                // Revokes credentials
+client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // Proxies tool execution
+client.connectors.register(registration: ConnectorRegistration): Promise<ConnectorDetail>; // Programmatic MCP server registration (fp-11)
+client.connectors.credentials(connectorId: string): Promise<ConnectorCredential>;      // Form definition and status (fp-11)
+client.connectors.setCredentials(connectorId: string, values: Record<string, string>): Promise<ConnectorCredential>; // Persists secrets
+client.connectors.clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;              // Clears secrets
 ```
 
-> **Bringing your own MCP server** (`fp-11`): if you have your own server and your own key, you do not
-> need a marketplace entry or a `token-schema.json` — hand the template you already have to
-> `register()`, and **the template is the declaration**:
+> **Dynamic Connector Registration** (introduced in `fp-11`): Custom MCP servers can be registered programmatically via template definitions without bundling catalog manifests:
 >
 > ```ts
 > const created = await client.connectors.register({
@@ -224,299 +152,267 @@ client.connectors.clearCredentials(connectorId: string, keys?: string[]): Promis
 >     type: "http",
 >     url: "https://mcp.acme.com/mcp",
 >     headers: { Authorization: "Bearer ${secret:ACME_KEY}" },
->     values: {},                       // the connector's own non-secret settings (`${NAME}`)
+>     values: {},                       // Non-secret connector configuration
 >   },
 > });
-> created.credential?.missing;          // ["ACME_KEY"] — key names, never values
+> created.credential?.missing;          // ["ACME_KEY"] —— Missing key names
 > await client.connectors.setCredentials(created.id, { ACME_KEY: process.env.ACME_KEY! });
-> const probe = await client.connectors.test(created.id);   // a real connection before it can be enabled
+> const probe = await client.connectors.test(created.id);   // Validate physical connectivity
 > ```
 >
-> Write the reference as `Bearer ${secret:ACME_KEY}` (or a whole-value `secret:ACME_KEY` in a stdio
-> server's `env`); those names *are* the form fields. The `secret:` namespace goes to the credential
-> store, `${NAME}` to the connector's own `values` (a name `values` already answers is not missing).
-> The response is the `connector/get` shape, so `missing` names the keys still needed.
+> Templates reference credentials using `${secret:KEY}` syntax. The host derives the credential schema automatically, with `missing` reporting unfilled keys.
 >
-> Three boundaries: **no secret travels in this call** (there is one write surface, `setCredentials`);
-> the row is created **disabled**, and enabling it still requires a probe that passes; and the method is
-> on the **installation-owner-only** surface, because choosing where the host reaches is the owner's
-> call. Re-registering the same name updates that connector.
+> Architectural invariants:
+> - **Write-Only Credential Safety**: Registration accepts no plaintext secrets; sensitive values are populated via `setCredentials()`, and responses mask secret values.
+> - **Disabled Initial State**: Dynamically registered connectors initialize as `disabled`, requiring a successful probe before activation.
+> - **Owner Scoping**: Registration is restricted to the host owner; duplicate names update existing configurations.
 
-> **Connectors that need a key or token** (`fp-9`, with the form's own text moved onto the block in
-> `fp-10`): `credentials(id)` returns a `credential` block — `mode` (`none` / `oauth` / `token`),
-> `status` (`not_required` / `requires_input` / `configured` / `error`), `missing` (**key names
-> only**) and `fields[]` (label / placeholder / description, both languages already resolved by the
-> host). The form's own text — `title` / `description` / `doc_url` / `doc_label` ("where do I get a
-> key") — sits on the **block**, not repeated per field: a marketplace `token-schema.json` declares it
-> once, at the top level. A server with no marketplace declaration (one handed to `register()`, or added
-> by hand on the host) gets the **same** form derived from its template, with the reference names as the
-> field keys.
-> Write with `setCredentials(id, { KEY: "…" })`; forget with `clearCredentials(id)`, or with `keys`
-> to clear a single field.
+> **Credential Model** (introduced in `fp-9`): `credentials(id)` returns form schema blocks (`mode`, `status`, `missing`, and `fields[]`). Secrets are scoped to the caller principal (`<principal>:NAME`) and masked in query outputs.
 >
-> **Values go in, never out**: a response **never** carries a secret's value — `fields[].value`
-> appears only for `plain` fields (the connector's own settings, such as `HOST` / `PORT`). The form is
-> the whole write surface: a key the connector's declaration does not name is refused. Credentials are
-> stored **per caller** (`<principal>:NAME`), so `missing` / `status` are statements *about you* — the
-> same connector can be `configured` for A and `requires_input` for B.
+> Set credentials via `setCredentials(id, values)`; revoke via `clearCredentials(id, keys?)`.
 
-> `call()` runs one MCP tool through the **host's own connection**: the transport, its headers and its OAuth token stay on the host — you send a tool name and an argument object, and you **cannot** name a URL, a command or a header. Whether the pair is callable is the host's `[connector_proxy]` policy: once its operator turns the proxy on, the **enabled connectors are callable**, and `allow` / `deny` are that operator's optional narrowing and subtraction. So `policy_denied` means "the host never turned the proxy on" or "this pair was narrowed out or explicitly denied" — **not** "you forgot to maintain a list".
+> **Tool Invocation Proxy**: `call()` invokes MCP tools through connections maintained by the host. Callers supply the tool name and arguments; underlying parameters and tokens remain encapsulated on the host. Host policy (`[connector_proxy]`) governs access, rejecting unauthorized calls with `policy_denied`.
 >
-> **How to know the arguments**: every tool returned by `get()` / `test()` carries `input_schema` (the upstream `tools/list` `inputSchema`, verbatim). Arguments are arbitrary JSON Schema and the client does **not** validate them — a wrong argument comes back as `is_error: true` with the server's own complaint, not as a rejected promise. If the host omitted some schemas to stay inside its size budget it sets `tools_truncated: true` (names and descriptions are never omitted).
->
-> **A tool-level failure is not a rejection**: when the server answers `isError: true` the promise still **resolves**, with `is_error` set. It rejects only when the call never reached the tool: `connector_call_timeout`, `connector_call_failed`, `response_too_large`, `connector_unavailable`, `policy_denied`, `not_found`. Check `capabilities.connector_calls` first (the method existing does **not** mean any tool is callable). The result object is passed through verbatim (`content`, `structuredContent`, … nothing dropped), capped at 1 MiB, default timeout 30s. All three connector transports are supported: stdio, Streamable HTTP and SSE.
+> **Parameter Validation**: `get()` and `test()` provide raw tool `input_schema` definitions. Parameter errors return `{ is_error: true }` without rejecting the invocation promise.
 
-> Tokens never pass through this package: the OAuth browser flow is owned by the trusted host; clients only trigger and wait. Failures have **two** channels, so do not read only one: a failure **before** the browser (endpoint discovery, client identity, binding the callback) comes back synchronously as `authStart`'s `state: "error"`; a failure **after** it (a refused token exchange, a callback timeout, an authorization server throttling with `slow_down`) appears in `authStatus().error` **only**, while `state` stays `not_authenticated` — the wire has no "failed" state. `waitForAuth(id)` is the loop over that second channel: `{state:"authenticated"}` / `{state:"error", error}` / `{state:"timeout"}`, a 120s budget by default (= the host's callback window), rejecting only when the status read itself fails.
+> **Tool Error Semantics**: Business-level tool failures resolve with `{ is_error: true, content }`. Promises reject only upon infrastructure or transport failures (timeouts, network errors, policy denials, not found).
 
-#### `store` — store lifecycle (acquire / install / use / disable / uninstall)
+> **OAuth Lifecycle**: OAuth authorization is managed via trusted host browser flows; clients initiate and monitor state changes asynchronously. `waitForAuth(id)` provides structured polling (default timeout 120s).
+
+#### `store` — Catalog Operations (Search / Install / Enable / Uninstall)
 
 ```ts
 client.store.list(): Promise<StoreItem[]>;
 client.store.search(query: string, filter?: { kind?: StoreItemKind }): Promise<StoreItem[]>;
 client.store.installed(): Promise<StoreItem[]>;
-client.store.checkUpdates(): Promise<StoreItem[]>;                 // installed AND update_available
+client.store.checkUpdates(): Promise<StoreItem[]>;                 // Installed items with pending updates
 client.store.updateHint(item): "none" | "uninstall_reinstall" | "unknown";
 client.store.install(item, opts?: { waitForReady?, timeoutMs?, signal? }): Promise<StoreOperationOutcome>;
 client.store.setEnabled(item, enabled: boolean, opts?: { componentIds? }): Promise<StoreOperationOutcome>;
 client.store.uninstall(item, opts?: { componentIds? }): Promise<StoreOperationOutcome>;
 ```
 
-> It adds **no wire method**: it only composes the flat top-level methods into one state machine (`search → install → … → uninstall`). `install` defaults to `waitForReady: true` — a skill is usable once copied, a connector is not: it is registered `disabled` by documented default, so readiness enables it before probing. A readiness timeout **never discards the install** (you get the successful install plus `readyIssue: "ready_timeout"`); a connector needing authorization returns `authorization_required` immediately. Readiness polling does **not** probe on every round: it really connects on the first round (and then at most once per `readyProbeMs`, 5s by default) and reads the status in between — a probe resolves the stored token (refreshing it when near expiry, and again on a 401), so probing at the poll interval meant a dozen requests against the connector and its authorization server inside a 30s budget. `outcome.components` is the server's per-component detail (`action` / `ok` / a stable `code`) passed through **verbatim**; failures are never swallowed.
+> The `store` sub-client coordinates multi-step state transitions. `install` defaults `waitForReady: true`, performing static imports for skills and probe validation for connectors. Detailed component statuses return in `outcome.components`.
 
-#### `conversations` — persistent conversations
+#### `conversations` — Persistent Sessions
 
 ```ts
-client.conversations.create(input): Promise<ConversationView>;  // omit model → server resolves the default from config.toml
+client.conversations.create(input): Promise<ConversationView>;  // Omitted model resolves to config.toml defaults
 client.conversations.update(id, input): Promise<ConversationView>;
 client.conversations.modelOptions(): Promise<ConversationModelOptions>;
 client.conversations.list(limit = 100): Promise<ConversationView[]>;
 client.conversations.get(id): Promise<ConversationView>;
 client.conversations.messages(query): Promise<ConversationMessagesPage>; // page/page_size/cursor
-client.conversations.send(id, content, idempotencyKey, options?): Promise<ConversationSendReceipt>; // explicit idempotency key required
+client.conversations.send(id, content, idempotencyKey, options?): Promise<ConversationSendReceipt>; // Requires explicit idempotency key
 client.conversations.cancel(id): Promise<ConversationView>;
 client.conversations.delete(id): Promise<{ conversation_id: string; deleted: boolean }>;
 await client.conversations.follow(id): Promise<ConversationSubscription>;
 ```
 
-The fourth argument of `send()` describes **this one turn** (the legacy `string[]` attachment array is still accepted):
+The fourth parameter of `send()` configures per-turn parameters:
 
 ```ts
 client.conversations.send(id, content, key, {
-  attachments: ["/abs/path/inside/workspace.png"],   // absolute path inside the conversation workspace
-  mentions: [{ kind: "skill", id: "release-notes" }], // a Skill mounted for this turn
+  attachments: ["/abs/path/inside/workspace.png"],   // Absolute path within conversation workspace
+  mentions: [{ kind: "skill", id: "release-notes" }], // Attached skill definition
 });
 ```
 
-> **`mentions` honours `kind: "skill"` only** (added in `fp-3`). A Skill is a **per-turn** payload: its instructions and immutable snapshot travel with that one turn, while the conversation's create-time snapshot is neither changed nor rewritable. `agent` and `connector` have **no carrier** on `send` (an expert is the conversation's identity, a connector is a host-level switch), so they are **refused with `invalid_request`** — explicitly, never silently not-mounted. `id` is the id `skill/list` publishes (the skill's name), not an `install/status` component id. Both fields stay off the wire when omitted.
+> **Dynamic Skill Mentions**: `mentions` accepts only `kind: "skill"`. Skills attach per-turn without mutating the frozen conversation snapshot. Supplying unsupported mention kinds returns `invalid_request`.
 
-`send()` can also **switch the conversation's model and reasoning level** (added in `fp-6`):
+`send()` also supports adjusting model choices and reasoning effort dynamically:
 
 ```ts
 await client.conversations.send(id, content, key, {
-  model: { provider_id: "opencode", model: "mimo-v2.5" }, // a config.toml provider name works too
-  reasoningEffort: "high",                                 // low | medium | high | xhigh | max (the server currently accepts only the first four)
+  model: { provider_id: "opencode", model: "mimo-v2.5" }, // Maps to provider keys in config.toml
+  reasoningEffort: "high",                                 // low | medium | high | xhigh | max
 });
 ```
 
-> **This is a conversation-level setting, not "this turn only"**: the value is written to the conversation row and takes effect **from this message onwards**, every later turn included — the Nomi runtime is built from that row, which is exactly why "set it before sending" is what makes it apply to this turn. To revert, send the old value once more. `model` has the same shape and resolution as `create` / `update` (a registered provider UUID is used verbatim, a `config.toml` provider name is registered idempotently), and `reasoningEffort` shares their vocabulary. **A conversation running a turn refuses the switch** (`conflict`): changing the model tears the runtime down, which cannot happen mid-turn. The current level is **readable** from `ConversationView.reasoning_effort` via `conversation/get` (absent = unspecified) — three paths can write it, so the view has to report it. Calls without either field stay byte-identical to before; whether the level actually takes effect depends on the model's catalog declaration.
+> **Session Configuration Persistence**: Modifications persist across subsequent conversation turns. Model mutations during an active turn (`running`) fail with `conflict`.
 
-`create()` can also build a conversation **as a named expert** with `agentId` (added in `fp-4`):
+`create()` supports binding an expert identity via `agentId`:
 
 ```ts
 const experts = await client.agents.list();
 const architect = experts.find((agent) => agent.name === "software-architect");
 
 const conv = await client.conversations.create({
-  name: "refactor discussion",
-  agentId: architect!.id,     // an `agent/list` id; not installed answers agent_not_installed
+  name: "Architecture Review",
+  agentId: architect!.id,     // Must match agent/list; returns agent_not_installed if missing
 });
 ```
 
-> An expert is the conversation's **identity**, decided once at creation: its preset snapshot, its own Skills and its Connectors are frozen into that conversation and cannot be rewritten afterwards (`conversation/update` refuses preset / Skill / connector keys). **Changing the expert means creating another conversation.** With `agentId` omitted this is the plain conversation it always was, byte for byte.
+> **Expert Immutability**: The expert identity and associated preset snapshots freeze at conversation creation; changing identities requires a new conversation.
 
-`create()` can also **open a team's Leader conversation** with `teamId` (added in `fp-5`):
+`create()` also initializes an Agent Team Leader session via `teamId`:
 
 ```ts
 const teams = await client.teams.list();
 const company = teams.find((team) => team.name === "Software Company");
 
 const leader = await client.conversations.create({ teamId: company!.id });
-// Same orchestration as `team/run` (member checks, template materialization or reuse,
-// conversation fences) but **without the goal turn**: you speak first, and
-// `delegation_policy` is already `automatic`.
-await client.conversations.send(leader.conversation_id, "break this release into a plan", crypto.randomUUID());
+// Orchestrates team context and launches into the interactive Leader session
+await client.conversations.send(leader.conversation_id, "Decompose requirements into steps", crypto.randomUUID());
 ```
 
-> `teamId` and `agentId` are **mutually exclusive** (sending both answers `invalid_request`): a conversation opens either as one expert or as one team's Leader. A member that is not installed, a member that is disabled, and a Connector the team binds but the host disabled are all refused **at creation** with their own stable codes (`agent_not_installed` / `agent_disabled` / `connector_unavailable`) — never a half-built Leader.
+> `teamId` and `agentId` are mutually exclusive. Sessions fail fast during creation if member agents or connectors are missing or disabled.
 
-Every entry in `modelOptions()` carries `name` / `display_name` / `context_limit` and may additionally carry **models.dev catalog facts**: `cost_input` / `cost_output` (USD per million tokens), `catalog_context_window`, and `supports_vision`. When the registry has no entry for that provider+model the fields are **absent entirely** — read them as "unknown", never as `false` or `0`.
+`modelOptions()` provides catalog metadata from models.dev (such as token pricing `cost_input`/`cost_output` and context capacities). Omitted for uncataloged models.
 
-Live subscription object:
+Real-time subscription object:
 
 ```ts
 const sub = await client.conversations.follow(convId);
-sub.onEvent((event) => console.log("seq", event.sequence, event)); // deduped by sequence
-sub.onResync((reason) => console.log("resync required:", reason)); // catch-up hint after disconnects
-sub.lastSequence; // highest sequence seen
-await sub.rearm(); // after a reconnect: re-register + reset cursor + re-issue conversation/subscribe
-await sub.close(); // server side unsubscribe (closing the socket also works)
+sub.onEvent((event) => console.log("seq", event.sequence, event)); // Deduplicates by sequence
+sub.onResync((reason) => console.log("resync required:", reason)); // Disconnect catch-up notification
+sub.lastSequence; // Highest observed sequence number
+await sub.rearm(); // Re-register listeners and reset cursor on reconnect
+await sub.close(); // Server-side unsubscription
 ```
 
-> After `rearm()` you still have to backfill the outage window yourself: this subscription has no event-replay API, so re-fetch with `conversation/messages`. The reset cursor means later duplicates are the caller's to dedupe by `sequence`.
+> Call `conversation/messages` following `rearm()` to backfill transcript deltas missed during disconnects.
 
-**One client can drive several conversations at once**: `create()` has no cap, and each conversation owns its `conversation_id`, its identity (expert / team) and its own event stream; `list(limit?)` enumerates them, and a single WS connection can `follow()` many at once (events are routed by `conversation_id`). The busy check (`conflict`) is **per conversation**, so two conversations run their own turns without blocking each other. **Process-level** isolation means several `dataDir`s, not more conversations (one directory holds a single-instance lock). A runnable example is in the [cookbook](/en-US/docs/examples-sdk) §7.
-
-#### `runs` — run lifecycle and live events
+#### `runs` — Execution Lifecycle and Event Streams
 
 ```ts
-client.runs.agent(input: AgentRunInput): Promise<RunReceipt>; // async receipt, not the final result
-client.runs.team(input: TeamRunInput): Promise<TeamRunReceipt>; // team run: Leader conversation + planned delegation
-client.runs.get(runId): Promise<RunView>;                     // authoritative state
-client.runs.plan(runId): Promise<RunPlan>;                    // plan view (run/plan, also HTTP-bound)
-client.runs.result(runId): Promise<RunResult>;                // resolves only at a terminal state
-client.runs.events({ runId, afterSequence, limit }): Promise<RunEvent[]>; // cursor replay
+client.runs.agent(input: AgentRunInput): Promise<RunReceipt>; // Asynchronous receipt
+client.runs.team(input: TeamRunInput): Promise<TeamRunReceipt>; // Team run: Leader session + planned delegation
+client.runs.get(runId): Promise<RunView>;                     // Authoritative status
+client.runs.plan(runId): Promise<RunPlan>;                    // Execution plan graph (run/plan)
+client.runs.result(runId): Promise<RunResult>;                // Resolves on terminal completion
+client.runs.events({ runId, afterSequence, limit }): Promise<RunEvent[]>; // Cursor-based event replay
 client.runs.cancel({ runId, expectedVersion, commandId, idempotencyKey }): Promise<RunView>;
 await client.runs.follow(runId): Promise<EventSubscription>;
 ```
 
-`runs.agent()` can name the model and reasoning level **for that one run** (added in `fp-6`):
+`runs.agent()` allows overriding model and reasoning parameters for a specific run:
 
 ```ts
 await client.runs.agent({
   agentId: architect!.id,
-  goal: "turn this requirement into a plan",
+  goal: "Decompose requirements into steps",
   model: { provider_id: "opencode", model: "mimo-v2.5" },
   reasoningEffort: "high",
 });
 ```
 
-> The precedence is **explicit > the preset's own > the host default** (`default_model` in `~/.agent-store/config.toml`): passing `model` unconditionally beats whatever the preset binds. `reasoningEffort` applies to **every attempt** of that run. Omitting either field keeps the previous behaviour byte for byte.
+> Parameter precedence: Explicit invocation parameters > Preset defaults > Host configuration defaults (`default_model`).
 
 ```ts
 const sub = await client.runs.follow(runId);
-sub.onEvent((event) => console.log(event));       // best-effort events (lossy, unordered)
-sub.onResync(({ run_ids, reason }) => …);         // subscription invalidated, replay required
-sub.onError((error) => …);                        // transport errors forwarded
+sub.onEvent((event) => console.log(event));       // Best-effort event stream
+sub.onResync(({ run_ids, reason }) => …);         // Reconnection catch-up signal
+sub.onError((error) => …);                        // Transport error callback
 sub.lastSequence;
-const replayed = await sub.rearm();               // after a reconnect: reset cursor + re-subscribe + replay all
+const replayed = await sub.rearm();               // Reconnect: resets sequence and replays history
 await sub.close();
 ```
 
-> `rearm()` **replays the whole history** (the cursor reset is deliberate), so consumers must dedupe by `sequence`; its return value is the replayed batch. Call it only after the reconnect handshake (`initialize`) has completed.
+> Event streams provide best-effort ordering; clients must deduplicate sequences using `run/events` replay cursors.
 
-> Event delivery is best-effort: durability relies on `run/events` cursor replay, so Node consumers should dedupe and order themselves.
-
-#### `workspaces` — workspace registration
+#### `workspaces` — Workspace Registration
 
 ```ts
 client.workspaces.list(): Promise<WorkspaceView[]>;
-client.workspaces.create(path: string): Promise<WorkspaceView>; // server canonicalizes, rejects links/reparse points
-client.workspaces.revoke(workspaceId: string): Promise<WorkspaceRevokeResult>; // soft delete; conversations kept
+client.workspaces.create(path: string): Promise<WorkspaceView>; // Canonical path resolution; rejects symlink loops
+client.workspaces.revoke(workspaceId: string): Promise<WorkspaceRevokeResult>; // Soft revocation preserving sessions
 ```
 
 ---
 
-## 4. `@flowy-agent-store/sdk` — the Node host
+## 4. `@flowy-agent-store/sdk` — Node Host Operations
 
 ### 4.1 `launchHarness(options): Promise<Harness>`
 
-One call does four things: locate and spawn the runtime → wait for the readiness line to learn the real port → connect over loopback → run the `initialize` / `initialized` handshake. **The object it returns *is* that client** — the business surface hangs off it directly, with no `.client` hop (doc `31` §5, option B).
+Spawns the local runtime binary, awaits the standard output readiness notification, binds a loopback connection, and performs the `initialize` / `initialized` protocol handshake. The returned `Harness` instance extends `AppServerClient` with process lifecycle management.
 
 ```ts
 interface HarnessOptions extends SpawnOptions {
   client: ClientInfo;             // { name, version }
   capabilities?: ClientCapabilities;
-  token?: string;                 // handed to WebSocketTransport
-  requestTimeoutMs?: number;      // default 30s (not enough for the first store/list — see the §3.3 warning)
+  token?: string;                 // Forwarded to WebSocketTransport
+  requestTimeoutMs?: number;      // Default 30s
 }
 
 interface Harness extends AppServerClient {
   server: SpawnedServer;          // readiness / dataDir / exited / close
-  handshake: InitializeResult;    // this launch's handshake response (never null)
-  close(): Promise<void>;         // unsubscribe → close transport → kill child → remove temp data-dir
+  handshake: InitializeResult;    // Handshake payload (non-null)
+  close(): Promise<void>;         // Unsubscribe → close socket → kill process → clean temp data-dir
 }
 ```
 
-The fields `HarnessOptions` adds itself (`SpawnOptions` fields are in §4.2):
+`HarnessOptions` configuration fields:
 
-| Field | Default | Meaning |
+| Field | Default | Description |
 | --- | --- | --- |
-| `client` | — | **Required**; identifies the caller in the handshake (server logs and audit) |
-| `capabilities` | omitted | `{ events?, approvals?, team_runtime?, artifacts? }` — which capabilities the client will consume |
-| `token` | omitted | Handed to `WebSocketTransport`; the WebSocket API cannot set headers, so it travels as `?token=…` on the loopback URL. Required when the host runs with `--auth`, optional in local mode (`auth: "disabled-local"`) |
-| `requestTimeoutMs` | `30000` | **Per-request** timeout, unrelated to startup. **Do not** raise it for the first `store/list` — that call does not wait for market registration (§3.3); poll `markets_pending` if you need registration to finish |
+| `client` | — | **Required**; client identification recorded in server audit logs |
+| `capabilities` | omitted | Capability declarations (`{ events?, approvals?, team_runtime?, artifacts? }`) |
+| `token` | omitted | Authentication token supplied to `WebSocketTransport` via query parameter |
+| `requestTimeoutMs` | `30000` | RPC request timeout in milliseconds |
 
-What `Harness` carries:
+`Harness` instance members:
 
-| Member | Content | Use it for |
+| Member | Content | Purpose |
 | --- | --- | --- |
-| (inherited) `conversations` / `agents` / `teams` / `skills` / `connectors` / `models` / `workspaces` / `runs` / `store` | The whole `AppServerClient` business surface | Every business call goes **directly** on the harness: `harness.conversations.create(...)` |
-| `handshake` | This launch's handshake response (**never null**) | Recording or asserting the protocol fingerprint |
-| `initializeInfo` | The **current** connection state (nullable; `null` after `close()`) | Deciding whether the connection is still ready |
-| `server.readiness` | The parsed readiness line: `{ host, port, url, protocol_version, version, auth }` | Logging; deciding from `auth` whether a `token` is required. ⚠️ `url` is the **site root** (`http://{host}:{port}/`), **not** the API root — a hand-rolled transport needs `ws://{host}:{port}/api/app-server/ws` (§13 of the examples page) |
-| `server.dataDir` | The data-dir the child actually uses | Diagnosis and isolation assertions (an auto-created temp dir shows up here too) |
-| `server.exited` | A `Promise<{ code, signal }>` that never rejects | Observing crashes and exits (contract in §4.4) |
-| `close()` | Unsubscribe → close transport → kill child → remove an auto-created data-dir | Call it in `finally`; safe to repeat |
+| `conversations` / `agents` / `teams` / `skills` / `connectors` / `models` / `workspaces` / `runs` / `store` | `AppServerClient` domain interfaces | Direct entry points for business operations |
+| `handshake` | Handshake response payload | Access protocol version fingerprints and host capabilities |
+| `initializeInfo` | Current readiness state | Connection readiness check (`null` after `close()`) |
+| `server.readiness` | Parsed readiness metadata | Contains host, port, url, protocol_version, auth, etc. |
+| `server.dataDir` | Active data directory | Validates directory paths and test isolation |
+| `server.exited` | Process exit Promise | Observes process crashes or exit signals |
+| `close()` | Teardown function | Closes transports, terminates child processes, and cleans temporary files |
 
-> **Breaking change vs the published `0.1.0-beta.5`**: the entry point is renamed to `launchHarness` (types `LaunchedClient` → `Harness`, `LaunchOptions` → `HarnessOptions`), the return value lost its `.client` hop, and `initializeResult` is now `handshake`. In other words `const session = await launchClient({…})` + `session.client.conversations.create(…)` becomes `const harness = await launchHarness({…})` + `harness.conversations.create(…)`. Item-by-item migration is in the [Upgrade and migration guide](/en-US/docs/upgrade) §6.5.
+> **Operational Boundaries**: `launchHarness` does not modify external model configurations (`config.toml`); runs against an ephemeral sandbox directory when `dataDir` is omitted; and does not register implicit process exit hooks.
 
-**What it does not do**: it does not configure models or providers (that is `config.toml` and the host's settings surface); it does not download the binary; without `dataDir` it does not persist anything (a one-shot sandbox); it does not restart the child or install process-exit hooks.
+### 4.2 Low-Level Primitives
 
-Copy-paste recipes (minimal call, your own data-dir, a token, failure handling, process-only) live in the [examples page](/en-US/docs/examples-sdk) §3.
-
-### 4.2 Lower-level primitives
-
-| Export | Meaning |
+| Export | Description |
 | --- | --- |
-| `spawnAppServer(options: SpawnOptions)` | Spawn + wait for readiness only (no connect). `SpawnOptions` below |
-| `resolveAppServerBin(explicit?)` | Locate the binary (§4.3) |
-| `parseReadinessLine(line)` | Parse one line; `null` when not the readiness line |
-| `ReadinessInfo` | `{ host, port, url, protocol_version, version, auth }` |
-| `assertProtocolCompatible(runtimeVersion)` | Throws on mismatch (both versions in the message) |
-| `SpawnExitInfo` | `{ code, signal }` — how the child exited (payload of `exited` / `onExit`) |
+| `spawnAppServer(options: SpawnOptions)` | Spawns child process and awaits readiness notification (without opening sockets) |
+| `resolveAppServerBin(explicit?)` | Resolves runtime binary path across known locations |
+| `parseReadinessLine(line)` | Parses standard output single-line JSON readiness payloads |
+| `ReadinessInfo` | Structured readiness metadata `{ host, port, url, protocol_version, version, auth }` |
+| `assertProtocolCompatible(runtimeVersion)` | Asserts protocol compatibility, throwing on mismatch |
+| `SpawnExitInfo` | Process exit payload `{ code, signal }` |
 
-`SpawnOptions`:
+`SpawnOptions` interface:
 
 ```ts
 interface SpawnOptions {
-  bin?: string;            // explicit path (overrides everything)
-  dataDir?: string;        // your own dir ⇒ you own it; omitted ⇒ temp dir removed on close
-  port?: number;           // default 0 = OS-assigned
-  extraArgs?: string[];    // extra CLI args appended after managed ones
-  readyTimeoutMs?: number; // default 120s (cold DB init)
-  env?: Record<string, string | undefined>; // merged over process.env
-  cwd?: string;            // child working directory; omitted ⇒ inherits the parent's
-  onExit?: (info: SpawnExitInfo) => void;   // called once when the child exits
+  bin?: string;            // Explicit binary path override
+  dataDir?: string;        // Dedicated data directory; temporary directory if omitted
+  port?: number;           // Defaults to 0 (dynamic OS allocation)
+  extraArgs?: string[];    // Additional command-line flags
+  readyTimeoutMs?: number; // Defaults to 120s
+  env?: Record<string, string | undefined>; // Merged with process.env
+  cwd?: string;            // Working directory override
+  onExit?: (info: SpawnExitInfo) => void;   // Exit callback
 }
 ```
 
-`SpawnedServer.exited` is a `Promise<SpawnExitInfo>` that **never rejects**: it settles whenever the child ends, for any reason — the only entry point for observing a runtime crash.
+### 4.3 Binary Discovery
 
-### 4.3 Binary resolution
-
-Order: the `bin` argument → the `AGENT_STORE_BIN` environment variable → the **platform runtime package** `@flowy-agent-store/runtime-<platform>-<arch>` (`vendor/flowy-agent-store[.exe]`; it is an optionalDependency of the SDK, so a normal install has it) → `flowy-agent-store` / `flowy-agent-store.exe` on `PATH`. When none of them hits it is a **hard error — never a download or a guess** (the message names all four routes; release-asset download is P2).
+Binaries resolve sequentially: explicit `bin` flag $\to$ `AGENT_STORE_BIN` environment variable $\to$ optional platform runtime package `@flowy-agent-store/runtime-<platform>-<arch>` $\to$ system `PATH`. Unresolved paths trigger immediate errors.
 
 ```bash
 AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node your-app.mjs
 ```
 
-### 4.4 Runtime contract (P0, verified)
+### 4.4 Process Contract
 
-- **Loopback enforced**: the child always runs `--host 127.0.0.1 --no-open`; the SDK only ever dials the process it spawned (`isLoopbackUrl` rejects anything else before connecting).
-- **Data-dir exclusivity**: omit `dataDir` ⇒ auto `mkdtemp`, removed on `close()`; passing your own dir means you own it — the backend single-instance lock fails fast (`already in use by another running Flowy backend`).
-- **Version check**: readiness `protocol_version` mismatch kills the child and reports both versions.
-- **Readiness line**: a single stdout JSON line `{"agent_store":"listening","host":...,"port":...,"url":...,"protocol_version":...,"version":...,"auth":...}`; the SDK scans lines and ignores everything else (tracing shares stdout).
-- **stdout kept drained**: once the readiness line is parsed the SDK keeps reading and discarding the child's stdout (`readline.close()` pauses that stream, so reading must not stop there). Otherwise the runtime blocks forever once its logs fill the OS pipe buffer (~64KB) — long sessions (multi-turn runs, market-tree scans) then hang silently. Post-readiness output is only drained and dropped; this release exposes no log callback.
-- **`env` / `cwd` passthrough**: `env` is **merged over** the parent's `process.env` (not a replacement, so `PATH` etc. stay visible); omitting `cwd` inherits the parent working directory. Both go to `child_process.spawn` unchanged.
-- **Exit is observable**: `SpawnedServer.exited` (`{ code, signal }`) settles whenever the child ends, for **any** reason including a crash or a non-zero code, and `onExit` fires once alongside it. The SDK **never restarts** the runtime; restarting belongs to the caller of `launchHarness`.
+- **Loopback Enforcement**: Child processes bind `--host 127.0.0.1 --no-open`; clients connect strictly to loopback addresses.
+- **Data Directory Mutual Exclusion**: Omitting `dataDir` generates an isolated temporary directory via `mkdtemp`; existing directories enforce single-instance file locks.
+- **Protocol Version Verification**: Handshake mismatches terminate the child process immediately with an explanatory error.
+- **Readiness Line Matching**: The SDK scans stdout for single-line JSON containing `"agent_store":"listening"` to discover port assignments.
+- **Continuous Output Draining**: stdout continues draining after readiness to prevent OS pipe buffer saturation and process deadlocks.
+- **Environment Inheritance**: `env` merges with `process.env`; `cwd` defaults to the parent process directory.
 
-### 4.5 Errors and cleanup
+### 4.5 Teardown and Cleanup
 
-- Spawn failure: the error appends the **last 50 stderr lines** (`stderr tail:` section).
-- Timeout: after the default 120s it throws `timed out after ${timeoutMs}ms waiting for the runtime readiness line` (`timeoutMs` is `readyTimeoutMs`).
-- Every failure path runs `child.kill()` → 2s grace → `SIGKILL`, and removes the auto-created data dir.
-- After readiness the promise is already settled: a later `exit` / `error` from the child no longer takes the failure path (it is not reported as a startup failure); such exits (crashes included) surface only through `SpawnedServer.exited` and `onExit`. The SDK never restarts the runtime, and lifetime is owned by the caller via `close()`.
-- Correct usage: `close()` in a `try/finally`; without it the temp dir leaks on process exit (no exit hook installed).
+- Spawning failures capture the final 50 lines of stderr;
+- Failure to reach readiness within `readyTimeoutMs` terminates the process;
+- Implement `try/finally` blocks to guarantee invocation of `harness.close()`, releasing file handles and temporary directories.
 
 ```ts
 const harness = await launchHarness({ client: { name: "x", version: "1" } });
@@ -527,49 +423,33 @@ try {
 }
 ```
 
-### 4.6 Export helpers: `exportAgent` / `exportTeam` / `materializePack` (since `0.1.0-beta.8`)
+### 4.6 Export Helpers: `exportAgent` / `exportTeam` / `materializePack`
 
-Write "an expert definition plus its skill bytes" into **a directory of your own**, in one call. The
-helpers orchestrate the four existing wire methods (`agent/export` · `team/export` · `skill/files` ·
-`skill/file`) — **no new protocol method, no fingerprint change** — and the writing happens in your process;
-the host never writes a file. `materializePack` takes a **pack you already hold** (an in-memory object) and
-writes it, together with the skill bytes it references, as a real directory — the pack data itself is
-unchanged, it just becomes files on disk.
+Serializes agent and team definitions alongside referenced skill files into a local directory. Coordinates existing wire APIs (`agent/export`, `team/export`, `skill/files`, `skill/file`) without altering wire contracts.
 
 ```ts
 import { exportAgent, exportTeam, materializePack } from "@flowy-agent-store/sdk";
 
-// Single expert; for a team use exportTeam(client, teamId, dir, teamVersion?) (all-or-nothing stays server-side)
+// Single agent export; use exportTeam for multi-agent bundles
 const result = await exportAgent(client, agentId, "./my-expert");
-result.pack;           // the ExpertPack — also in memory
-result.writtenSkills;  // skill names actually written (deduplicated across members)
-result.danglingSkills; // declared but unresolvable here: { id, error } — reported, never skipped in silence
+result.pack;           // ExpertPack object in memory
+result.writtenSkills;  // Written skill names
+result.danglingSkills; // Unresolved skills: { id, error }
 ```
 
-- **Layout**: `expert-pack.json` (the wire pack byte-for-byte) + `persona.md` (**agent kind only** — a team
-  has no persona of its own) + `members/<id>/persona.md` (**team kind only**, one per member, leader first)
-  + `skills/<name>/…` (referenced skills, deduplicated by id).
-- **Error semantics**: the pack is fetched **before** anything is written — a failed wire export
-  (`agent_not_installed` / `agent_disabled` / `policy_denied` / `version_mismatch` / `response_too_large`…)
-  leaves no half-written directory; a `skill/files` rejection lands in `danglingSkills` and the loop
-  continues; a `skill/file` failure after a successful listing **throws** (host I/O errors are not swallowed).
-- **Skills are never inlined**: the pack carries `{name, id}` references only; for a different layout, assemble
-  it yourself from the 11-line public-primitive recipe in the examples page §9.4.
-- The first argument is a narrow structural type (the `agents` / `teams` / `skills` sub-client faces); pass the
-  value `launchHarness` resolved to.
+- **Output Structure**: Writes `expert-pack.json` (metadata manifest), `persona.md` (persona instructions), and `skills/<name>/...` (associated assets).
+- **Execution Invariants**: Fetches and verifies all assets before initiating disk writes to prevent partial artifacts.
 
 ---
 
-## 5. Per-method API reference
+## 5. Method API Reference
 
-How the three packages' real exports line up with the protocol methods. Method names follow `05`; this table introduces no new ones.
+### 5.1 `AppServerClient` Top-Level Methods
 
-### 5.1 `AppServerClient` top-level methods
-
-| Method | Params | Returns | Protocol method |
+| Method | Parameters | Return | Protocol method |
 | --- | --- | --- | --- |
 | `connect()` | — | `InitializeResult` | `initialize` → `initialized` |
-| `onNotification(listener)` | `(notification) => void` | unsubscribe | — (server notifications) |
+| `onNotification(listener)` | `(notification) => void` | Unsubscribe function | — (Server notifications) |
 | `close()` | — | `void` | — |
 | `runImport(input)` | `ImportRequest` | `ImportResult` | `import/run` |
 | `listImports()` | — | `ImportSummary[]` | `import/list` |
@@ -589,23 +469,23 @@ How the three packages' real exports line up with the protocol methods. Method n
 | `listStore()` | — | `StoreList` | `store/list` |
 | `installStoreEntry(marketplaceId, entryName)` | `string, string` | `StoreInstallResult` | `store/install-entry` |
 
-### 5.2 Sub-clients
+### 5.2 Sub-Clients
 
-| Sub-client | Methods | Protocol methods |
+| Sub-client | Methods | Protocol method |
 | --- | --- | --- |
 | `agents` | `list()` / `get(agentId)` / `export(agentId)` | `agent/list` / `agent/get` / `agent/export` |
 | `teams` | `list()` / `get(teamId)` / `export(teamId, teamVersion?)` | `team/list` / `team/get` / `team/export` |
 | `skills` | `list()` / `get(skillId)` / `files(skillId)` / `readFile(skillId, path)` / `readFileWithType(skillId, path)` | `skill/list` / `skill/get` / `skill/files` / `skill/file` |
 | `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `waitForAuth(id, opts?)` / `logout(id)` / `call(id, tool, args?)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` · `call` |
-| `store` | `list()` / `search(query, filter?)` / `installed()` / `checkUpdates()` / `updateHint(item)` / `install(item, opts?)` / `setEnabled(item, enabled, opts?)` / `uninstall(item, opts?)` | composed methods, no wire method of their own: `store/list` · `store/install-entry` · `install/run` · `install/status` · `install/disable` · `install/enable` · `install/uninstall` |
-| `conversations` | `create(input)` / `update(id, input)` / `modelOptions()` / `list(limit?)` / `get(id)` / `messages(query)` / `send(id, content, idempotencyKey, options?)` / `cancel(id)` / `delete(id)` / `follow(id, options?)` | the same-named `conversation/*` methods |
+| `store` | `list()` / `search(query, filter?)` / `installed()` / `checkUpdates()` / `updateHint(item)` / `install(item, opts?)` / `setEnabled(item, enabled, opts?)` / `uninstall(item, opts?)` | Composite client mapping: `store/list` · `store/install-entry` · `install/run` · `install/status` · `install/disable` · `install/enable` · `install/uninstall` |
+| `conversations` | `create(input)` / `update(id, input)` / `modelOptions()` / `list(limit?)` / `get(id)` / `messages(query)` / `send(id, content, idempotencyKey, options?)` / `cancel(id)` / `delete(id)` / `follow(id, options?)` | `conversation/*` corresponding methods |
 | `runs` | `agent(input)` / `team(input)` / `get(id)` / `plan(id)` / `result(id)` / `events(query)` / `cancel(input)` / `steer(input)` / `answerDecision(input)` / `follow(id, options?)` | `agent/run` · `team/run` · `run/get` · `run/plan` · `run/result` · `run/events` · `run/cancel` · `run/steer` · `run/answer-decision` |
 | `workspaces` | `list()` / `create(path)` / `revoke(id)` | `workspace/list` / `workspace/create` / `workspace/revoke` |
 | `models` | `list()` | `models/list` |
 
-### 5.3 HTTP binding
+### 5.3 HTTP Bindings
 
-HTTP and WebSocket are two bindings of one method semantics. `httpRouteTable()` returns the **machine-readable route table** (method → verb + path + provenance), so this guide does not hand-copy it:
+HTTP and WebSocket bindings represent two transport options for the same wire specification. `httpRouteTable()` exports the mapping programmatically:
 
 ```ts
 import { httpRouteTable } from "@flowy-agent-store/client";
@@ -614,18 +494,12 @@ const routes = httpRouteTable();
 // { "market/remove": { verb: "POST", path: "/markets/:marketplace_id/remove", source: "…" }, … }
 ```
 
-- Covers **52 / 77** methods. The 25 outside the route table: `initialize`, `initialized`, `workspace/create`, `conversation/model-options`, `conversation/update`, `conversation/subscribe`, `conversation/unsubscribe`, `run/subscribe`, `run/unsubscribe`, `agent/list`, `agent/get`, `team/list`, `team/get`, `agent/export`, `team/export`, `config/get`, `config/set`, `skill/create`, `skill/update`, `skill/delete`, `skill/copy`, `config/get-mcp`, `config/set-mcp`, `config/set-mcp-enabled`, `skill/file`.
-  - Those 25 methods do **not** mean the server has no HTTP route for them: `initialize` / `initialized` do have one (`POST /api/app-server/initialize`, `/initialized` — the HTTP transport's handshake goes through them), they are simply not business methods; `skill/file` has one too (`GET /api/app-server/skills/{skill_id}/files/{path}`), but it answers with **raw bytes plus a `content-type`** rather than a JSON envelope, so it is likewise absent from the JSON transport's route table — use `client.skills.readFile()` (WebSocket, base64) or `fetch` the route directly.
-- `config/get` / `config/set` (the host settings file `~/.agent-store/config.toml`) are **host management surface** (`16` §6): wire methods with no HTTP binding, and deliberately **not part of this package's client** — the Web UI calls them through its own transport helpers. Contract in `05` §4.10.
-- `config/get-mcp` / `config/set-mcp` / `config/set-mcp-enabled` (the MCP declaration file `~/.agent-store/mcp.json`) are host management surface by the same `16` §6 judgement: wire-only, no HTTP binding, and not in this package. The write face is **fail-closed** (an unparseable file, or an entry the parser rejects, leaves the file byte-identical) and the toggle is a **text-level minimal edit** (only that entry's `enabled` value moves; comments and indentation survive). Note that `config/get-mcp` is the **only** read that returns the file's own text (for the host's own editor, on demand, inside the loopback + owner gate); every other read (`config/get.mcp`) still carries no `env` / `headers` values. Contract in `05` §4.10.
-- `skill/create` / `skill/update` / `skill/delete` / `skill/copy` (the skill write face, `16` R17 / W12) are host management surface by the same `16` §6 judgement: a third-party consumer must not be able to write files into the host's skill tree, so they are wire-only, have no HTTP binding, and are not in this package. `skill/update` is a **field-level patch** (only the named fields move; `name` is not editable) and `skill/copy` derives a writable user skill from any origin. The read face's `SkillSummary` gains `origin` / `writable` (additive); contract in `05` §4.11.
-- **`HttpTransport` is the request/response binding and is not equivalent to WebSocket**: `notify()` throws and `onNotification()` returns a no-op unsubscribe. Live events and subscriptions require `WebSocketTransport`.
-- Every call performs its own handshake (`initialize` → `initialized` → business call), so `connect()` is a no-op. Host-side code that needs a ready connection id calls `openConnection()`.
-- `/api/fs/*` (browse / list / read / metadata) is a host file service, not a protocol method, and is not part of this package.
+- Maps **52 of 77** protocol methods. Unmapped methods represent handshakes, continuous streaming interfaces, or privileged local management APIs.
+- Privileged host operations (e.g. `config/get`, `config/set`, `config/get-mcp`, `skill/create`) are restricted to authenticated local connections.
 
-### 5.4 Answering approvals: `run/answer-decision`
+### 5.4 Human-in-the-Loop Approvals: `run/answer-decision`
 
-A run stops when it needs a human decision: `run/events` projects `approval.requested`, and the answer goes through `runs.answerDecision(input)`:
+When an execution pauses awaiting user interaction, `run/events` emits `approval.requested`. Callers submit decisions via `runs.answerDecision(input)`:
 
 ```ts
 const pending = (await client.runs.events({ runId })).find(
@@ -634,64 +508,48 @@ const pending = (await client.runs.events({ runId })).find(
 
 await client.runs.answerDecision({
   runId,
-  stepId: pending.step_id!,                    // attempt scope, projected on the event
+  stepId: pending.step_id!,                    // Scoped step identifier
   attemptId: pending.attempt_id!,
-  answer: "Approved, continue",
-  expectedExecutionVersion: pending.expected_execution_version!,  // the three CAS versions
+  answer: "Approved to proceed",
+  expectedExecutionVersion: pending.expected_execution_version!,  // Three CAS tokens
   expectedStepVersion: pending.expected_step_version!,
   expectedAttemptVersion: pending.expected_attempt_version!,
 });
 ```
 
-- **The three `expected*Version` values are mandatory CAS tokens**, not an optional nicety: the server passes them straight to the engine's single answer gate, and any one of them having moved returns `conflict` instead of silently overwriting. `run/events` projects the current three onto every unanswered `approval.requested` (read from the authoritative rows at projection time), so a client echoes them rather than inventing versions.
-- **Only a `waiting_input` attempt can be answered**; a foreign owner, a stale version, a non-waiting attempt, or an empty answer are all refused (`NotFound` / `Conflict` / `BadRequest`).
-- **There is no `always_allow`**: the desktop confirmation route's approve-all switch is not part of this protocol. The params are `deny_unknown_fields`, so sending it fails with `invalid_request`.
-- `RunEvent.step_id` / `attempt_id` are present only when the engine scoped the event to an attempt (typically `approval.requested` / `approval.responded`).
+- **Optimistic Concurrency Control**: The three `expected*Version` parameters enforce CAS token checks, returning `conflict` if any version drifts.
+- Decisions are valid only when the target attempt is in the `waiting_input` state.
 
-## 6. Event reference: `sequence` and catch-up
+## 6. Events Reference: `sequence` and Catch-Up
 
-### 6.1 Event types
+### 6.1 Event Types
 
-`ConversationEventType` is a **closed union** (`protocol.ts`) with 9 members:
+`ConversationEventType` consists of 9 distinct event kinds:
 
 | Event type | Meaning | Decoded kind |
 | --- | --- | --- |
-| `message.created` | A message was persisted | `message.created` |
-| `message.delta` | Body increment (`replace` swaps wholesale) | `message.delta` |
-| `message.thinking` | Thinking increment | `message.thinking` |
-| `message.tips` | Tip row (`tip_type`) | `message.tips` |
-| `message.tool` | Tool call (streams running → completed) | `message.tool` |
-| `message.error` | Terminal error (decoded with `code` and `retryable`) | `message.error` |
-| `message.activity` | Activity row (`kind` drives rendering; carries this turn's token usage when `kind === "turn_completed"`) | `message.activity` |
-| `turn.status` | Turn busy/idle (`status === "running"`) | `turn.status` |
-| `context.usage` | Context usage | `context.usage` |
+| `message.created` | New message record committed | `message.created` |
+| `message.delta` | Incremental message body chunk | `message.delta` |
+| `message.thinking` | Incremental reasoning block | `message.thinking` |
+| `message.tips` | Operational tips and warnings | `message.tips` |
+| `message.tool` | Tool invocation lifecycle event | `message.tool` |
+| `message.error` | Terminal execution error | `message.error` |
+| `message.activity` | Activity and turn completion events | `message.activity` |
+| `turn.status` | Turn state transition notification | `turn.status` |
+| `context.usage` | Context token consumption report | `context.usage` |
 
-The server spells "thinking" two ways: `message.thinking`, and `message.activity` with `kind === "thinking"`. `decodeConversationEvent` **normalises** the latter into `message.thinking`, so callers keep one thinking path. Unknown types land in `unknown` (raw `event_type` preserved) rather than being misread as a known one.
+### 6.2 `sequence` Guarantees
 
-A `message.activity` frame whose `kind === "turn_completed"` also carries **this turn's** token usage (`usage: { input_tokens, output_tokens, total_tokens }`, the runtime's per-turn report). The field decodes to `null` when the runtime reported nothing, only one side, or two zeros — **"unknown" is not "free"**, so callers must not substitute context occupancy or a zero. Per-turn usage arrives only on the live stream (the server does not persist past turns), and the field names are snake_case, matching the Run-side `TurnUsage`.
+- `sequence` numbers increment monotonically per conversation per connection, resetting upon socket reconnection;
+- A delta where `sequence > lastSeen + 1` indicates network frame loss, triggering catch-up routines;
+- Duplicated or disordered events are silently dropped by client filters.
 
-`message.error` decodes `code` (the server's error code) and `retryable` alongside the message text. `retryable` is **three-valued**: `true`, `false`, or `null` — `null` means the wire did not supply it (history rows, commonly), and callers must not guess it into `false` or `true`. Re-reading the send receipt also exposes `result_error_retryable`, which agrees with it.
+### 6.3 Catch-Up Mechanics
 
-### 6.2 `sequence` semantics
-
-- `sequence` is a **per-conversation, monotonic and contiguous** counter, not a global ordinal. The server keeps it **per connection**, bucketed by conversation (source comment: `Notification sequence is connection-local`), so **a reconnect starts the numbering over** — the durable record is `conversation/messages`, not this counter.
-- Unsubscribing destroys that counter; resubscribing starts at `1`, which is why `rearm()` resets the local cursor to `0`.
-- Gap detection: `sequence > lastSeen + 1` while `lastSeen > 0` means loss — the subscription emits `onResync("gap")` and triggers catch-up.
-- Duplicates and out-of-order frames (`sequence <= lastSeen`) are dropped and never re-delivered.
-- **List-projection notifications are not part of that counter**: `conversation/list-changed` (the conversation list's `created` / `updated` / `deleted`; auto-titling arrives as `updated`) **carries no `sequence`**, so it must never advance `lastSeen` or take part in the gap check above. It is a best-effort hint — losing one only delays a refresh, while `conversation/list` stays authoritative.
-
-### 6.3 Catch-up
-
-Conversations and runs catch up through different carriers:
-
-| Case | Server signal | Catch-up mechanism | Package entry point |
+| Scenario | Server signal | Catch-up mechanism | Client entry |
 | --- | --- | --- | --- |
-| Conversation | `conversation/resync-required` | re-fetch `conversation/messages` (V1 has no conversation event replay) | `follow(..., { fetchMessages })` → `onBackfill` |
-| Run | `run/resync-required` | replay `run/events` with `after_sequence` | `follow()` auto-resyncs; manual replay is **`resync()` only** (`catchUp()` is *not* a catch-up — it marks persisted events as seen **without dispatching**, and `follow()` calls it once when it subscribes) |
-
-Conversation subscriptions auto-catch-up by default (`autoResync`) and run at most one fetch at a time (bursts coalesce); the fetched page is handed to `onBackfill`. If your layer owns the pagination cursor, pass `autoResync: false` and listen only to `onResync`, then reload authoritatively yourself.
-
-On a `client` that has already `connect()`ed (full setup in the [TypeScript SDK cookbook](/en-US/docs/examples-sdk)):
+| Conversation | `conversation/resync-required` | Re-fetch messages via `conversation/messages` | `follow(..., { fetchMessages })` → `onBackfill` |
+| Run | `run/resync-required` | Replay events via `run/events` with `after_sequence` | `follow()` auto catch-up or manual `resync()` |
 
 ```ts
 const subscription = await client.conversations.follow(conversationId);
@@ -703,55 +561,42 @@ subscription.onBackfill((snapshot) => resetTranscript(snapshot.messages));
 subscription.onError((error) => report(error));
 ```
 
-## 7. Error model and retry
+## 7. Error Models and Retries
 
-All four error classes are exported from `@flowy-agent-store/protocol`; `retryable` is the stable contract (never branch on `message`):
-
-| Class | Raised when | `retryable` |
+| Class | Trigger scenario | `retryable` |
 | --- | --- | --- |
-| `AppServerError` | the server returned a business error; carries `code` / `requestId` / `details` | per the server hint |
-| `TransportError` | connect / send / receive / close failed; carries `phase` | decided by `phase` and the caller |
-| `ProtocolError` | malformed message, version mismatch, unexpected response; carries `kind` | no |
-| `RequestTimeoutError` | request timed out; carries `method` / `timeoutMs` | no |
+| `AppServerError` | Server-side domain error payload (`code` / `requestId` / `details`) | Determined by server hint |
+| `TransportError` | Transport socket failure (`phase`) | Evaluated by client phase |
+| `ProtocolError` | Malformed message or schema mismatch (`kind`) | No |
+| `RequestTimeoutError` | Timeout exceeded (`method` / `timeoutMs`) | No |
 
-`isRetryableError(error)` is the single retry predicate; `formatError(error)` is the single human-readable rendering. `withRetry(operation, options)` backs off exponentially (with jitter) on `retryable`:
+`withRetry(operation, options)` coordinates exponential backoff:
 
-| Option | Default | Meaning |
+| Option | Default | Description |
 | --- | --- | --- |
-| `maxAttempts` | `3` | total attempts including the first |
-| `baseDelayMs` | `500` | first backoff |
-| `maxDelayMs` | `8000` | ceiling for one delay |
-| `jitter` | `0.25` | jitter fraction; delay lands in `[0.75×, 1.0×]` |
-| `onRetry` | — | called before each retry with `{ attempt, delayMs, error }` |
-| `shouldRetry` | protocol `retryable` | custom predicate |
-| `sleep` | `setTimeout` | injectable (tests) |
+| `maxAttempts` | `3` | Total invocation attempts |
+| `baseDelayMs` | `500` | Initial delay in milliseconds |
+| `maxDelayMs` | `8000` | Maximum backoff delay cap |
+| `jitter` | `0.25` | Delay jitter ratio in `[0.75×, 1.0×]` |
+| `onRetry` | — | Retry notification callback `{ attempt, delayMs, error }` |
+| `shouldRetry` | Protocol `retryable` | Custom retry predicate |
+| `sleep` | `setTimeout` | Delay function injection |
 
-For a runnable `withRetry` example see the [TypeScript SDK cookbook](/en-US/docs/examples-sdk) §11.
+Write operations carrying an `idempotency_key` are safe for retry attempts.
 
-Writes carrying an `idempotency_key` / `command_id` replay safely: the App Server deduplicates same-key requests instead of executing twice.
+## 8. MCP Integration Guide
 
-## 8. MCP integration guide
+Connector declaration locations:
 
-The official MCP path for Agent Store is the **connector descriptor**, with no second format introduced:
-
-| Case | Where it is declared |
+| Scenario | Declaration location |
 | --- | --- |
-| Connector market entry | an entry in `.codebuddy-connector/connectors.json` |
-| MCP servers shipped by a plugin | the plugin manifest's `mcpServers` field |
+| Marketplace entry | Entries within `.codebuddy-connector/connectors.json` |
+| Plugin bundled server | `mcpServers` object inside plugin manifests |
 
-Remote HTTP/SSE and local stdio servers are both described verbatim in the manifest; Agent Store only hosts them and proxies tools under a namespace — it never executes connector content. Credentials:
+Sensitive configuration properties are mapped to `secret:<KEY>` references during ingestion, populated at runtime exclusively from secure local credential storage. Refer to [Plugins & Marketplace](/en-US/docs/plugins-market) for schema details.
 
-- Mark sensitive config entries in the `userConfig` schema; values go to the OS credential store.
-- Do not put secrets in `env` as **plain values**: the importer rewrites the **values** of `env` / `headers` entries whose **key names** contain `api` / `token` / `secret` / `password` / `apikey` into `secret:<KEY>` references, and the real value is resolved from `[credentials]` (or the process environment) into memory only when the host starts the child process — never into a snapshot, the database or a log. Copying a source plugin's secret lines is therefore safe; a plaintext value under **any other key name** is not covered — use an explicit `secret:` reference or `userConfig` for credentials.
+## 9. Next Steps
 
-More manifest fields and examples: [Plugins and market](/en-US/docs/plugins-market).
-
-## 9. Next steps
-
-
-- Full method semantics: repo `docs/agent-store/05-flowy-agent-store-app-server-protocol.md`.
-- Implementation and test samples: `web/packages/{protocol,client,sdk}/src` (the sdk has `spawn.test.ts`, `readiness.test.ts`).
-- Browser-only helpers (asset `<img>` URLs, `/api/fs/browse`): implemented by the host app, not in these three packages.
-- Runnable examples: [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
-
----
+- Protocol specification: `docs/agent-store/05-flowy-agent-store-app-server-protocol.md`.
+- Implementation source: `web/packages/{protocol,client,sdk}/src`.
+- Integration recipes: [TypeScript SDK cookbook](/en-US/docs/examples-sdk).

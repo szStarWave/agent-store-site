@@ -1,10 +1,10 @@
 # 兼容性矩阵
 
-这页回答三件事：**哪些平台能跑**、**哪些来源能装进来**、**装进来的东西能用到什么程度**。
+本文说明 Flowy Agent Store 的运行环境支持范围、资源导入来源规范以及资产兼容性状态评定体系。
 
 ## 平台
 
-当前仅发布 **Windows x64** 构建；其余平台暂未提供，需按需立项后再开放。二进制在 [GitHub Releases](https://github.com/szStarWave/agent-store-site/releases) 按目标命名分发（当前为预览版，标为 pre-release）。
+当前官方提供 **Windows x64** 预编译二进制构建；其他系统平台处于规划阶段。二进制构建通过 [GitHub Releases](https://github.com/szStarWave/agent-store-site/releases) 提供分发（当前预览版本标记为 pre-release）。
 
 | 操作系统 | 架构 | 状态 |
 | --- | --- | --- |
@@ -14,72 +14,70 @@
 | Linux | x86_64 | 未提供 |
 | Linux | aarch64 | 未提供 |
 
-> 下载按钮会按你的系统识别平台：仅 Windows x64 提供直链，其余平台引导至 GitHub Releases 手动查看。
+> 官网下载模块自动检测客户端操作系统；非 Windows x64 环境将重定向至 GitHub Releases 发布列表。
 
 ## 来源格式
 
 | 来源 | 导入方式 | 可能得到的兼容性状态 |
 | --- | --- | --- |
 | CodeBuddy Plugin | Importer → PluginSnapshot | `compatible` / `compatible-with-adapter` / `manual-review` |
-| WorkBuddy Skill | Importer → PluginSnapshot | `compatible`（附属脚本只导入、不执行） |
+| WorkBuddy Skill | Importer → PluginSnapshot | `compatible`（附属脚本仅导入存储，不自动执行） |
 | WorkBuddy Connector | Importer → PluginSnapshot | `compatible-with-adapter`（MCP）；`manual-review`（CLI 连接器） |
-| 未确认版权资源 | 标记 `pending-legal-review` | 不进入公开分发 |
+| 未确认版权资源 | 标记 `pending-legal-review` | 排除在公开分发之外 |
 
 ### 兼容性状态的含义
 
-状态说的是**它在本产品里当前能用到什么程度**，不是它在来源产品里的能力：
+兼容性状态用于界定资产在当前产品中的可用程度与适配边界，而非其在原生宿主中的功能特性：
 
 | 状态 | 含义 |
 | --- | --- |
-| `compatible` | 语义与形态都可直接使用 |
-| `compatible-with-adapter` | 经适配层转换后可用（例：MCP 连接器经工具命名空间化接入） |
-| `manual-review` | 需人工审查后才能启用（例：CLI 连接器、Hook、LSP） |
-| `unsupported` | 当前明确不支持 |
-| `pending-legal-review` | 版权 / 分发授权未确认，禁止进入公开市场与默认安装包 |
+| `compatible` | 结构与语义完全原生支持 |
+| `compatible-with-adapter` | 经适配层协议转换后可用（例如：MCP 连接器经工具命名空间注入后接入） |
+| `manual-review` | 需人工安全审查后方可启用（例如：CLI 连接器、Hook、LSP 服务） |
+| `unsupported` | 当前环境明确不受支持 |
+| `pending-legal-review` | 资产版权或再分发授权尚未明确，禁止进入公开市场与默认安装包 |
 
 ### 它其实是三个维度
 
-界面上看到的那一个状态只是其中一维。导入报告同时记录三条独立事实，避免把「可以转换」误报成「已经能运行」：
+UI 界面所呈现的状态仅为单一综合视图。导入报告从三个独立维度进行评估，防止将模型层「可完成转换」误判为「具备实际运行能力」：
 
 | 维度 | 取值 | 回答的问题 |
 | --- | --- | --- |
-| `semantic_status` | 上面那张状态表 | 语义能不能保留 |
-| `runtime_status` | `not-verified` → `adapter-verified` → `runtime-verified` → `release-eligible` | 适配器与运行时是否真的验证过 |
-| `distribution_status` | `local-only` | 是否允许安装 / 分发 |
+| `semantic_status` | 上述兼容性状态枚举 | 资产语义能否在导入后完整保留 |
+| `runtime_status` | `not-verified` → `adapter-verified` → `runtime-verified` → `release-eligible` | 适配层与核心运行时是否完成验证 |
+| `distribution_status` | `local-only` | 是否允许安装与再分发 |
 
-> 只有 `runtime-verified` 且通过发布门禁的组件才标记为可运行；`pending-legal-review` 始终覆盖分发状态。所以**「导入成功」不等于「可以运行」**——把状态拆成三维就是为了让这句话在报告里看得见。
->
-> 拼写差异：目录面（`compatibility_status`）用连字符写法，导入报告的三维面用下划线写法——同一组值的两种拼法，不要当成两组状态。
+> 组件仅在满足 `runtime-verified` 且通过发布门禁的前提下才标记为可运行；`pending-legal-review` 具备最高优先级，将覆盖所有分发状态（即导入成功不代表具备执行条件）。注：目录接口使用连字符命名（如 `compatibility_status`），导入报告内部则使用下划线字段，两者映射同一状态枚举。
 
 ## 连接器
 
-连接器（MCP server）是**宿主持有连接与凭据、替调用方执行**的那一类组件。能力分两半，权限也分两半：
+连接器（MCP Server）由本地宿主统一管理物理连接与敏感凭据，代调用方执行特定工具能力。其接口能力与权限控制严格划分为两套访问面：
 
 | 面 | 方法 | 需要宿主授权吗 |
 | --- | --- | --- |
-| **读面**（目录 / 状态 / 探测） | `connector/list`、`connector/get`、`connector/status`、`connector/test` | 不需要。`get` / `test` 会带上每个工具的参数 schema，先看清怎么调再调 |
-| **调用面**（真正执行工具） | `connector/call` | **需要**。宿主的 `[connector_proxy]` 默认关闭；开启后**已启用的连接器即可调用**，`allow` / `deny` 是操作者的可选收窄与减法——见[配置文件](/zh-CN/docs/configuration) |
+| **读面**（目录 / 状态 / 探测） | `connector/list`、`connector/get`、`connector/status`、`connector/test` | 否。`connector/get` 与 `connector/test` 附带工具参数 JSON Schema，供调用方校验参数结构 |
+| **调用面**（真正执行工具） | `connector/call` | **是**。宿主配置中的 `[connector_proxy]` 默认处于关闭状态；开启后已启用的连接器方可被调用，支持通过 `allow` / `deny` 名单执行细粒度权限过滤（详见 [配置文件](/zh-CN/docs/configuration)） |
 
-- **三种传输都支持**：stdio、Streamable HTTP 与旧式 SSE。
-- **凭据不出宿主**：OAuth 走标准 PKCE Loopback，令牌进安全存储、调用时注入；`mcp.json` 声明里的 `env` / `headers` 用 `secret:NAME` 引用，取值只在启动子进程时填进内存。
-- **调用方点不了名之外的东西**：只能点名一个**已注册**的连接器 id，不能指定 URL / 命令 / header——地址永远来自宿主自己的配置。
+- **传输协议支持**：支持 stdio、Streamable HTTP 以及标准 SSE 传输。
+- **凭据隔离边界**：OAuth 流程遵循标准 PKCE Loopback 协议，访问令牌注入本地安全存储；`mcp.json` 中配置的 `env` 与 `headers` 采用 `secret:NAME` 格式引用，仅在子进程启动时动态注入运行时内存。
+- **安全调用寻址**：调用方仅允许按已注册的连接器 ID 发起请求，禁止直接指定上游 URL、本地命令或请求头参数，通信目标严格以宿主配置为准。
 
 ### 运行时状态
 
-`connector/status` 的 `status` 只有这几个取值，判定顺序即下表顺序（`connector/list` 给的是同一份事实的**摘要视图**，两者可能不一致，见下）：
+`connector/status` 返回连接器的精确生命周期状态，系统严格按以下判定优先级顺序计算（`connector/list` 则返回轻量级摘要视图）：
 
 | 顺序 | 条件 | 状态 |
 | --- | --- | --- |
-| 1 | 连接器被停用 | `installed` |
-| 2 | 最近一次探测失败 | `error` |
-| 3 | 需要 OAuth 且尚未授权 | `authorization_required` |
-| 4 | 最近一次探测成功 | `connected` |
-| 5 | 其它（已启用、认证就绪，但还没探测成功过） | `configured` |
+| 1 | 连接器已被禁用 | `installed` |
+| 2 | 最近一次物理探测失败 | `error` |
+| 3 | 声明了 OAuth 鉴权且尚未完成授权 | `authorization_required` |
+| 4 | 最近一次物理探测成功 | `connected` |
+| 5 | 其余状态（已启用且鉴权正常，但尚未完成有效探测） | `configured` |
 
-> **`connected` 需要两件事同时成立**：认证就绪**且**最近一次探测成功。缺一不算——「登录成功但调用不通」不会得到某个中间状态，它表现为 `configured`（探测没成功）或 `error`（探测失败）。
+> `connected` 状态的充要条件为：鉴权就绪且最近一次物理探测成功。若仅完成鉴权但通信异常，状态将标为 `configured`（未探测成功）或 `error`（探测失败）。
 >
-> 判断「能不能调」请以 `connector/status` 为准：`connector/list` 里的 `status` 是同一份事实的摘要视图，它不查 OAuth 的实时状态，所以在「已授权但上次探测未成功」的连接器上可能比 `connector/status` 更悲观。
+> 判断调用可用性应以 `connector/status` 为准；`connector/list` 中的状态为摘要视图，不进行实时 OAuth 鉴权检测。
 
 ## 非目标（V1）
 
-云端执行、多租户、HA、完整 Marketplace 审核后台、签名更新体系、任意 Hook/bin 执行——均不在 V1 范围。
+云端托管执行、多租户隔离、高可用编排（HA）、市场审核管理后台、代码签名热更新体系以及任意非受控 Hook/可执行文件执行，均不在 V1 版本支持范围内。

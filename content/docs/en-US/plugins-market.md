@@ -1,31 +1,31 @@
 # Plugins & Marketplace
 
-Agent Store natively supports **plugins** and a **plugin marketplace**: a plugin bundles capabilities (experts, teams, skills, connectors, commands), and the marketplace is the distribution channel. Consistent with the runtime, the plugin system is **local-first** — the market only handles discovery and distribution; after import, everything (snapshots, credentials, execution) happens on your machine.
+Flowy Agent Store natively supports plugins and plugin marketplaces: a plugin packages functional assets (including experts, teams, skills, connectors, and commands), while a marketplace serves as the distribution channel. The plugin architecture adheres to the **local-first** paradigm — the marketplace manages discovery and distribution, while imported snapshots, credentials, and runtime execution remain entirely on the local machine.
 
 ## 1. What a plugin contains
 
-A plugin can carry the following components, which become reusable, standardized definitions in the Catalog after import:
+Importing a plugin converts assets into standardized, reusable component definitions within the Catalog:
 
 | Component | Description |
 | --- | --- |
-| Expert (AgentDefinition) | Reusable expert configuration, carried at runtime via the Preset mechanism |
-| Team (AgentTeamDefinition) | Fixed member roster + collaboration rules |
-| Skill (SkillDefinition) | Atomic capability invoked by an Agent; never runs standalone conversations |
-| Connector (ConnectorDefinition) | Managed capability for interacting with external systems, with a credential schema |
-| Command (CommandDefinition) | User-invokable prompts/commands |
-| Hooks / LSP | Lifecycle hooks and language servers (metadata level) |
+| Expert (AgentDefinition) | Reusable agent configuration, mounted via the Preset mechanism at runtime |
+| Team (AgentTeamDefinition) | Multi-agent collaboration definition containing member rosters and policies |
+| Skill (SkillDefinition) | Atomic capability invoked by an Agent; does not maintain independent conversations |
+| Connector (ConnectorDefinition) | Managed integration component (MCP) with credential schema declarations |
+| Command (CommandDefinition) | User-invokable prompts and task execution templates |
+| Hooks / LSP | Runtime lifecycle hooks and language server extensions (metadata level) |
 
 ## 2. Where marketplaces come from
 
-Marketplace sources are declared in [`~/.agent-store/config.toml`](/en-US/docs/configuration) with five `source_kind` values:
+Marketplace sources are declared in [`~/.agent-store/config.toml`](/en-US/docs/configuration) across five supported `source_kind` protocols:
 
 | source_kind | source | Notes |
 | --- | --- | --- |
-| `zip` | HTTP(S) archive URL | **What all three official markets use**: one archive whose **root is the market root** (the manifest sits at the archive root, not inside a wrapper folder), fetched in a single request |
-| `url` | HTTPS/HTTP manifest URL | A directory listing (`_files.txt`) is recommended so entry trees can mirror over HTTP |
-| `github` | GitHub repository | Fetches the marketplace manifest from GitHub |
-| `git` | Git repository URL | Syncs over the Git protocol |
-| `directory` | Local directory path | Points directly at a local market/plugin root |
+| `zip` | HTTP(S) archive URL | **Official marketplace standard**: single archive package where the root directory matches the catalog manifest root; synchronizes full metadata in a single request |
+| `url` | HTTPS/HTTP manifest URL | Remote manifest directory; supplying an index file (`_files.txt`) is recommended for incremental tree mirroring |
+| `github` | GitHub repository | Synchronizes marketplace manifests directly from a GitHub repository |
+| `git` | Git repository URL | Clones and pulls updates using the Git protocol |
+| `directory` | Local directory path | Directly points to a local filesystem development directory |
 
 ```toml
 # Each official market is a zip archive hosted on ModelScope;
@@ -43,15 +43,15 @@ source_kind = "zip"
 source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
 ```
 
-A `zip` source uses the archive's own sha256 for both freshness and integrity: the client sends a `HEAD` to the stable URL and reads `X-Linked-Etag` (that sha256); an unchanged digest means no download, and the downloaded bytes are verified against the same digest. On ModelScope a `.zip` goes through LFS, so the stable address answers **302** to a CDN URL carrying a time-limited `auth_key` signature — **write only the stable address, and never copy the CDN URL into a config or a doc**.
+The `zip` source verifies cache freshness and archive integrity via content hashes: the client dispatches an HTTP `HEAD` request to read the `X-Linked-Etag` header (representing the sha256 archive digest), skipping re-download when unchanged and validating payload integrity upon transfer. When hosted via ModelScope LFS, stable URLs return HTTP 302 redirects to signed CDN URLs; **always configure stable URLs in settings, never hardcode temporary signed CDN URLs**.
 
-`url` / `git` / `github` / `directory` all remain: third-party sources can still mirror a whole tree — a `url` source may ship a pre-generated `_files.txt` in the market root (one relative path per line) that clients walk to mirror the entry tree file by file.
+Other source kinds (`url`, `git`, `github`, `directory`) support full file tree mirroring. For `url` sources, the server may provide a precompiled `_files.txt` in the root directory for automated mirror sync.
 
-At startup the runtime fetches and parses these manifests, and the **Market** page (top navigation / footer) lets you browse every entry: experts, skills and connectors.
+The runtime parses configured marketplace manifests at startup. Entries can be searched and inspected via the **Market** link in the Web UI navigation.
 
 ## 3. Import: from market to Catalog
 
-Installing a marketplace entry (`store/install-entry`) runs the importer in a fixed order:
+Triggering an installation via the marketplace (`store/install-entry`) invokes the importer pipeline through the following deterministic sequence:
 
 ```text
 1. Locate the source (market entry / plugin root / skill or connector directory)
@@ -62,70 +62,70 @@ Installing a marketplace entry (`store/install-entry`) runs the importer in a fi
 6. Emit standardized definitions per component type and register them in the local Catalog
 ```
 
-Supported source formats:
+Supported manifest and directory structures:
 
-- **CodeBuddy / WorkBuddy plugins**: `.codebuddy-plugin/plugin.json` + component directories
-- **WorkBuddy skill marketplaces**: `.codebuddy-skill/marketplace.json` + `skills/<slug>/` (a single directory with `SKILL.md` also works)
-- **WorkBuddy connector marketplaces**: `.codebuddy-connector/connectors.json` + `connectors/<slug>/`
+- **CodeBuddy / WorkBuddy plugins**: `.codebuddy-plugin/plugin.json` with associated component trees
+- **WorkBuddy skill marketplaces**: `.codebuddy-skill/marketplace.json` with `skills/<slug>/` layout (or standalone directories containing `SKILL.md`)
+- **WorkBuddy connector marketplaces**: `.codebuddy-connector/connectors.json` with `connectors/<slug>/` layout
 
 ## 4. PluginSnapshot: immutable snapshots
 
-The core artifact of an import is a **PluginSnapshot** — an immutable image of the source content:
+The primary output of ingestion is a **PluginSnapshot**, representing a frozen, immutable capture of the source assets:
 
-- Contains source kind, source URI, declared version, `content_digest`, the component list and a compatibility report;
-- Any change in source content requires a **new** snapshot; historical snapshots are never mutated in place;
-- A running Agent / Team freezes its target snapshot and is unaffected by later Catalog updates;
-- Historical runs can be traced back to the exact snapshot, definition version and content digest.
+- Encapsulates source type, source URI, declared version, `content_digest`, component metadata, and compatibility evaluations;
+- Any change in source files mandates generating a new snapshot; existing snapshots remain strictly immutable;
+- Running Agent or Team instances bind to explicit snapshot IDs, insulating active runs from concurrent Catalog updates;
+- Enables complete traceability across Snapshot ID, definition revision, and content digest.
 
-Components that fail compatibility checks are marked with a status rather than silently dropped; resources with unconfirmed licenses never enter public distribution.
+Components failing static compatibility checks are marked with descriptive statuses rather than silently dropped; assets lacking explicit licensing are excluded from public catalogs.
 
 ## 5. Credentials & security
 
-- Importing a connector only **creates the credential schema**; real secrets are never read;
-- Real credentials enter local secure storage only at runtime — Web / SDK only ever see status, account identifiers and expiry;
-- Market sync and import never execute anything remotely; execution semantics belong exclusively to the local `allo` runtime.
+- **Schema-Only Ingestion**: Importing connectors registers credential schemas only; private keys are never accessed or stored during this phase;
+- **Dynamic Runtime Injection**: Secrets reside exclusively in local secure storage; external interfaces (Web / SDK) expose only configuration state and masked identifiers;
+- **Sandboxed Execution**: Manifest synchronization and asset ingestion never execute untrusted remote code; tool execution semantics are strictly isolated within the local `allo` Runtime.
 
 ## 6. Integrating a self-developed MCP server / custom skills
 
-**A self-developed MCP server does not need to go through the Marketplace registration interface.** The marketplace is only a distribution channel. An MCP server in fact has **three** sources, with different landing points and scopes:
+Developers can integrate custom MCP servers without publishing them to the public marketplace. MCP servers can be introduced through three distinct mechanisms:
 
 | Source | Lands in | Scope | Best for |
 | --- | --- | --- | --- |
-| The `~/.agent-store/mcp.json` declaration file | **no row**; read once at host start | that host's sessions | fixed local private servers. File format, fields and validation are in [Configuration](/en-US/docs/configuration) |
-| The MCP configuration API (the runtime's own HTTP surface) | a `mcp_servers` row | bound explicitly in a session / run | self-developed or private deployments that want connection tests and OAuth |
-| Marketplace / plugin distribution | a `mcp_servers` row, written at install time | as above | public distribution |
+| The `~/.agent-store/mcp.json` declaration file | **No database record**; read at host startup | All host sessions | Private local services. See [Configuration](/en-US/docs/configuration) for syntax and validation rules |
+| The MCP configuration API (HTTP endpoints) | `mcp_servers` table | Explicitly bound in a session or run | Self-hosted services requiring connection testing and OAuth flows |
+| Marketplace / plugin distribution | Written to `mcp_servers` upon installation | Same as above | Packaged assets intended for public or team distribution |
 
-All three can coexist. On a name collision **the declaration file > the `mcp_servers` row**, and an explicit binding made in one call outranks both; the source order and the read timing are defined once, in [Configuration](/en-US/docs/configuration), and not repeated here.
+Precedence hierarchy: for matching identifiers, **`mcp.json` declarations override `mcp_servers` records**; explicit bindings provided within an active invocation take highest precedence.
 
-The two paths below cover the **latter two** (both land in `mcp_servers`):
+The two persistent registration paths operate as follows:
 
 ### Path A: direct registration (recommended for self-developed / private deployments)
 
-Register by name through the MCP configuration API (these are the runtime's own HTTP endpoints and the host serves them; the Agent Store Web UI does **not** use them — that panel reads and writes the `mcp.json` declaration, see [Configuration](/en-US/docs/configuration)):
+Register servers by identifier via the host HTTP management API:
 
-- `POST /api/mcp/servers` — register/update an MCP server (upsert by name)
-- `POST /api/mcp/servers/import` — batch import
-- `POST /api/mcp/test-connection` — connection test
-- `/api/mcp/oauth/*` — standard OAuth (PKCE Loopback) login
+- `POST /api/mcp/servers` — Upsert an MCP Server by name
+- `POST /api/mcp/servers/import` — Batch import server definitions
+- `POST /api/mcp/test-connection` — Test physical socket connectivity
+- `/api/mcp/oauth/*` — Standard OAuth (PKCE Loopback) endpoints
 
-Three transports are supported; pick the one matching your server (the snippet below is the **value shape** of the `transport` field — a full request body also carries `name`; `mcp.json` is a different spelling, see [Configuration](/en-US/docs/configuration)):
+Three transport configurations are supported within the `transport` object:
 
 ```jsonc
-// Local process
+// Local child process (stdio)
 { "stdio": { "command": "./my-mcp-server", "args": [], "env": {} } }
-// Streamable HTTP (recommended for remote)
+// Streamable HTTP (recommended for remote endpoints)
 { "http": { "url": "https://mcp.example.com/mcp", "headers": { "Authorization": "Bearer <token>" } } }
-// SSE (legacy remote)
+// SSE (legacy remote streaming)
 { "sse": { "url": "https://mcp.example.com/sse", "headers": {} } }
 ```
 
-API keys / custom auth go directly in the transport `headers`; standard OAuth is handled by the runtime (login, storage, request injection). After registration, bind the server in a session/run (`selected_mcp_server_ids`) — the runtime `McpManager` connects and injects the tools into the model.
+Static authentication headers are passed within `headers`; OAuth lifecycles are orchestrated by the runtime. Once registered, servers are bound via `selected_mcp_server_ids` in session or run payloads, allowing `McpManager` to establish connections and expose tools to model prompts.
 
 ### Integrating via the TypeScript SDK
 
-The SDK's connector client is **catalog reads + OAuth pass-through + the call proxy**: `list` / `get` / `status` / `test` (`get` and `test` carry each tool's parameter schema, so you can see how to call it before calling it), `authStart` / `authStatus` / `waitForAuth` / `logout`, and `call`, which actually runs a tool over the host's own connection and needs the host to admit it in `[connector_proxy]` (see the [Configuration file](/en-US/docs/configuration)). **But** the App Server protocol has **no** WebSocket method for "register an MCP server", so inside the SDK a self-developed MCP server is wired in through the protocol-native **import → install** chain: package the server as a connector market directory, `import/run` it into an immutable PluginSnapshot, and `install/run` registers the connector into the runtime `mcp_servers` automatically.
+The SDK connector client provides catalog queries, OAuth lifecycles, and tool call delegation (`list`, `get`, `status`, `test`, `call`). Custom MCP servers can be registered programmatically through the native **import $\to$ install** pipeline:
 
-1. Create a minimal connector market directory — **two levels**: the market manifest lists entries, each entry's `source` points at its own directory, and the server declaration lives in there:
+1. Create a two-level directory structure for the connector source:
 
    ```text
    my-market/
@@ -144,7 +144,7 @@ The SDK's connector client is **catalog reads + OAuth pass-through + the call pr
    }
    ```
 
-   An entry is keyed by `id` or `name`, and `source` **must be relative**; the fields inside `mcp.json`'s `mcpServers` are the **same set** as `~/.agent-store/mcp.json` (`command` / `url` / `headers` / `env`), and the importer turns each of them into a connector component — fields and validation are in the [Configuration file](/en-US/docs/configuration).
+   The `source` attribute must be a relative directory path; `mcpServers` adheres to standard definitions:
 
    ```json
    {
@@ -154,7 +154,7 @@ The SDK's connector client is **catalog reads + OAuth pass-through + the call pr
    }
    ```
 
-2. Import and install within the SDK session (the `import` / `install` methods have no sub-client wrapper yet — pass them through `transport.request`):
+2. Execute import and installation within an active harness session:
 
    ```ts
    import { launchHarness } from "@flowy-agent-store/sdk";
@@ -181,23 +181,23 @@ The SDK's connector client is **catalog reads + OAuth pass-through + the call pr
    await harness.close();
    ```
 
-3. For standard OAuth, start with the SDK's `connector.authStart(connectorId)` and wait with `connector.waitForAuth(connectorId)` (its `error` carries the reason when it fails);
-4. At run time, inject via `mentions`: `{ kind: "connector", id }` appends to the run's MCP list (must be an enabled server); skills mount with `{ kind: "skill", id }`. Query install state with `install/status` and manage it with `install/enable` / `install/disable`.
+3. Initiate OAuth via `connector.authStart(connectorId)` and await resolution with `connector.waitForAuth(connectorId)`;
+4. Inject components at execution time via `mentions`: `{ kind: "connector", id }` mounts an active MCP server, while `{ kind: "skill", id }` mounts a skill. State can be inspected with `install/status` and toggled via `install/enable` / `install/disable`.
 
 ### Path B: marketplace / plugin distribution (for public distribution)
 
-To let others install your server from a marketplace in one click, package it as:
+For public distribution, MCP servers can be bundled into either:
 
-- **A connector marketplace entry**: `.codebuddy-connector/connectors.json` + `connectors/<slug>/`, published to a marketplace source (`source_kind` supports `zip` / `url` / `github` / `git` / `directory`);
-- **Plugin-level MCP**: a `.mcp.json` (`mcpServers` field) inside a `.codebuddy-plugin/` plugin package.
+- **Dedicated Connector Packages**: `.codebuddy-connector/connectors.json` accompanied by `connectors/<slug>/`, hosted on any supported marketplace source;
+- **Plugin-Level MCP Bundles**: A `.mcp.json` file defining `mcpServers` placed inside `.codebuddy-plugin/`.
 
-After installation both paths land in `mcp_servers` — the two paths converge. Note that V1 OAuth only supports standard PKCE Loopback; custom URI schemes, public relays and other complex auth flows are not yet supported.
+Client installations automatically populate the local `mcp_servers` table.
 
 ### Custom skills
 
-- SDK / protocol: `import/run` (`source_kind: "workbuddy-skill-market"`; a single directory containing `SKILL.md` also works) → `install/run`, then mount via a run mention;
-- Local: `POST /api/skills/import` (directory or zip) imports as user skills;
-- Marketplace: publish using the `.codebuddy-skill/marketplace.json` + `skills/<slug>/` layout.
+- **SDK / Protocol Ingestion**: Execute `import/run` (`source_kind: "workbuddy-skill-market"`) $\to$ `install/run`, then mount via run `mentions`;
+- **Local Filesystem Import**: Dispatch `POST /api/skills/import` (pointing to a local directory or ZIP file) to register a private user skill;
+- **Marketplace Publishing**: Distribute using the `.codebuddy-skill/marketplace.json` + `skills/<slug>/` layout.
 
 ## 7. Further reading
 
