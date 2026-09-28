@@ -1,21 +1,32 @@
 {
+  // 不 `extends` `@docusaurus/tsconfig`：那个预设里写着 `baseUrl: "."`，而本站用的
+  // TypeScript 7 已经**移除**了 `baseUrl`（报 `TS5102`），继承会让 typecheck 直接失败。
+  // 它真正提供的两项在这里等价给出：
+  //   - `paths` 里的 `@site/*` → 仓库根（Docusaurus 的模块别名，`docusaurus.config.ts` 也会用到）
+  //   - 其余编译选项由下面按站点需要显式写出
+  // 注意 TS7 起 `paths` 相对**本文件所在目录**解析，不再依赖 `baseUrl`。
   "compilerOptions": {
     "target": "ES2023",
-    "useDefineForClassFields": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx",
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "verbatimModuleSyntax": true,
-    "types": ["bun", "vite/client"]
+    "paths": {
+      "@site/*": ["./*"]
+    },
+    "types": ["bun", "@docusaurus/module-type-aliases", "@docusaurus/theme-classic"]
   },
-  "include": ["app", "vite.config.ts", "react-router.config.ts"]
+  "include": ["src", "docusaurus.config.ts", "scripts"],
+  "exclude": ["build", ".docusaurus", "node_modules"]
 }

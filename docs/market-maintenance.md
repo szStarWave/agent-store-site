@@ -6,7 +6,7 @@
 - 适用范围：新增、修改、下架市场条目
 - 不适用：改站点页面与样式、改文档、发版（见文末「相关文档」）
 - **关键前提：所有资源改动都不需要改代码。** 目录页直接读 `content/market.json`，
-  预渲染路由 `react-router.config.ts` 已覆盖 `/market` 与 `/{lang}/market`。
+  路由 `/market` 与 `/{lang}/market` 已由 `src/pages/` 下的页面覆盖。
 
 ## agent 执行须知
 
@@ -32,9 +32,9 @@ market-source/{experts,skills,connectors}/     提交进仓库，上游的 1:1 �
         ▼
 content/market.json                            提交进仓库，目录页数据源
         │
-        ├─ bun run dev      →  http://127.0.0.1:5173/zh-CN/market
-        └─ bun run build    →  预渲染 HTML，并把 market-source/ 拷为
-                               build/client/source/  →  对外 /source/<market>/…
+        ├─ bun run dev      →  http://127.0.0.1:5173/zh-CN/market（dev 直接把 /source/** 映射到 market-source/）
+        └─ bun run build    →  SSG 生成 HTML，并把目录页头像拷为
+                               build/source/  →  对外 /source/<market>/…
 ```
 
 | 路径 | 角色 | 谁维护 |
@@ -42,7 +42,7 @@ content/market.json                            提交进仓库，目录页数据
 | 上游市场工作目录 | 原始资源树 | 运行时/市场侧；**不是本仓库** |
 | `market-source/` | 上游的 1:1 镜像，含每市场的 `_files.txt` | `sync:tree` 生成，**禁止手工编辑** |
 | `content/market.json` | 目录页用的精简快照 | `sync:market` 生成，**禁止手工编辑** |
-| `build/client/source/` | 构建产物里**本站托管的那部分**树（默认三个市场整树，可只留一部分，见下） | `copy-market-tree.mjs` 生成，构建产物不入库 |
+| `build/source/` | 构建产物里目录页引用的头像（`copy-market-tree.mjs` 生成，构建产物不入库） | `copy-market-tree.mjs` 生成，构建产物不入库 |
 
 对外，本站同时是三个市场源（`url` 型 `source_kind`）：
 
@@ -65,36 +65,40 @@ content/market.json                            提交进仓库，目录页数据
 ### 托管边界：哪些市场由本站整树托管
 
 EdgeOne Makers 对**构建产物**有两条硬上限（官方排障指南给出，且没有提额入口）：**≤ 20,000 个文件**、
-**单文件 ≤ 25 MiB**。现状：
+**单文件 ≤ 25 MiB**。三个市场整树加起来远超这条线：
 
 | 部分 | 文件数 |
 | --- | --- |
-| 站点自身（页面、文档） | 94 |
+| 站点自身（页面、文档、资源） | 约 90 |
 | `experts` | 14,714（含 45.8 MiB 的 `malaysia-legal` 数据集） |
 | `skills` | 4,634 |
 | `connectors` | 3,264 |
-| 合计 | **22,706** ← 超限：日志停在 `Checking output`，随后 `File count exceeds project limit.` |
+| 合计 | **约 22,700** ← 超限：日志停在 `Checking output`，随后 `File count exceeds project limit.` |
 
-所以 `scripts/copy-market-tree.mjs` 支持只整树托管其中一部分。开关是脚本里的
-**`HOSTED_DEFAULT` 常量**（随提交进仓库、推送即生效，EdgeOne 不需要额外配置）；环境变量
-`SITE_HOSTED_MARKETS` 只是本地的临时覆盖，用来试算：
+**现状（doc 30）：三个市场都已迁到 ModelScope 的 zip 归档**（`bun run pack:market` 打包、
+`bun run publish:market` 上传），本站**一个都不整树托管**，`copy-market-tree.mjs` 的
+`HOSTED_DEFAULT` 是**空数组**。产物里只留目录页引用的头像（648 个文件、约 103 MB）。
+
+「只托管部分市场」这条能力仍然保留，将来若要回退，改 `HOSTED_DEFAULT` 这一个常量即可
+（随提交进仓库、推送即生效）；环境变量 `SITE_HOSTED_MARKETS` 只是本地试算用的覆盖：
 
 ```powershell
-$env:SITE_HOSTED_MARKETS="skills,connectors"   # 例如把专家交给别的宿主
-bun run build                                   # 产物变成 94 + 4,634 + 3,264 + 306 ≈ 8,298 文件
+$env:SITE_HOSTED_MARKETS="skills,connectors"   # 未列出的市场只留目录页引用的图片
+bun run build
 ```
 
-- **默认值仍是三个全托管**，也就是行为不变；
 - 不在列表里的市场**只保留目录页引用的图片**（从 `content/market.json` 的 `avatar` 路径取），
   目录页的图标因此始终正常——目录页头像是按同源解析的；
 - 它只是产物侧的开关：不改 `market-source/`、不改 `content/market.json`、不影响 `check:market`。
 
-> **顺序铁律：先把新宿主和「老 URL 怎么办」安排妥当，再把这个市场从 `SITE_HOSTED_MARKETS` 里去掉。**
-> 客户端 `~/.agent-store/config.toml` 里写的是 `<站点>/source/<market>/…`；市场从站点消失而没有替代，
-> 那些客户端下次刷新就拉不到市场，而镜像语义是「上游没有即删除」，可能连带删掉用户已装的条目。
+> **顺序铁律：先把新宿主和「老 URL 怎么办」安排妥当，再把某个市场放回 `HOSTED_DEFAULT` 或从
+> `SITE_HOSTED_MARKETS` 里去掉。** 客户端 `~/.agent-store/config.toml` 里写的是
+> `<站点>/source/<market>/…`；市场从站点消失而没有替代，那些客户端下次刷新就拉不到市场，
+> 而镜像语义是「上游没有即删除」，可能连带删掉用户已装的条目。官方源现已指向 ModelScope 的
+> zip 归档，与本站产物无关。
 
-开发态与此**不一致**：`vite.config.ts` 的 `marketSourcePlugin()` 直接从 `market-source/` 托管
-`/source/**`、不看这个开关，所以本地永远能看到完整树。
+开发态与产物**不一致**：`src/plugins/market-source-dev.ts` 直接把 `market-source/` 托管在
+`/source/**` 上、不看托管开关，所以本地永远能看到完整树（仅 dev，不进产物）。
 
 ## 2. 四类资源的文件与字段规范
 
@@ -279,7 +283,7 @@ bun run dev            # http://127.0.0.1:5173
   标题、简介、标签、图标正确
 - 资源可达性：抽一个图标或文件地址，例如
   `http://127.0.0.1:5173/source/connectors/icons/<slug>.svg` 应返回 200
-  （开发态由 `vite.config.ts` 的 `marketSourcePlugin()` 直接托管 `market-source/`）
+  （开发态由 `src/plugins/market-source-dev.ts` 直接托管 `market-source/`）
 - 判定某条是否已被收录时**精确匹配名字**，不要只按关键词：
 
   ```powershell
@@ -297,9 +301,10 @@ git push origin main
 
 - **两个路径要一起提交**：只提交 `market-source/` 会让页面与树不一致，只提交
   `content/market.json` 则指向了不存在的文件。
-- 推送 `main` 会触发 EdgeOne Makers 构建；构建里 `copy-market-tree.mjs` 把树拷进
-  `build/client/source/`。`_files.txt` 在 `edgeone.json` 中被显式设为 `no-cache`，
-  因为客户端会轮询该清单，缓存会导致新条目不可见。
+- 推送 `main` **本应**触发 EdgeOne Makers 构建（该自动触发自 2026-09-17 起失效，需手动触发，
+  见 [`deploy-trigger.md`](deploy-trigger.md)）；构建里 `copy-market-tree.mjs` 把目录页头像拷进
+  `build/source/`。`/source/**` 在 `edgeone.json` 中被设为 `max-age=0, must-revalidate`，
+  因为头像与市场清单路径都不带 hash，长缓存会让新条目/新图标不可见。
 - 提交信息建议单独成一笔，不要和业务代码改动混在一起（`market-source/` 变动通常
   几百个文件）。
 
@@ -585,9 +590,9 @@ git status --short               # 两个产物成对出现，且没有手改过
 | 英文站技能标题是中文 | 技能清单没有 `name_en` | 上游数据限制，需上游补字段 |
 | 目录页数字没变化 | 只跑了 `sync:tree`，或 `content/market.json` 没提交 | 跑 `bun run sync`，并把两个路径一起提交 |
 | 条目在树里但页面搜不到 | 只提交了 `market-source/` | 补提交 `content/market.json` |
-| 线上 `/source/…` 404 | 构建未完成，或直接跑了 `react-router build`（漏掉拷贝步骤） | 用 `bun run build`；本地 `preview` 刻意不兜底 `/source`，以便暴露这种情况 |
-| `bun run dev` 起不来，报 safe-delete / trash 操作失败 | 环境变量 `NODE_OPTIONS` 注入了 node-language-shim，`react-router dev` 清理 `.react-router/types` 时触发 | 先 `$env:NODE_OPTIONS=""` 再启动 |
-| 市场镜像客户端连不上开发服务器，本地代理报 502 / ECONNREFUSED | 默认 `host: "localhost"` 在 Windows 上只绑到 `::1`，而代理转发到 `127.0.0.1` 被拒 | 已由 `vite.config.ts` 的 `host: "127.0.0.1"` 处理；浏览器访问 `localhost` 仍可用（会回落） |
+| 线上 `/source/…` 404 | 构建未完成，或直接跑了 `docusaurus build`（漏掉拷贝步骤） | 用 `bun run build`；本地 `preview` 刻意不兜底 `/source`，以便暴露这种情况 |
+| `bun run dev` 起不来，报 safe-delete / trash 操作失败 | 环境变量 `NODE_OPTIONS` 注入了 node-language-shim | 先 `$env:NODE_OPTIONS=""` 再启动 |
+| 市场镜像客户端连不上开发服务器，本地代理报 502 / ECONNREFUSED | 默认 host 解析在 Windows 上只绑到 `::1`，而代理转发到 `127.0.0.1` 被拒 | 已由 `bun run dev` 里的 `--host 127.0.0.1` 处理；浏览器访问 `localhost` 仍可用（会回落） |
 | git 提示 `CRLF will be replaced by LF` | Windows 行尾差异 | 正常，忽略 |
 | 同步后条目「凭空」少了几个 | 本机上游副本旧或不全，预检的 `-removed` 没被检查（见 4.3） | 从 `git log` 找回被删条目并补回上游副本，再按 4.4 重做 |
 | 目录页出现两张重复卡片 | 上游清单里同一资源登记了两次（门禁不拦，见 4.3） | 上游删掉重复条目后重新同步；提交前跑 4.3 的查重命令 |
@@ -651,7 +656,11 @@ git check-ignore -v market-source/experts/plugins/<专家>/skills/<技能>/.code
 | 带图标条目 | 648（专家 306 / 381、技能 114 / 268、连接器 228 / 228） |
 | `market-source/` 文件数 | 22,612（含三份 `_files.txt`） |
 | 三份清单行数 | 专家 14,713、技能 4,633、连接器 3,263 |
-| 仓库体积 | `market-source` 695.3 MB、`build/client` 699.1 MB、`.git` 约 277 MB |
+| 仓库体积 | `market-source` 695.3 MB、`.git` 约 277 MB |
+| 站点产物体积 | 约 110 MB（其中 `build/source` 的目录页头像约 103 MB） |
+
+> 产物体积与旧站（`build/client` 699.1 MB）不可比：三个市场已迁到 ModelScope 的 zip 归档，
+> 站点不再整树托管它们，只留目录页引用的头像。
 
 > **2026-09-17 更正**：此前记的 22,696 含 84 个只存在于同步机磁盘、进不了提交的文件
 > （4 个专家的 `skills/fbs-bookwriter/.codebuddy/{agents,providers}`）。它们从未出现在已发布

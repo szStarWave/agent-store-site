@@ -335,7 +335,7 @@ const PROBE_NAMES = [
   "logs/run.md",
   "market-icons/a.svg",
   ".codebuddy/agents/a.md",
-  ".react-router/x.ts",
+  ".docusaurus/x.ts",
   ".tef_dist/a.js",
   ".edgeone/a.json",
   ".cache/a.json",

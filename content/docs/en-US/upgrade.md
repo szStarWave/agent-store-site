@@ -1,49 +1,43 @@
 # Upgrade and migration guide
 
-This page answers three questions: **can I upgrade**, **which version do I take**, and **how do I do it**. It covers `@flowy-agent-store/{protocol,client,sdk}` and the platform runtime packages that ship alongside them.
-
-Release facts and upgrade steps live here; the full method semantics stay in the repo file `docs/agent-store/05-allo-app-server-protocol.md`.
+This document provides migration procedures, versioning policies, and compatibility guarantees for `@flowy-agent-store/{protocol,client,sdk}` and associated platform runtime dependencies.
 
 ## 1. Compatibility promise (current stance)
 
-**No backward compatibility is promised during beta.** All three packages are `0.1.0-beta.*` pre-releases with an unfrozen API: type narrowing, methods added or dropped, and event-surface changes can all happen inside the beta line.
+**Backward compatibility is not guaranteed during the beta phase.** The packages currently publish under `0.1.0-beta.*` prerelease semantics with unfrozen APIs: type narrowing, method signature changes, and event stream adjustments may occur across beta iterations.
 
-Two rules go with that (decided as D10=A):
+Release management principles:
 
-- inside the beta line, a breaking change ships under the **next pre-release counter** (`0.1.0-beta.3` → `0.1.0-beta.4`) and is marked **breaking in the changelog, one entry at a time, with a migration path**; a **minor** number (`0.1.x` → `0.2.0`) is reserved for breaking changes **after beta** — there is no stable release to break yet, so no major number is used;
-- every release states its change type **in the [changelog](/en-US/docs/changelog)** (see §9).
+- Within the beta line, **breaking changes increment the prerelease identifier** (such as `0.1.0-beta.3` $\to$ `0.1.0-beta.4`) and are explicitly cataloged with migration steps in the [Changelog](/en-US/docs/changelog). Minor version increments (such as `0.2.0`) are reserved for breaking releases following graduation from beta.
+- Detailed classification of modifications is documented in the [Changelog](/en-US/docs/changelog).
 
-Two consequences for your daily work:
+Integration guidelines:
 
-- pin an exact version in production (see §5) instead of trusting what a bare `bun add` / `npm install` resolves to (see §4);
-- read the [changelog entry](/en-US/docs/changelog) for the target version first, then follow the per-version steps in §6.
+- Production environments must **pin exact package revisions** (see §5) and avoid relying on loose version ranges (see §4);
+- Review the target version's [Changelog entry](/en-US/docs/changelog) prior to executing the migration steps in §6.
 
 ## 2. Published release sequence (facts)
 
-The table is derived from registry metadata and from the published artifacts (commands to reproduce are in §8):
+The following table documents published releases, distribution tags, and breaking characteristics:
 
-| Version | Published (UTC) | dist-tag today | Difference from the previous release |
+| Version | Published (UTC) | Current dist-tag | Substantive changes from prior release |
 | --- | --- | --- | --- |
-| `0.1.0` | 2026-09-09T09:09:04Z | none | first publish; for all three packages the **code and type declarations are byte-identical to beta.2**, only `package.json` differs: the sdk had no `optionalDependencies` then (no platform runtime packages attached) |
-| `0.1.0-beta.2` | 2026-09-09T09:27:36Z | `latest` | adds the sdk `optionalDependencies` (five platform runtime packages for darwin / linux / win32, same version) |
-| `0.1.0-beta.3` | 2026-09-10T04:44:34Z | — | adds public declarations to client / sdk (reconnect lifecycle, exit observation, see §6.1); `package.json` gains `engines.node >= 22`, `repository` and `sideEffects`; the protocol declarations are unchanged byte for byte |
-| `0.1.0-beta.7` | 2026-09-20T10:33:48Z | `beta` | **breaking**: the protocol fingerprint moved to `fp-8` (older clients cannot connect to this runtime) — two WebSocket-only methods, `agent/export` / `team/export`, now return a portable `ExpertPack`; the method count moves `48 / 71` → `48 / 73` with the mapped count unchanged. **No type narrowing or renames**, so code usually needs no changes (steps in §6.6) |
-| `0.1.0-beta.6` | 2026-09-18T11:08:21Z | — | **breaking**: the entry point of `@flowy-agent-store/sdk` was **renamed and reshaped** (`launchClient` → `launchHarness`, no more `.client` hop, `initializeResult` → `handshake`), so **code changes are required**; the wire is untouched — fingerprint still `fp-7` and still `48 / 71` (steps in §6.5) |
-| `0.1.0-beta.5` | 2026-09-17T11:41:10Z | — | **breaking**: the protocol fingerprint jumped from `fp-1` to `fp-7` (older clients cannot connect to the new runtime); everything else is additive — the connector tool's `input_schema` / `tools_truncated`, per-turn Skill mounting (`mentions` honours `kind: "skill"` only), `agent_id` / `team_id`, `model` / `reasoning_effort`, and the new `zip` marketplace source kind. No methods added or removed, still `48 / 71` (steps in §6.4) |
-| `0.1.0-beta.4` | 2026-09-16T10:24:02Z | — | **breaking**: the protocol fingerprint became the strict-equality `fp-1` (older clients cannot connect to this runtime) and `event_type` was narrowed to the closed union `ConversationEventType`; it also carries the Skill file-tree read face, the `connector/call` proxy and `conversation/list-changed` (steps in §6.3); the client now maps `48 / 71` methods over HTTP |
-
-Note that `0.1.0` is the **earliest** publish (about 18 minutes before beta.2) and yet no dist-tag points at it; it is neither a stable release nor newer than the beta line.
+| `0.1.0-beta.7` | 2026-09-20T10:33:48Z | `beta` | **Breaking**: Protocol fingerprint incremented to `fp-8` (strict equality check); adds WebSocket APIs `agent/export` and `team/export`, bringing total methods to 73 (steps in §6.6) |
+| `0.1.0-beta.6` | 2026-09-18T11:08:21Z | — | **Breaking**: SDK API reshaping (`launchClient` renamed to `launchHarness`, `.client` nesting removed, `initializeResult` renamed to `handshake`), requiring code updates; wire remains `fp-7` (steps in §6.5) |
+| `0.1.0-beta.5` | 2026-09-17T11:41:10Z | — | **Breaking**: Protocol fingerprint updated to `fp-7`; adds connector `input_schema`, per-turn skill mounting, session `agent_id`/`team_id`, and `zip` marketplace protocol (steps in §6.4) |
+| `0.1.0-beta.4` | 2026-09-16T10:24:02Z | — | **Breaking**: Protocol fingerprint enforces strict equality `fp-1`; `event_type` narrowed to closed union `ConversationEventType`; introduces skill file reads and tool proxying (steps in §6.3) |
+| `0.1.0-beta.3` | 2026-09-10T04:44:34Z | — | Introduces client lifecycle observation APIs (`onLifecycle`, exit hooks); declares `engines.node >= 22` and repository metadata (steps in §6.1) |
+| `0.1.0-beta.2` | 2026-09-09T09:27:36Z | `latest` | Bundles platform runtime dependencies across darwin, linux, and win32 architectures |
+| `0.1.0` | 2026-09-09T09:09:04Z | none | Initial untagged publish; source and type declarations match `beta.2` but lack optional platform dependencies |
 
 ## 3. What dist-tags mean
 
-A `dist-tag` is a label the publisher can move; it says nothing about version ordering:
+`dist-tag` pointers represent mutable registry aliases:
 
 | dist-tag | Points at today |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
 | `beta` | `0.1.0-beta.7` |
-
-`0.1.0` carries no tag at all. The three packages and `@flowy-agent-store/runtime-*` agree on both tags (verified).
 
 ```bash
 npm view @flowy-agent-store/sdk versions dist-tags --json
@@ -56,226 +50,152 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 }
 ```
 
-Two traps:
-
-1. `latest` is **not** the newest version — it points at `0.1.0-beta.2`, while the newest beta is `0.1.0-beta.7` under the `beta` tag.
-2. `0.1.0` has no tag, but a version range can still resolve to it (see §4).
-
-Also note that the `versions` array is **not** in chronological order: `0.1.0` is listed last and was published first.
+Key considerations:
+1. `latest` does not track newest commits and remains pinned to `0.1.0-beta.2`; active prereleases track under `beta`.
+2. Initial release `0.1.0` carries no tag but remains matchable by permissive version range selectors.
 
 ## 4. Bare installs and range resolution
 
-A bare install follows `latest`, so it lands on `0.1.0-beta.2`; worse, bun writes a **range** into `package.json` (`^0.1.0-beta.2`), so the next install resolves again — and one range does not resolve the same way in every tool.
-
-Measured in throwaway directories with an empty `node_modules`:
+Unspecified installation targets resolve against `latest`; ambiguous version ranges (such as `^0.1.0-beta.2`) resolve inconsistently across package managers.
 
 ```bash
 bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2 (latest)
 bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.7
-bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → bun resolves 0.1.0-beta.2
-npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → npm resolves 0.1.0 (the untagged early publish)
+bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → resolves 0.1.0-beta.2
+npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → resolves 0.1.0
 ```
 
-Conclusion: **do not rely on range resolution**. A tag alias is no safer — `latest` moves on the next publish (so does `beta`), so `@beta` written today may install another version tomorrow. Write the exact version into `package.json`.
+Policy: **Production dependencies must declare exact package versions** rather than dynamic tags or semver ranges.
 
 ## 5. Pin the exact version (recommended)
 
 ```bash
-# Write the exact version; avoid ^ and ~
+# Pin exact package versions
 bun add @flowy-agent-store/sdk@0.1.0-beta.7
-bun add @flowy-agent-store/protocol@0.1.0-beta.7   # when you import wire types
+bun add @flowy-agent-store/protocol@0.1.0-beta.7
 
-# same for npm / pnpm
+# Using npm / pnpm
 npm install @flowy-agent-store/sdk@0.1.0-beta.7
 ```
 
-`package.json` should end up with `"@flowy-agent-store/sdk": "0.1.0-beta.7"` (**no** `^`). The sdk's platform runtime packages are pinned to the same version by its `optionalDependencies`, so they need no separate entry.
-
-Commit the lockfile too: `bun.lock` / `package-lock.json` / `pnpm-lock.yaml` is the only authoritative record of what an install actually pulled.
-
-An upgrade is then: change that one string, reinstall, re-run your tests. Nothing else.
+Ensure `package.json` entries omit `^` or `~` prefixes, and commit generated lockfiles (`bun.lock`, `package-lock.json`, or `pnpm-lock.yaml`) to version control.
 
 ## 6. Per-version upgrade steps
 
 ### 6.1 From 0.1.0-beta.2 to 0.1.0-beta.3
 
-This is the **first** beta-to-beta jump and it needs **no code change**: the measured difference is added declarations only (client: `TransportLifecycle` / `onLifecycle` / `connectTimeoutMs` / subscription `rearm()`; sdk: `assertProtocolCompatible`, `SpawnOptions.env` / `cwd` / `onExit`, `SpawnedServer.exited`, `SpawnExitInfo`) plus `package.json` metadata; the protocol declarations are unchanged byte for byte. The second one — which does carry breaking changes — is §6.3.
+Additive release requiring no code changes:
 
 ```bash
-# 1) see what is actually installed
-bun pm ls | grep '@flowy-agent-store'          # npm projects: npm ls @flowy-agent-store/sdk
-# 2) pin the target version (upgrade the packages you use, on one version)
+# 1) Inspect installed packages
+bun pm ls | grep '@flowy-agent-store'
+# 2) Pin target version
 bun add @flowy-agent-store/sdk@0.1.0-beta.3
 bun add @flowy-agent-store/protocol@0.1.0-beta.3
-# 3) confirm what got resolved
+# 3) Verify resolved revision
 node -p "require('@flowy-agent-store/sdk/package.json').version"
-# 4) re-run your own type check and tests
+# 4) Run typecheck and test suite
 bun run typecheck && bun run test
 ```
 
-If you point `AGENT_STORE_BIN` at a self-built binary, note that the SDK **checks the readiness line's `protocol_version` against its own** (see the [TypeScript SDK cookbook](/en-US/docs/examples-sdk) §12): after upgrading the SDK an older binary is rejected, so update the binary in the same step.
+Update custom binaries referenced via `AGENT_STORE_BIN` concurrently to maintain handshake compatibility.
 
-### 6.2 From 0.1.0 back onto the beta line
+### 6.2 From 0.1.0 Back to the Beta Line
 
-`0.1.0` was the first publish and carries no dist-tag; for all three packages its **code and type declarations are byte-identical to `0.1.0-beta.2`**, and the only difference is `package.json` — in particular the sdk at that time had **no** `optionalDependencies`, so it does not bring `@flowy-agent-store/runtime-win32-x64` or the other platform runtime packages, and `launchHarness` may fail to find an executable.
+Migrate untagged `0.1.0` installations to the active beta branch:
 
 ```bash
-# move off the untagged 0.1.0 onto the current beta line (current beta: see §3)
 bun add @flowy-agent-store/sdk@0.1.0-beta.7
-bun pm ls | grep '@flowy-agent-store'   # confirm 0.1.0 is gone
+bun pm ls | grep '@flowy-agent-store'
 ```
-
-The move from `0.1.0` to `beta.3` is additive: the public declaration surface only grew (the runtime packages added in `beta.2`, the reconnect and exit observation added in `beta.3`) — nothing was removed or renamed. **`beta.4` is not additive** — it carries type narrowing and a strict-equality protocol fingerprint, see §6.3; **`beta.5` is not additive either** (the fingerprint is compared for strict equality again), but it needs **no code changes**, see §6.4. **`beta.6` is not additive either** — the SDK entry point was renamed and reshaped, and it **does** require code changes, see §6.5; **`beta.7` is not additive either** (the fingerprint moves `fp-7` → `fp-8`), but it needs **no code changes**, see §6.6.
 
 ### 6.3 From 0.1.0-beta.3 to 0.1.0-beta.4
 
-This is the **first beta-to-beta jump that carries breaking changes**, so it is not just a version bump:
+Introduces breaking changes:
 
 ```bash
-# 1) see what is actually installed
-bun pm ls | grep '@flowy-agent-store'          # npm projects: npm ls @flowy-agent-store/sdk
-# 2) pin 0.1.0-beta.4 (upgrade the packages you use, on one version)
 bun add @flowy-agent-store/sdk@0.1.0-beta.4
 bun add @flowy-agent-store/protocol@0.1.0-beta.4
-# 3) confirm what got resolved
-node -p "require('@flowy-agent-store/sdk/package.json').version"
-# 4) re-run your type check and tests — ConversationEvent.event_type is a closed union now
 bun run typecheck && bun run test
 ```
 
-Two differences you have to handle:
-
-1. **The protocol fingerprint is compared for strict equality**: `0.1.0-beta.3` reports `2026-08-26`, `0.1.0-beta.4` reports `fp-1`. Both the handshake and the SDK's readiness-line check use strict equality, so **an older client cannot connect to the new runtime**. If you point `AGENT_STORE_BIN` at a self-built binary, upgrade the SDK and the binary **together** (or move to `@flowy-agent-store/runtime-win32-x64@0.1.0-beta.4`).
-2. **`ConversationEvent.event_type` narrowed**: code that reads it as a `string` must handle the closed union `ConversationEventType` (`RunEvent.event_type` stays an open `string` and is unaffected). When you need a discriminated branch, use the in-package decoder `decodeConversationEvent(event)`, which returns a `DecodedConversationEvent` carrying `kind` — do not let a `default: break` swallow unknown kinds.
-
-The additive items need no code changes: the Skill file-tree read face (`skill/files` / `skill/file`), the Connector call proxy (`connector/call`, off by default), the `conversation/list-changed` notification, and so on.
+Migration requirements:
+1. **Strict Protocol Equality**: Fingerprint updated to `fp-1`; update host runtime binaries concurrently.
+2. **Event Type Narrowing**: `ConversationEvent.event_type` narrows to `ConversationEventType`; use `decodeConversationEvent` for discriminant matching.
 
 ### 6.4 From 0.1.0-beta.4 to 0.1.0-beta.5
 
-The fingerprint is compared for strict equality again (`fp-1` → `fp-7`), so upgrading is **mandatory**; but this release has **no type narrowing and no methods added or removed**, so **no code changes are required**:
-
 ```bash
-# 1) see what is actually installed
-bun pm ls | grep '@flowy-agent-store'          # npm projects: npm ls @flowy-agent-store/sdk
-# 2) pin 0.1.0-beta.5 (upgrade the packages you use, on one version)
 bun add @flowy-agent-store/sdk@0.1.0-beta.5
 bun add @flowy-agent-store/protocol@0.1.0-beta.5
-# 3) confirm what got resolved
-node -p "require('@flowy-agent-store/sdk/package.json').version"
-# 4) re-run your type check and tests — it should pass with zero changes
 bun run typecheck && bun run test
 ```
 
-The only thing you have to handle is the **fingerprint**: `0.1.0-beta.4` reports `fp-1`, this release reports `fp-7`. If you point `AGENT_STORE_BIN` at a self-built binary, upgrade the SDK and the binary **together** (or move to `@flowy-agent-store/runtime-win32-x64@0.1.0-beta.5`).
-
-The optional fields added (none of which changes existing behaviour): `ConnectorTool.input_schema`, `ConnectorDetail.tools_truncated`, `ConnectorProbeResult.tools_truncated`, `ConversationCreateInput.agentId` / `teamId`, `AgentRunInput.model` / `reasoningEffort`, `ConversationView.reasoning_effort`, and `MarketplaceSourceKind`'s `"zip"`.
-
-Two **behaviour** changes (the signatures are unchanged, so type checking will not catch them):
-
-1. **The host config `[connector_proxy]` grant shape** (`fp-2`): `allow` went from a **mandatory per-tool allowlist** to an **optional narrowing**, and `deny` was added (it subtracts **after** `allow`). The semantics are now: `enabled = true` with **no** `allow` ⇒ every tool of that connector is **callable**; writing an `allow` narrows to it, and an `allow` that is present but empty (`allow = []`) ⇒ **nothing is callable**; with no such table at all ⇒ nothing is callable. So **a host that previously wrote only `enabled = true` without listing tools one by one ends up with a wider grant surface after upgrading** — re-read that table; a warning is logged at startup for exactly this case (`enabled with neither "allow" nor "deny"`), so use it as the checklist.
-2. **`conversation/send`'s `mentions` honours `kind: "skill"` only** (`fp-3`): `agent` / `connector` are explicitly refused with `invalid_request`. The field's type surface already shipped in `0.1.0-beta.4`, so this one is only visible at runtime.
+- **Protocol Fingerprint**: Incremented to `fp-7`; requires binary updates.
+- **Proxy Permissions**: `allow` within `[connector_proxy]` becomes an optional whitelist, defaulting to permissive proxying for enabled connectors when omitted.
 
 ### 6.5 From 0.1.0-beta.5 to 0.1.0-beta.6
 
-**Upgrading is mandatory, and code changes are required**: the fingerprint did not move (still `fp-7`, so the wire interoperates with `0.1.0-beta.5`), but the entry point of `@flowy-agent-store/sdk` was **renamed and reshaped** — this release's only breaking change, and the reason it rides a pre-release counter rather than a minor number.
+Refactors SDK interface contracts:
 
 ```bash
-# 1) see what is actually installed
-bun pm ls | grep '@flowy-agent-store'          # npm projects: npm ls @flowy-agent-store/sdk
-# 2) pin 0.1.0-beta.6 (upgrade the packages you use, on one version)
 bun add @flowy-agent-store/sdk@0.1.0-beta.6
 bun add @flowy-agent-store/protocol@0.1.0-beta.6
-# 3) confirm what got resolved
-node -p "require('@flowy-agent-store/sdk/package.json').version"
-# 4) re-run your type check — this time it **fails**, and every error is a site to fix
 bun run typecheck
 ```
 
-**The three things to change** (what `launchClient` returned **is** the client now; there is no wrapper):
+Code migration mapping:
 
 ```ts
-// before (0.1.0-beta.5)
+// Prior usage (0.1.0-beta.5)
 const session = await launchClient({ client: { name: "my-app", version: "1.0.0" } });
 await session.client.conversations.create({ name: "demo" });
 session.initializeResult.protocol_version;
 
-// after (0.1.0-beta.6)
+// Updated standard (0.1.0-beta.6)
 const harness = await launchHarness({ client: { name: "my-app", version: "1.0.0" } });
 await harness.conversations.create({ name: "demo" });
 harness.handshake.protocol_version;
 ```
 
-1. the function `launchClient` → **`launchHarness`**, and the types `LaunchedClient` → **`Harness`** / `LaunchOptions` → **`HarnessOptions`**;
-2. the business surface hangs **directly** off the return value: `session.client.conversations` → `harness.conversations` (same for `store` / `agents` / `teams` / `skills` / `connectors` / `models` / `workspaces` / `runs`);
-3. `initializeResult` → **`handshake`** (the non-null handshake response). The base class still carries `initializeInfo`, meaning the **current** connection state — it goes back to `null` after `close()`.
-
-`close()` got **stronger**: one call now covers unsubscribe → close transport → kill the child → remove an auto-created data-dir. Code that only called `server.close()` still runs, but can no longer leave the transport open.
-
-**What does not change**: the wire. The fingerprint is still `fp-7` and the method count is still `48 / 71`, so a `0.1.0-beta.5` runtime and this SDK interoperate (the rename itself is not type-compatible across versions). The `client` option (self-reported identity) and direct `transport.request(...)` calls are unchanged.
+1. Rename `launchClient` invocation to `launchHarness`;
+2. Access domain clients directly on the returned harness instance;
+3. Access handshake results via `handshake`.
 
 ### 6.6 From 0.1.0-beta.6 to 0.1.0-beta.7
 
-**Upgrading is mandatory, but no code changes are needed**: the fingerprint moves from `fp-7` to `fp-8`, and the handshake and SDK compare it with **strict equality** — a client built against `beta.6` or earlier **cannot connect** to this runtime, so it must be upgraded alongside it. Beyond that this release **only adds methods; nothing was narrowed or renamed**, the SDK entry point is still `launchHarness`, and caller code usually needs no edits at all.
-
 ```bash
-# 1) see what is actually installed
-bun pm ls | grep '@flowy-agent-store'          # npm projects: npm ls @flowy-agent-store/sdk
-# 2) pin 0.1.0-beta.7 (upgrade the packages you use, on one version)
 bun add @flowy-agent-store/sdk@0.1.0-beta.7
 bun add @flowy-agent-store/protocol@0.1.0-beta.7
-# 3) confirm what got resolved
-node -p "require('@flowy-agent-store/sdk/package.json').version"
-# 4) re-run your type check and tests — this should pass with zero changes
 bun run typecheck
 ```
 
-**Two things to check**:
+- Protocol fingerprint advances to `fp-8`; host and client must align;
+- Introduces `agents.export` and `teams.export` methods for asset serialization.
 
-```ts
-// the fingerprint moved: code asserting the old value must be relaxed or updated
-harness.handshake.protocol_version;   // now "fp-8"; a beta.6 runtime reports "fp-7"
-
-// new capability (optional): export an expert / team to an external runtime
-const pack = await harness.agents.export(agentId);
-const team = await harness.teams.export(teamId);          // a team definition, every member expanded
-```
-
-1. **If you asserted the fingerprint's literal value** (for example using `handshake.protocol_version === "fp-7"` as a check), it will now **fail** — compare against the `APP_SERVER_PROTOCOL_VERSION` constant instead, or drop the hard-coded value. Ordinary connections through the SDK are unaffected: the SDK validates with the new constant, and an old runtime is rejected outright.
-2. **If you inject your own binary via `AGENT_STORE_BIN`**: the SDK and the binary must be upgraded **in the same batch**, or the handshake fails immediately.
-
-**Also worth knowing (it does not affect SDK usage)**: the `[memory]` table in `~/.agent-store/config.toml` gained `enabled` (the built-in memory master switch; it defaults to **on**, and omitting the key keeps the upstream default, so behavior is unchanged after upgrading) — see the `memory` section of the [Configuration file](/en-US/docs/configuration). And `[models.*]`'s `max_output_size` / `protocol` were previously **declared but had no consumer** (which made anthropic / bedrock / vertex runtime builds fail with `BAD_REQUEST`); this release wires them up, and does so **only when empty, never overwriting**. Neither item **enters the fingerprint** — they only change how the host reads its config, so upgrading the npm packages without swapping the runtime will not reveal them.
-
-## 7. Check which version you actually have
+## 7. Verifying Installed Versions
 
 ```bash
-# what the project resolved (start here)
-bun pm ls | grep '@flowy-agent-store'      # npm: npm ls @flowy-agent-store/sdk
-# read the installed package.json (all three packages export ./package.json)
+# Verify project-level resolved versions
+bun pm ls | grep '@flowy-agent-store'
+# Read installed package manifests
 node -p "require('@flowy-agent-store/protocol/package.json').version"
-# what the lockfile pinned
+# Verify lockfile records
 grep -o '@flowy-agent-store/sdk@[0-9][^"]*' bun.lock | head -1
-# what the registry offers, and where the tags point
+# Check remote tag pointers
 npm view @flowy-agent-store/sdk versions dist-tags --json
 ```
 
-When the three disagree, trust the **lockfile and the installed `package.json`**: the range in `package.json` states intent, what landed in `node_modules` is the fact.
+## 8. Artifact Diff Verification
 
-## 8. Published-artifact differences and how to check them
+As of `0.1.0-beta.7`, repository contracts align with published packages:
 
-As of `0.1.0-beta.7` (2026-09-20), **the working tree matches the published artifacts** — there is **no** new unpublished increment after `beta.7`. Both batches accumulated after `beta.6` shipped with this release:
+1. **Asset Serialization Surface — `fp-7` $\to$ `fp-8`**: Adds `agent/export` and `team/export`, bringing wire methods to 73.
+2. **Host Configuration Options**: Adds `[memory]` `enabled` flag and `max_output_size` mapping.
 
-1. **Expert / team definition export — `fp-7` → `fp-8` (breaking)**: two WebSocket-only methods, `agent/export` / `team/export`, with the method count moving `48 / 71` → `48 / 73` (the mapped count unchanged). The full entry is in §2.1 of the [Changelog](/en-US/docs/changelog); migration steps are in §6.6 below.
-2. **Host-configuration increment — zero wire change**: the `[memory]` table in `~/.agent-store/config.toml` gained `enabled` (the built-in memory master switch, **independent of** the existing `distill_enabled`); the same batch wired up `[models.*]`'s `max_output_size` / `protocol`. Neither **enters the fingerprint**, so reading two artifacts side by side **cannot** reveal them — they only change how the host reads its config; see the [Configuration file](/en-US/docs/configuration).
+### 8.1 Migrating Marketplace Sources in Existing Configurations
 
-The SDK entry rename and shape change of `0.1.0-beta.6` are in §2.2 of the [Changelog](/en-US/docs/changelog) (migration steps in §6.5 below), the six fingerprint increments of `0.1.0-beta.5` are in §2.3 of the same page, and what `0.1.0-beta.4` changed relative to `0.1.0-beta.3` is in §2.4. The commands below are how you check the **protocol surface** — fetch the published artifacts of any two versions and read them side by side.
-
-> A caveat on scope: the self-check commands in this section can only prove whether the **wire surface** agrees. Host-configuration increments (like `[memory] enabled` and `max_output_size` above) never enter the fingerprint, so reading two artifacts side by side **cannot** reveal them; judge those by the [Configuration file](/en-US/docs/configuration), not by this page.
-
-### 8.1 Migrating a config's marketplace sources
-
-The three official marketplace sources (`experts` / `skills` / `connectors`) moved off this site's `/source/<market>/…` file-per-entry tree and onto zip archives on ModelScope, and the site no longer hosts the market trees. **No address is rewritten automatically**, so an upgrade needs one manual pass — it only affects machines whose config already declares `[default_marketplaces]` (both `agent-store init` and hand-copying the URLs from older docs write those blocks in).
-
-First check whether `~/.agent-store/config.toml` carries these three blocks:
+Marketplaces have migrated to single Zip archives on ModelScope. Configurations pointing to legacy paths:
 
 ```toml
 [default_marketplaces.experts]
@@ -283,10 +203,9 @@ source_kind = "url"
 source = "https://agent-store.flowyaipc.cn/source/experts/.codebuddy-plugin/marketplace.json"
 ```
 
-If it does, take one of two routes:
-
-- **Delete the three `[default_marketplaces.*]` blocks** — with no table declared, the runtime's built-in defaults (the zip addresses below) apply;
-- **Repoint them at the new zip addresses** — one archive per market, with `source_kind = "zip"`:
+Resolution options:
+- Remove `[default_marketplaces]` entirely to leverage built-in official defaults;
+- Or update definitions to the official Zip archive URLs:
 
 ```toml
 [default_marketplaces.experts]
@@ -302,53 +221,30 @@ source_kind = "zip"
 source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
 ```
 
-If the config has no such blocks, there is nothing to do. **Failure is benign**: a failed fetch never touches the last-good local copy, so entries do not disappear — they stay at their old data. The first fetch after the switch downloads the whole archive (the largest of the three is `experts` at 289.0 MiB).
-
-To check for yourself what a published artifact actually contains, reading two adjacent versions side by side is the clearest way:
+Inspecting symbol changes between releases:
 
 ```bash
-# beta.3: ConversationEvent.event_type still has the | string escape hatch, fingerprint is a date stamp
-npm pack @flowy-agent-store/protocol@0.1.0-beta.3 --silent
-tar xzf flowy-agent-store-protocol-0.1.0-beta.3.tgz
-grep -n 'event_type' package/dist/index.d.mts
-# 0.1.0 / 0.1.0-beta.2 / 0.1.0-beta.3 all ship an index.d.mts of 20049 bytes, identical byte for byte
-# event_type: "message.created" | ... | "context.usage" | string;   ← the | string is still there
-
-# beta.4: the same place is a closed union, and the fingerprint is fp-1
-npm pack @flowy-agent-store/protocol@0.1.0-beta.4 --silent
-tar xzf flowy-agent-store-protocol-0.1.0-beta.4.tgz
-grep -n 'event_type:\|APP_SERVER_PROTOCOL_VERSION' package/dist/index.d.mts
-# export declare const APP_SERVER_PROTOCOL_VERSION = "fp-1";
-# event_type: ConversationEventType;   ← ConversationEvent (narrowed)
-# event_type: string;                  ← RunEvent, a separate declaration, deliberately open
-
-# beta.5: the fingerprint jumps from fp-1 to fp-7, and the only additions are optional fields
-mkdir -p b4 b5
-(cd b4 && npm pack @flowy-agent-store/protocol@0.1.0-beta.4 --silent && tar xzf *.tgz)
-(cd b5 && npm pack @flowy-agent-store/protocol@0.1.0-beta.5 --silent && tar xzf *.tgz)
-grep -n 'APP_SERVER_PROTOCOL_VERSION' b5/package/dist/index.d.mts
-# export declare const APP_SERVER_PROTOCOL_VERSION = "fp-7";
-diff <(grep -o '^export [a-z]* [A-Za-z]*' b4/package/dist/index.d.mts) \
-     <(grep -o '^export [a-z]* [A-Za-z]*' b5/package/dist/index.d.mts)
-# (no output) 141 export names, neither more nor fewer → only fields were added, no declaration was narrowed or deleted
+# Verify protocol symbol exports across releases
+mkdir -p b6 b7
+(cd b6 && npm pack @flowy-agent-store/protocol@0.1.0-beta.6 --silent && tar xzf *.tgz)
+(cd b7 && npm pack @flowy-agent-store/protocol@0.1.0-beta.7 --silent && tar xzf *.tgz)
+diff <(grep -o '^export [a-z]* [A-Za-z]*' b6/package/dist/index.d.mts) \
+     <(grep -o '^export [a-z]* [A-Za-z]*' b7/package/dist/index.d.mts)
 ```
 
-The same works on the client side: install `@flowy-agent-store/client` into a throwaway directory and count the keys of `httpRouteTable()` — that is the mapped number quoted in §5.3 (`0.1.0-beta.5` reports 48). For the protocol side's "no types added or removed", the `diff` above that counts export names is enough — `0.1.0-beta.4` and `0.1.0-beta.5` are both **141**.
+## 9. Changelog and Release Notes Scope
 
-## 9. Changelog and release notes boundary
-
-| Item | Status | Basis |
+| Aspect | Current status | Basis |
 | --- | --- | --- |
-| Versioning of breaking changes | inside the beta line, the **next pre-release counter**, stated in the changelog; the minor number is reserved for breaking changes after beta | the compatibility stance D10=A (no backward compatibility during beta); the revision is recorded in §3 of the [Changelog](/en-US/docs/changelog) |
-| Standalone changelog / release notes page | ✅ **built**: [Changelog](/en-US/docs/changelog) | item R6 of plan doc `16` (shipped in batch 4) |
-| This page's job | record published release facts and verified unpublished differences | no invented release history |
-| Division of labour | this page explains **how to upgrade**; the changelog records **what changed in each version** and is the only announcement surface for breaking changes | the two pages cross-reference instead of duplicating |
-
-So this page states **what happened** (publish times, dist-tags, artifact differences) and **what a published artifact actually contains** (§8). For any change not listed here, do not assume it has happened.
+| Breaking change versions | Released under next prerelease identifier with explicit notices | Beta compatibility stance |
+| Dedicated changelog page | [Changelog](/en-US/docs/changelog) | Standardized release documentation |
+| Guide scope | Documents release facts and migration procedures | Operational focus |
+| Separation of concerns | This guide details migration; the changelog logs feature modifications | Bidirectional cross-reference |
 
 ## 10. See also
 
-- [TypeScript SDK reference](/en-US/docs/typescript-sdk): install, API, events and error model; runnable examples in the [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
-- [Quick start](/en-US/docs/quick-start): the installer path for end users.
-- [Compatibility matrix](/en-US/docs/compatibility): supported platforms and source formats.
-- [Changelog](/en-US/docs/changelog): what changed in each published version, and the announcement surface for breaking changes.
+- [TypeScript SDK reference](/en-US/docs/typescript-sdk): Complete API and error models.
+- [TypeScript SDK cookbook](/en-US/docs/examples-sdk): Integration patterns and code recipes.
+- [Quick start](/en-US/docs/quick-start): Binary runtime setup.
+- [Compatibility matrix](/en-US/docs/compatibility): Supported platforms and formats.
+- [Changelog](/en-US/docs/changelog): Detailed version change notes.
