@@ -156,10 +156,10 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. Unpublished changes and release cadence
 
-**Planned Capabilities (Unreleased)**:
-- **Connector Credential Decoupling (fp-9 through fp-11)**: Adds `credential` block to connector models and exposes credential endpoints (`connector/credential/*`); enforces bidirectional payload masking.
-- **Dynamic Template Registration (fp-11)**: Introduces `connector/register` to register private MCP servers via templates, dynamically deriving credential forms; updates fingerprint to `fp-11`.
-- **SDK Pack Materialization (0.1.0-beta.8)**: Adds `exportAgent`, `exportTeam`, and `materializePack` helpers to serialize definitions and assets to disk.
+**Recently Implemented and Planned Capabilities (Pre-release or staged)**:
+- **Connector User Credential System (fp-9 through fp-11)**: Adds `credential` block and `token-schema.json` support to connectors; introduces `connector/credential/{get,set,clear}` management APIs and `connector/register` dynamic template MCP registration; enforces payload masking (`[REDACTED]`) with write-only encryption at rest.
+- **SDK Pack Materialization (0.1.0-beta.8)**: Adds `exportAgent`, `exportTeam`, and `materializePack` helpers in `@flowy-agent-store/sdk` to serialize definitions and assets to structured disk directories (`members/<id>/persona.md` and deduplicated `skills/<name>/...`).
+- **In-Place Safe Store Updates (fp-12)**: Introduces `store/update-entry` wire verb (wire protocol `fp-12`, total methods expanded to **78**, HTTP mapped routes to **53**); guarantees atomic upgrades (installs new version, verifies readiness, and releases old version with safe fallbacks); updates expert presets in place preserving preset IDs; equips client with `store.update()` and `updateHint`.
 
 The current stable release is `0.1.0-beta.7` (wire protocol `fp-8`). Features not listed on this page should not be considered active.
 

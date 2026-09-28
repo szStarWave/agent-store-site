@@ -386,7 +386,10 @@ if (outcome.ready === false && outcome.readyIssue === "authorization_required") 
 const installedEntries = await client.store.installed();
 const outdated = await client.store.checkUpdates();
 for (const entry of outdated) {
-  console.log(`Update strategy: ${client.store.updateHint(entry)}`); // Outputs "uninstall_reinstall"
+  console.log(`Update strategy: ${client.store.updateHint(entry)}`); // Outputs "update"
+  // In-place atomic upgrade: installs new version, releases old only upon readiness; preserves old on failure
+  const updateOutcome = await client.store.update(entry, { waitForReady: true });
+  console.log(`Upgrade result: ${updateOutcome.ok ? "Success" : "Failed"}`);
 }
 
 // 4. Disable and uninstall entries cleanly
@@ -478,6 +481,38 @@ if (invocation.is_error) {
 }
 ```
 
+### 5.5 Connector user credentials and private server registration
+
+```ts
+// 1. Query required credential configuration form (derived from token-schema)
+const credForm = await client.connectors.credentials("weather-service");
+console.log(`Auth mode: ${credForm.mode}`); // "token" | "oauth" | "none"
+console.log(`Documentation link: ${credForm.doc_url?.en}`);
+
+if (credForm.status === "missing") {
+  console.warn(`Missing required keys: ${credForm.missing.join(", ")}`);
+
+  // 2. Safely write sensitive credentials (encrypted at rest, values never exposed over the wire)
+  await client.connectors.setCredentials("weather-service", {
+    WEATHER_API_KEY: "sk-live-mock-api-key-9988",
+  });
+}
+
+// 3. Dynamically register private MCP template server (${secret:NAME} automatically derives fields)
+const registered = await client.connectors.register({
+  name: "custom-internal-db",
+  transport: {
+    sse: {
+      url: "https://internal.corp/db/sse",
+      headers: { Authorization: "Bearer ${secret:INTERNAL_DB_TOKEN}" },
+    },
+  },
+});
+
+// 4. Reset or purge stored credentials
+await client.connectors.clearCredentials("weather-service", ["WEATHER_API_KEY"]);
+```
+
 ## 6. Resource export and host controls
 
 ### 6.1 Workspace management and skill file inspection
@@ -505,9 +540,7 @@ if (client.initializeInfo?.capabilities.skill_files) {
 ### 6.2 Exporting experts and teams to local disk
 
 ```ts
-import { exportTeam } from "@flowy-agent-store/sdk";
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { exportAgent, exportTeam, materializePack } from "@flowy-agent-store/sdk";
 
 // Mode A: High-level exportTeam helper to materialize full teams and shared skill trees
 const teamId = "frontend-backend-experts";
@@ -517,21 +550,14 @@ if (exportResult.danglingSkills.length > 0) {
   console.warn("Unresolved dangling skills:", exportResult.danglingSkills);
 }
 
-// Mode B: Assemble ExpertPack and write to disk manually
-const pack = await client.agents.export("wb-architect");
-const targetDir = "./exported-expert";
-await mkdir(targetDir, { recursive: true });
-await writeFile(join(targetDir, "expert-pack.json"), JSON.stringify(pack, null, 2));
-await writeFile(join(targetDir, "persona.md"), pack.persona.instructions);
+// Mode B: High-level exportAgent helper to materialize a single agent
+const agentResult = await exportAgent(client, "wb-architect", "./exported-expert");
+console.log(`Single agent directory: ${agentResult.dir}`);
 
-for (const skill of pack.skills) {
-  const files = await client.skills.files(skill.id);
-  for (const file of files.files) {
-    const dest = join(targetDir, "skills", skill.name, file.path);
-    await mkdir(dirname(dest), { recursive: true });
-    await writeFile(dest, await client.skills.readFile(skill.id, file.path));
-  }
-}
+// Mode C: Obtain ExpertPack in memory and serialize to disk via materializePack
+const pack = await client.agents.export("wb-architect");
+const customResult = await materializePack(client, pack, "./exported-custom");
+console.log(`Custom materialized skills: ${customResult.writtenSkills.join(", ")}`);
 ```
 
 ### 6.3 Host tool policy pruning and control

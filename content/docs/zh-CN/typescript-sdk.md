@@ -383,15 +383,28 @@ try {
 SDK 提供高阶导出工具，用于将专家与团队资产完整解构物化到本地磁盘：
 
 ```ts
-import { exportAgent, exportTeam, materializePack } from "@flowy-agent-store/sdk";
+import { exportAgent, exportTeam, materializePack, type ExportResult } from "@flowy-agent-store/sdk";
 
-// 导出单专家定义及关联技能资源到本地目录
-const result = await exportAgent(client, "software-architect", "./dist/architect");
+// 1. 导出单专家定义及关联技能资源到本地目录
+const result: ExportResult = await exportAgent(client, "software-architect", "./dist/architect");
 console.log(`成功导出技能: ${result.writtenSkills.join(", ")}`);
+if (result.danglingSkills.length > 0) {
+  console.warn("未在宿主安装的悬空技能引用:", result.danglingSkills);
+}
 
-// 导出专家团队全量定义包
+// 2. 导出专家团队全量定义包（Leader 成员优先排列）
 await exportTeam(client, "dev-team", "./dist/dev-team");
+
+// 3. 将内存中的 ExpertPack 结构物理物化为磁盘目录
+const pack = await client.agents.export("software-architect");
+await materializePack(client, pack, "./dist/architect-manual");
 ```
+
+物化产物遵循以下标准目录树规范：
+- `expert-pack.json`：完整的标准化 `ExpertPack` 格式定义（包含 `pack_format`、角色信息及依赖清单）；
+- `persona.md`：单专家的 Prompt 指令正文（仅 `kind === "agent"` 时生成）；
+- `members/<member.id>/persona.md`：团队成员的专属 Persona 指令（仅 `kind === "team"` 时生成）；
+- `skills/<name>/...`：引用的原子技能文件树，自动在顶层去重聚合。
 
 ---
 

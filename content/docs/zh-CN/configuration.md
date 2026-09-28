@@ -417,7 +417,7 @@ disabled = ["mcp__<key>__*"]
 
 ### 敏感凭据引用（`secret:NAME`）
 
-在 `env` 与 `headers` 中支持使用 `secret:NAME` 进行敏感凭据引用。宿主进程启动时将从 `[credentials]` 表（或进程环境变量）中解析实际数值并注入内存，避免敏感信息直接暴露在声明文件中。
+在 `env`、`headers` 与 `url` 模板中支持使用 `secret:NAME` 或 `${NAME}` 进行敏感凭据引用。宿主进程将从 `~/.agent-store/config.toml` 的 `[credentials]` 表（或进程环境变量）中解析实际数值并注入运行时，避免敏感信息直接暴露在声明文件中。
 
 ```toml
 # 与 mcp.json 同级的 config.toml
@@ -425,7 +425,7 @@ disabled = ["mcp__<key>__*"]
 UPSTREAM_TOKEN = "…"    # 注入到 mcp.json 中的 secret:UPSTREAM_TOKEN
 ```
 
-> `[credentials]` 表不支持通过管理 API 读取或修改。若引用的密钥名不存在，宿主将省略该字段并记录告警。
+> **安全隔离说明**：常规管理接口（如 `config/get` 与 `config/set`）严格屏蔽 `[credentials]` 表，防止网络扫描与整表导出。针对需要配置 API Key / Token 的连接器，宿主提供了受 Principal 隔离保护的定向写入接口（`connector/credential/set`），仅允许写入该连接器在 `token-schema.json` 中声明过的凭据字段。已存储的凭据在网络回包中始终处于物理脱敏状态（值永不回显）；若引用的密钥名未配置，宿主将执行安全省略（Fail-Closed 原则）并记录告警。
 
 ### Web UI 管理与持久化编辑
 

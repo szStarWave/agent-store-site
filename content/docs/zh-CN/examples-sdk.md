@@ -386,7 +386,10 @@ if (outcome.ready === false && outcome.readyIssue === "authorization_required") 
 const installedEntries = await client.store.installed();
 const outdated = await client.store.checkUpdates();
 for (const entry of outdated) {
-  console.log(`更新策略: ${client.store.updateHint(entry)}`); // 输出 "uninstall_reinstall"
+  console.log(`更新策略: ${client.store.updateHint(entry)}`); // 输出 "update"
+  // 原地原子升级：先装新版本，就绪后安全释放旧版本产物；中途失败保留旧安装
+  const updateOutcome = await client.store.update(entry, { waitForReady: true });
+  console.log(`升级结果: ${updateOutcome.ok ? "成功" : "失败"}`);
 }
 
 // 4. 停用与彻底卸载
@@ -478,6 +481,38 @@ if (invocation.is_error) {
 }
 ```
 
+### 5.5 连接器用户凭据表单与私有服务注册
+
+```ts
+// 1. 查询连接器所需的凭据配置表单（来自 token-schema 声明）
+const credForm = await client.connectors.credentials("weather-service");
+console.log(`认证模式: ${credForm.mode}`); // "token" | "oauth" | "none"
+console.log(`获取密钥链接: ${credForm.doc_url?.zh}`);
+
+if (credForm.status === "missing") {
+  console.warn(`缺失必需凭据: ${credForm.missing.join(", ")}`);
+
+  // 2. 定向安全写入敏感凭据（单向加密落盘，网络回包中值永不越界）
+  await client.connectors.setCredentials("weather-service", {
+    WEATHER_API_KEY: "sk-live-mock-api-key-9988",
+  });
+}
+
+// 3. 动态注册私有 MCP 模板服务（由 ${secret:NAME} 模板自动派生凭据字段）
+const registered = await client.connectors.register({
+  name: "custom-internal-db",
+  transport: {
+    sse: {
+      url: "https://internal.corp/db/sse",
+      headers: { Authorization: "Bearer ${secret:INTERNAL_DB_TOKEN}" },
+    },
+  },
+});
+
+// 4. 重置或清除不再需要的凭据
+await client.connectors.clearCredentials("weather-service", ["WEATHER_API_KEY"]);
+```
+
 ## 6. 资源导出与宿主管控
 
 ### 6.1 工作区管理与技能内部文件读取
@@ -505,9 +540,7 @@ if (client.initializeInfo?.capabilities.skill_files) {
 ### 6.2 专家与团队打包导出至本地目录
 
 ```ts
-import { exportTeam } from "@flowy-agent-store/sdk";
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { exportAgent, exportTeam, materializePack } from "@flowy-agent-store/sdk";
 
 // 模式 A：使用 SDK 高阶函数 exportTeam 完整物化团队及跨成员技能
 const teamId = "frontend-backend-experts";
@@ -517,21 +550,14 @@ if (exportResult.danglingSkills.length > 0) {
   console.warn("缺失引用的悬空技能:", exportResult.danglingSkills);
 }
 
-// 模式 B：手动组装 ExpertPack 并写入本地磁盘结构
-const pack = await client.agents.export("wb-architect");
-const targetDir = "./exported-expert";
-await mkdir(targetDir, { recursive: true });
-await writeFile(join(targetDir, "expert-pack.json"), JSON.stringify(pack, null, 2));
-await writeFile(join(targetDir, "persona.md"), pack.persona.instructions);
+// 模式 B：使用 exportAgent 高阶函数物化单专家
+const agentResult = await exportAgent(client, "wb-architect", "./exported-expert");
+console.log(`单专家物化路径: ${agentResult.dir}`);
 
-for (const skill of pack.skills) {
-  const files = await client.skills.files(skill.id);
-  for (const file of files.files) {
-    const dest = join(targetDir, "skills", skill.name, file.path);
-    await mkdir(dirname(dest), { recursive: true });
-    await writeFile(dest, await client.skills.readFile(skill.id, file.path));
-  }
-}
+// 模式 C：内存中处理 ExpertPack 并调用 materializePack 落盘
+const pack = await client.agents.export("wb-architect");
+const customResult = await materializePack(client, pack, "./exported-custom");
+console.log(`自定义物化技能: ${customResult.writtenSkills.join(", ")}`);
 ```
 
 ### 6.3 宿主工具域裁剪与策略控制
