@@ -125,6 +125,6 @@ export const PLATFORM_LABELS: Record<TargetOS, Record<Language, string>> = {
 };
 
 export const ARCH_LABELS: Record<TargetArch, Record<Language, string>> = {
-  aarch64: { "zh-CN": "Apple 芯片", "en-US": "Apple silicon" },
+  aarch64: { "zh-CN": "Apple Silicon", "en-US": "Apple silicon" },
   x86_64: { "zh-CN": "Intel / x64", "en-US": "Intel / x64" },
 };
