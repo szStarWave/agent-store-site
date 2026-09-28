@@ -81,9 +81,9 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 
 未声明 `type` 或设为 `""` 均等价于 `custom`（OpenAI Chat Completions 兼容协议）。系统仅识别受支持的特定枚举，未匹配项将默认按 OpenAI 兼容协议处理：
 
-| 你写的值 | 实际使用的协议 | 说明 |
+| 声明值（type） | 解析协议 | 说明 |
 | --- | --- | --- |
-| 不写 / `""` / `custom` / `openai` / `kimi` | OpenAI Chat Completions | `kimi`、`mimo`、`deepseek` 等兼容 OpenAI 协议的服务均归入此类 |
+| 缺省 / `""` / `custom` / `openai` / `kimi` | OpenAI Chat Completions | `kimi`、`mimo`、`deepseek` 等兼容 OpenAI 协议的服务均归入此类 |
 | `anthropic` | Anthropic Messages | 严格遵守 Anthropic Messages 协议；对 `max_output_size` 具有硬性校验要求 |
 | `openai_responses` | **OpenAI Chat Completions**（并非 Responses） | 若需启用 OpenAI Responses 协议，应在**模型级别**指定 `protocol = "openai-responses"` |
 | `google-genai` / `vertexai` | **OpenAI Chat Completions**（协议不符） | 系统对应支持的供应商类型为 `gemini` 与 `gemini-vertex-ai` |
@@ -114,13 +114,13 @@ Bad request: the anthropic protocol requires an explicit output ceiling;
 set Max output tokens on the <provider>/<model> model in Settings -> Models
 ```
 
-| 协议 | `max_output_size` 缺失时 | 声明了之后 |
+| 协议类型 | max_output_size 缺省行为 | 显式声明时行为 |
 | --- | --- | --- |
 | `anthropic` | **报错**：运行时以 `BAD_REQUEST` 拒绝，请求无法发出 | 映射为 `max_tokens` 参数发出 |
 | OpenAI Chat Completions | 允许缺省：请求体不包含该字段，由服务端决定 | 映射为 `max_tokens`（部分网关为 `max_completion_tokens`）参数发出 |
 | OpenAI Responses | 允许缺省：同上 | 映射为 `max_output_tokens` 参数发出 |
 
-### 声明值不一定原样发出
+### 输出上限的双重动态收敛约束
 
 `max_output_size` 实际生效值受两重向下收敛约束：
 
@@ -141,7 +141,7 @@ set Max output tokens on the <provider>/<model> model in Settings -> Models
 - 错误信息需严格匹配 `supported range is from L ... to U ...` 模式，其他错误格式不触发重试。
 - OpenAI Responses 协议不包含此协商机制。
 
-### 两条与本键相关的注册行为
+### 模型注册与存量补齐机制
 
 - **非破坏性写入**：模型注册时仅当目标模型缺失输出上限时填补配置值，不会覆盖用户在 Web UI 中手动调整的数值。
 - **存量平滑补齐**：早期版本注册的供应商模型若缺失输出上限，下次模型解析时将自动按配置补齐，无需删除重建。
@@ -185,7 +185,7 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 
 设为 `false` 时以下子系统同步停止运作：
 
-| 面 | 关闭后的行为 |
+| 受控子系统 | 停用后的行为 |
 | --- | --- |
 | 系统提示词记忆注入 | 停止注入（不向模型呈现 `MEMORY.md` 索引） |
 | `remember` 工具 | 停止注册，禁止写入新记忆 |
@@ -202,7 +202,7 @@ enabled = false
 - 该开关与 `distill_enabled` 相互独立；`enabled = false` 时蒸馏开关自动失效。
 - 仅 Agent Store 宿主采纳该配置，修改后需重启宿主进程生效。
 
-### `distill_enabled`：只关掉轮后蒸馏
+### `distill_enabled`：关闭轮后记忆蒸馏
 
 记忆蒸馏（Distillation）指在每轮会话完成后异步调用模型提取关键信息写入文件存储。该过程在对话结束信号前触发，通常伴随 6~15 秒处理延迟。可通过禁用该阶段优化交互耗时。
 
@@ -255,7 +255,7 @@ auto_update_interval_hours = 6
 
 ### `tools.domains`
 
-| 键 | 关掉的能力 |
+| 业务能力域（domain） | 停用功能与影响 |
 | --- | --- |
 | `cron` | 定时任务能力（`cron_create` / `cron_list` / `cron_delete`） |
 | `meeting` | 会议音频与听会上下文工具族（`meeting.*`） |
@@ -285,11 +285,11 @@ companion = false
 requirement = false
 ```
 
-### 用环境变量覆盖（`AGENT_STORE_TOOLS`）
+### 环境变量覆盖（`AGENT_STORE_TOOLS`）
 
 运行时支持通过环境变量直接覆盖工具策略：
 
-| 事实 | 行为 |
+| 配置属性 | 运行机制与规范 |
 | --- | --- |
 | 格式 | JSON 字符串，结构与 `[tools]` 表一致；`{}` 表示保持全量默认 |
 | 优先级 | 环境变量 `AGENT_STORE_TOOLS` > `config.toml` > 默认宽松策略 |
@@ -301,7 +301,7 @@ requirement = false
 AGENT_STORE_TOOLS='{"computer":false,"domains":{"knowledge":false}}' agent-store
 ```
 
-完整调用范例请参阅 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §10。
+完整调用范例请参阅 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §6.3。
 
 ## `connector_proxy`
 
@@ -326,7 +326,7 @@ deny = ["mcp__*__delete_*"]       # 拦截所有连接器下的删除类工具
 
 权限判决顺序：
 
-| # | 门 | 不过时返回 |
+| 序号 | 判定检查项 | 未通过时返回错误 |
 | --- | --- | --- |
 | 1 | 配置块缺失或 `enabled != true` | `policy_denied` |
 | 2 | 目标连接器不存在 | `not_found` |
@@ -389,7 +389,7 @@ deny = ["mcp__*__delete_*"]       # 拦截所有连接器下的删除类工具
 
 解析器执行严格校验，包含未知字段或传输模式不匹配（如 stdio 声明 `headers`）将导致单条记录加载失败，不影响文件中其他合法服务声明。
 
-### 与参考实现的五处差异
+### 与参考实现的边界差异
 
 与标准 CLI 参考实现相比，本规范存在以下边界差异：
 
@@ -399,7 +399,7 @@ deny = ["mcp__*__delete_*"]       # 拦截所有连接器下的删除类工具
 - **无全局超时缺省继承**：不从主配置中继承超时参数，超时设置需在各条目中独立指定。
 - **超时上限严格收敛**：超时上限设为 600,000 毫秒（10 分钟），超出范围将直接拒绝加载该条目。
 
-### server key、工具名与工具过滤
+### 服务标识、工具命名与过滤规则
 
 `mcpServers` 中的服务键名将作为工具名称的前缀（格式为 `mcp__<key>__<tool>`）。键名必须满足以下约束：由 ASCII 字母、数字、`_`、`-` 组成，必须以字母或数字开头及结尾，且长度不超过 40 个字符。
 
@@ -415,7 +415,7 @@ deny = ["mcp__*__delete_*"]       # 拦截所有连接器下的删除类工具
 disabled = ["mcp__<key>__*"]
 ```
 
-### `secret:NAME`：凭据不写进声明文件
+### 敏感凭据引用（`secret:NAME`）
 
 在 `env` 与 `headers` 中支持使用 `secret:NAME` 进行敏感凭据引用。宿主进程启动时将从 `[credentials]` 表（或进程环境变量）中解析实际数值并注入内存，避免敏感信息直接暴露在声明文件中。
 
@@ -427,14 +427,14 @@ UPSTREAM_TOKEN = "…"    # 注入到 mcp.json 中的 secret:UPSTREAM_TOKEN
 
 > `[credentials]` 表不支持通过管理 API 读取或修改。若引用的密钥名不存在，宿主将省略该字段并记录告警。
 
-### 在 Web UI 里读、开关与编辑
+### Web UI 管理与持久化编辑
 
 Web UI 的「MCP 服务管理」模块直接呈现当前配置文件的状态：
 - 集中展示已声明服务的名称、传输协议、运行状态及异常条目的诊断原因。
 - 界面开关直接通过文本级编辑更新目标服务的 `enabled` 字段，完整保留既有缩进与注释排版。
 - 内置编辑器保存时执行语法校验，校验失败时阻止写入并高亮错误行号。
 
-## 与 Kimi Code / Claude Code 配置的异同
+## 第三方工具配置对比（Kimi Code / Claude Code）
 
 | 维度 | Agent Store | Kimi Code 等 |
 | --- | --- | --- |

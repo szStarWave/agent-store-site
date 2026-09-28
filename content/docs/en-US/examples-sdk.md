@@ -1,594 +1,554 @@
 # TypeScript SDK cookbook
 
-This document serves as the practical example companion to the [TypeScript SDK reference](/en-US/docs/typescript-sdk), providing copy-paste integration patterns across major usage scenarios.
+This document serves as the practical example companion to the [TypeScript SDK reference](/en-US/docs/typescript-sdk), providing copy-paste integration patterns structured across major usage scenarios.
 
 > Architecture breakdown: `@flowy-agent-store/protocol` supplies pure type contracts and error classes; `@flowy-agent-store/client` provides transport-decoupled client abstractions; `@flowy-agent-store/sdk` encapsulates Node.js host lifecycle orchestration (`launchHarness`). **Real-time subscriptions mandate `WebSocketTransport`**; stateless request-response invocations can use `HttpTransport`.
 
-## 1. Which package for which job
+## 1. Packages and runtime architecture
 
-| Package | Use it when | Runtime |
+| Package | Use case and role | Runtime environment |
 | --- | --- | --- |
-| `@flowy-agent-store/protocol` | You only need type contracts and error definitions, or build a custom transport | Universal (zero-runtime overhead) |
-| `@flowy-agent-store/client` | Connecting to an active App Server instance (desktop client or standalone daemon) | Universal (Node.js or browser) |
-| `@flowy-agent-store/sdk` | Orchestrating runtime process lifecycles programmatically | Node.js ≥ 22 or Bun |
-
-## 2. Before you start
+| `@flowy-agent-store/protocol` | Pure type contracts, error definitions, and encoding utilities | Universal (Node.js / browser / zero runtime dependencies) |
+| `@flowy-agent-store/client` | Transport-decoupled `AppServerClient` and subclients | Universal (Node.js / browser / Electron renderer) |
+| `@flowy-agent-store/sdk` | Node.js host process management, dynamic port discovery, and harness orchestration | Node.js ≥ 22 or Bun |
 
 ```bash
-node -v                      # Node.js >= 22 (global WebSocket), or use Bun instead
-bun add @flowy-agent-store/sdk   # or npm install / pnpm add
+# Verify Node.js version (requires built-in global WebSocket), or use Bun instead
+node -v
 
-# The runtime binary: the SDK never downloads it — bin → AGENT_STORE_BIN → the runtime package's vendor/ → PATH
+# Install the primary SDK package
+bun add @flowy-agent-store/sdk # or npm install @flowy-agent-store/sdk
+
+# Declare the prebuilt binary path (optional; searched across PATH and platform packages if omitted)
 export AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store
 ```
 
-## 3. Node: one call to launch, one full lifecycle
+## 2. Transport and protocol selection
+
+The system provides two transport implementations. Their functional boundaries and selection criteria are summarized below:
+
+| Feature | WebSocketTransport | HttpTransport |
+| --- | --- | --- |
+| Real-time event streaming (`follow` / `onNotification`) | **Supported** (bidirectional long-lived streaming connection) | **Not supported** (invocations throw `TransportError`) |
+| Handshake and connection lifecycle | Single handshake per session over a multiplexed persistent socket | Independent HTTP connection and auth negotiation per call |
+| Recommended use cases | Desktop GUIs, Web frontends, continuous task monitoring | CLI scripts, single-pass CI smoke tests, one-off queries |
+
+```ts
+import { AppServerClient, HttpTransport, WebSocketTransport, httpRouteTable } from "@flowy-agent-store/client";
+
+// Mode A: WebSocketTransport (for real-time interactive UIs and streaming event subscriptions)
+const wsTransport = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", {
+  token: process.env.AGENT_STORE_TOKEN,
+  requestTimeoutMs: 30_000,
+});
+const wsClient = new AppServerClient({
+  transport: wsTransport,
+  client: { name: "desktop-ui", version: "1.0.0" },
+});
+await wsClient.connect();
+
+// Mode B: HttpTransport (for lightweight stateless scripts and one-off queries)
+const httpTransport = new HttpTransport({
+  baseUrl: "http://127.0.0.1:8787",
+  token: process.env.AGENT_STORE_TOKEN,
+});
+const httpClient = new AppServerClient({
+  transport: httpTransport,
+  client: { name: "cli-tool", version: "1.0.0" },
+});
+await httpClient.connect(); // In HTTP mode, connect() is a no-op
+const store = await httpClient.listStore();
+
+// Inspect supported HTTP methods via the route table (streaming methods are excluded)
+console.log(`HTTP supported methods: ${Object.keys(httpRouteTable()).length}`);
+```
+
+## 3. Runtime host integration and lifecycle
+
+### 3.1 Node.js managed mode (launchHarness lifecycle)
 
 Spawns the local runtime, discovers dynamic port allocations, binds over loopback, and completes handshake initialization in a single call:
 
 ```ts
 import { launchHarness } from "@flowy-agent-store/sdk";
 
+// Launch host process, complete handshake, and obtain an initialized client instance
 const harness = await launchHarness({
-  client: { name: "my-app", version: "0.1.0" },
+  client: { name: "my-service", version: "1.0.0" },
+  capabilities: { events: true, approvals: true, team_runtime: true },
 });
-const store = await harness.listStore();
-await harness.close();
+
+try {
+  console.log(`Server readiness URL: ${harness.server.readiness.url}`);
+  console.log(`Protocol version: ${harness.handshake.protocol_version}`);
+
+  const store = await harness.listStore();
+  console.log(`Store items ready: ${store.items.length}`);
+} finally {
+  // Always close in a finally block: terminates the child process and cleans up temporary files
+  await harness.close();
+}
 ```
 
 Internal lifecycle steps performed by `launchHarness`:
-
-1. Discovers the runtime binary (`bin` $\to$ `AGENT_STORE_BIN` $\to$ optional platform packages $\to$ system `PATH`);
+1. Discovers the runtime binary (`bin` $\to$ `AGENT_STORE_BIN` $\to$ platform packages $\to$ system `PATH`);
 2. Spawns a child process with `--host 127.0.0.1 --port 0 --no-open` and an isolated temporary `--data-dir`;
 3. Scans stdout for the machine-readable readiness line (`{"agent_store":"listening",...}`) to extract assigned ports;
 4. Enforces strict `protocol_version` equality against the SDK, terminating child processes on mismatch;
-5. Connects via loopback WebSocket and completes `initialize` $\to$ `initialized` handshakes, returning an active `AppServerClient`.
+5. Connects via loopback WebSocket and completes handshakes, returning an active `AppServerClient`. See [reference](/en-US/docs/typescript-sdk) §4 for full parameter details.
 
-> See [TypeScript SDK reference](/en-US/docs/typescript-sdk) §4 for complete parameter options and lifecycle teardown rules.
-
-### 3.1 Install an expert → run it once → read the result
-
-```ts
-import { launchHarness } from "@flowy-agent-store/sdk";
-
-const harness = await launchHarness({ client: { name: "demo", version: "1.0.0" } });
-try {
-  // Catalog (Store)
-  const items = await harness.listStore();
-  console.log(`${items.items.length} items in the store`);
-
-  // Install and run an agent
-  await harness.installStoreEntry("experts", "frontend-backend-experts");
-  const receipt = await harness.runs.agent({
-    agentId: "frontend-backend-experts",
-    goal: "Generate a todo REST API",
-  });
-  const result = await harness.runs.result(receipt.run_id);
-  console.log(result.status);
-} finally {
-  await harness.close(); // terminate child + remove temp data-dir
-}
-```
-
-### 3.2 Sessions + live events
-
-```ts
-import { launchHarness } from "@flowy-agent-store/sdk";
-
-const harness = await launchHarness({ client: { name: "my-tool", version: "1.0.0" } });
-try {
-  const conversation = await harness.conversations.create({ name: "demo" });
-  const subscription = await harness.conversations.follow(conversation.conversation_id);
-  subscription.onEvent((event) => console.log(event.event_type));
-  await harness.conversations.send(conversation.conversation_id, "hello", crypto.randomUUID());
-} finally {
-  await harness.close(); // terminate the child process + remove the temp data-dir
-}
-```
-
-### 3.3 A fixed binary plus your own data-dir (CI / parallel instances / a reusable store)
+### 3.2 Custom configuration and persistent data directory (production and testing)
 
 ```ts
 import { launchHarness } from "@flowy-agent-store/sdk";
 
 const harness = await launchHarness({
-  bin: "/opt/flowy-agent-store/flowy-agent-store", // omitted ⇒ §2's four routes are searched
-  dataDir: "/var/lib/my-app/agent-store",          // you own it ⇒ never deleted; the store survives across calls
-  readyTimeoutMs: 180_000,                         // cold start builds the database
-  requestTimeoutMs: 120_000,                       // store/list does not wait for market registration; empty? check markets_pending
-  extraArgs: ["--agent-store-config", "/etc/my-app/agent-store.toml"], // point at another host config
-  client: { name: "ci-smoke", version: "1.0.0" },
-  onExit: (info) => console.error("runtime exited", info.code, info.signal),
+  bin: "/opt/flowy-agent-store/flowy-agent-store", // Pin specific prebuilt binary
+  dataDir: "/var/lib/my-app/agent-store",          // Persistent directory: survives process termination
+  readyTimeoutMs: 180_000,                         // Extended cold-start timeout budget (180s)
+  requestTimeoutMs: 120_000,                       // Extended per-request timeout budget (120s)
+  extraArgs: ["--agent-store-config", "/etc/my-app/agent-store.toml"],
+  client: { name: "ci-worker", version: "1.0.0" },
+  onExit: (info) => console.warn(`Runtime exited: code=${info.code}, signal=${info.signal}`),
 });
+
 try {
   const store = await harness.listStore();
-  console.log(store.items.length, store.markets_pending);
+  console.log(`Items: ${store.items.length}, warming: ${store.markets_pending}`);
 } finally {
-  await harness.close(); // your own directory is left in place
+  await harness.close(); // Gracefully stops process; persistent data directory remains intact
 }
 ```
 
-> Defaults to port `0` (dynamic allocation); parallel instances must use isolated `dataDir` paths to prevent file lock contention.
+### 3.3 Standalone process management (spawnAppServer decoupled from client)
 
-### 3.4 A host behind a token, plus capabilities
-
-```ts
-const harness = await launchHarness({
-  client: { name: "internal-ui", version: "2.0.0" },
-  // required when the host runs with --auth; optional in local mode (server.readiness.auth === "disabled-local")
-  token: process.env.AGENT_STORE_TOKEN ?? "",
-  // declare what you will consume: events / approvals / team_runtime / artifacts
-  capabilities: { events: true, approvals: true, team_runtime: true, artifacts: false },
-});
-console.log(harness.server.readiness.url, harness.handshake.protocol_version);
-```
-
-### 3.5 Catching a failed launch
-
-```ts
-import { launchHarness } from "@flowy-agent-store/sdk";
-
-try {
-  const harness = await launchHarness({ client: { name: "my-app", version: "1.0.0" } });
-  // Normal business operations
-} catch (error) {
-  // Catches three primary startup failure categories:
-  // 1) Binary not found: details searched file locations
-  // 2) Readiness timeout or premature process exit
-  // 3) Protocol version contract mismatch
-  console.error(String(error));
-}
-```
-
-The SDK enforces clean teardown upon failure, emitting the final 50 stderr lines. Unexpected crashes following readiness can be monitored via `server.exited` and `onExit` callbacks.
-
-### 3.6 Process only, no client: `spawnAppServer`
+Manages process lifecycles independently without creating an in-memory client:
 
 ```ts
 import { spawnAppServer } from "@flowy-agent-store/sdk";
 import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
 
-const server = await spawnAppServer({ dataDir: "/var/lib/my-app/agent-store" });
+// Spawn and manage standalone daemon process without binding an internal client
+const server = await spawnAppServer({
+  dataDir: "/var/lib/my-app/agent-store",
+  host: "127.0.0.1",
+  port: 0, // OS assigns an ephemeral free port dynamically
+});
+
 try {
-  const url = `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`;
+  const wsUrl = `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`;
   const client = new AppServerClient({
-    transport: new WebSocketTransport(url),
-    client: { name: "my-app", version: "1.0.0" },
+    transport: new WebSocketTransport(wsUrl),
+    client: { name: "external-client", version: "1.0.0" },
   });
   await client.connect();
+
+  const catalog = await client.connectors.list();
+  console.log(`Connectors count: ${catalog.length}`);
 } finally {
-  await server.close();
+  await server.close(); // Terminate server child process
 }
 ```
 
-## 4. Browser: connect to an already-running server
-
-Browser environments connect exclusively over persistent sockets. `WebSocketTransport` injects `token` parameters as query strings automatically:
+### 3.4 Web browser persistent connection mode (connecting to an active server)
 
 ```ts
 import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
 
-const transport = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", { token });
-const client = new AppServerClient({ transport, client: { name: "web", version: "1.0.0" } });
+// Browser environments cannot spawn processes; connect to an existing server over WebSocket
+const token = window.sessionStorage.getItem("agent_store_token") ?? undefined;
+const transport = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", {
+  token, // Automatically appended as a query parameter when authentication is enabled
+  requestTimeoutMs: 15_000,
+});
+
+const client = new AppServerClient({
+  transport,
+  client: { name: "web-dashboard", version: "1.0.0" },
+});
+
 await client.connect();
+const experts = await client.agents.list();
+console.log(`Ready experts: ${experts.length}`);
 ```
 
-> Tokens are optional in local trusted mode; stateless requests can switch to `HttpTransport`.
+### 3.5 Electron hybrid architecture (main process spawn and renderer connection)
 
-## 5. Electron: spawn in the main process, connect from the renderer
-
-The Electron main process manages runtime binaries and physical data directories, while the renderer receives only loopback socket URLs and session tokens. Secrets remain strictly confined to the main process.
-
-**Main Process `main.ts`**:
+The main process manages the runtime binary and data directory, while the renderer process receives loopback credentials to establish direct WebSocket connections. Private secrets stay within the main process secure enclave.
 
 ```ts
-import { app, BrowserWindow, ipcMain } from "electron";
+// 1. Electron main process (main.ts): manages daemon lifecycle and storage
+import { app, ipcMain } from "electron";
 import { spawnAppServer, type SpawnedServer } from "@flowy-agent-store/sdk";
 import { join } from "node:path";
 
 let server: SpawnedServer | null = null;
 
-async function startBackend() {
+async function bootstrap() {
   server = await spawnAppServer({
     dataDir: join(app.getPath("userData"), "agent-store"),
   });
 
-  // 回环 WS 地址（loopback 下 auth 通常为 disabled-local，无需 token）
   const wsUrl = `ws://${server.readiness.host}:${server.readiness.port}/api/app-server/ws`;
-  const token = server.readiness.auth === "disabled-local" ? undefined : await getHostToken();
+  const token = server.readiness.auth === "disabled-local" ? undefined : process.env.AGENT_STORE_TOKEN;
 
-  // 渲染进程主动来取
   ipcMain.handle("agent-store:get-connection", () => ({ url: wsUrl, token }));
 
-  // 崩溃可见：进程意外退出时记日志（SDK 不自动重启）
   server.exited.then((info) => {
-    console.warn("agent-store runtime exited:", info.code, info.signal);
+    console.warn(`Runtime exited: code=${info.code}, signal=${info.signal}`);
   });
 }
 
-app.whenReady().then(startBackend);
-
+app.whenReady().then(bootstrap);
 app.on("before-quit", async (event) => {
   if (server) {
-    event.preventDefault(); // 先等清理完成再退出
+    event.preventDefault();
     await server.close();
     server = null;
   }
   app.exit();
 });
-```
 
-**Preload Script `preload.ts`**:
-
-```ts
-import { contextBridge, ipcRenderer } from "electron";
-
-contextBridge.exposeInMainWorld("agentStore", {
-  getConnection: () => ipcRenderer.invoke("agent-store:get-connection"),
-});
-```
-
-**Renderer Process `renderer.ts`**:
-
-```ts
+// 2. Renderer process (renderer.ts): requests connection info via IPC and binds WebSocket
 import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
 
-const { url, token } = await window.agentStore.getConnection();
-const transport = new WebSocketTransport(url, { token, requestTimeoutMs: 30_000 });
-const client = new AppServerClient({ transport, client: { name: "electron-ui", version: "1.0.0" } });
+const { url, token } = await (window as any).agentStore.getConnection();
+const client = new AppServerClient({
+  transport: new WebSocketTransport(url, { token }),
+  client: { name: "electron-renderer", version: "1.0.0" },
+});
 await client.connect();
-
-// 之后即可使用全部子客户端
-const catalog = await client.connectors.list();
 ```
 
-## 6. Store: browse → install → ready → uninstall
+## 4. Conversations and multi-agent orchestration
 
-```ts
-// 列出全市场统一目录（首次可能为空，含 markets_pending 标志，见接口参考 §3.3）
-const store = await client.listStore();
-for (const item of store.items) {
-  console.log(item.marketplace_id, item.entry_name, item.kind, item.installed);
-}
-
-// 一键安装：缺导入就导入 + 注册
-const receipt = await client.installStoreEntry("experts", "frontend-backend-experts");
-console.log("installed:", receipt.installed);
-
-// 市场源管理
-const markets = await client.listMarketplaces();
-const added = await client.addMarketplace({ source_kind: "url", source: "https://example.com/market.json" });
-await client.refreshMarketplace(added.marketplace_id);
-await client.removeMarketplace(added.marketplace_id, /* cascade */ true);
-```
-
-Using the `client.store` sub-client for orchestrated state transitions:
-
-```ts
-// 找到目标条目（分类过滤可选）
-const items = await client.store.search("frontend", { kind: "agent" });
-
-const outcome = await client.store.install(items[0]); // 默认 waitForReady: true
-if (!outcome.ok) console.warn("components failed:", outcome.components.filter((c) => !c.ok));
-if (outcome.ready === false) {
-  // 需要授权的连接器会立刻返回，不会把就绪超时预算烧光
-  if (outcome.readyIssue === "authorization_required") {
-    const started = await client.connectors.authStart(outcome.readyComponentId!);
-    // authStart 只确认「浏览器已拉起」：之前的失败同步回 state:"error"
-    if (started.state === "error") throw new Error(started.error ?? "auth start failed");
-    const auth = await client.connectors.waitForAuth(outcome.readyComponentId!);
-    // 之后的失败只能从 authStatus.error 读到，waitForAuth 会把它带回来
-    if (auth.state !== "authenticated") {
-      throw new Error(auth.state === "error" ? auth.error : "oauth timed out in the browser");
-    }
-  } else {
-    console.warn("not ready:", outcome.readyIssue);
-  }
-}
-
-// 已安装清单与版本提示（没有「更新」动词）
-const installed = await client.store.installed();
-const behind = await client.store.checkUpdates();
-if (behind.length > 0) console.log(client.store.updateHint(behind[0])); // "uninstall_reinstall"
-
-await client.store.setEnabled(items[0], false); // 技能只翻目录标记，见下
-await client.store.uninstall(items[0]);         // 真的释放运行时产物
-```
-
-- Connectors initialize as `disabled`; `store.install` automatically handles enablement and periodic probe validation.
-- Readiness timeouts preserve installed asset records while indicating `ready: false`.
-- Upgrades follow uninstall-and-reinstall (`uninstall_reinstall`) semantics.
-
-## 7. Sessions and Runs
-
-### 7.1 Session: create → send → receive in real time
+### 4.1 Basic conversation interaction (creation, event streaming, and idempotent delivery)
 
 ```ts
 import { decodeConversationEvent } from "@flowy-agent-store/protocol";
 
-const conv = await client.conversations.create({ name: "demo" });
-const sub = await client.conversations.follow(conv.conversation_id);
-sub.onEvent((event) => {
-  const decoded = decodeConversationEvent(event);
-  if (decoded.kind === "message.delta") render(decoded.delta, decoded.replace);
-});
-sub.onBackfill((snapshot) => resetTranscript(snapshot.messages));
-sub.onError((error) => report(error));
+// 1. Create a new conversation
+const conversation = await client.conversations.create({ name: "Technical Exploration" });
+const conversationId = conversation.conversation_id;
 
+// 2. Subscribe to the real-time event stream
+const subscription = await client.conversations.follow(conversationId);
+subscription.onEvent((rawEvent) => {
+  const event = decodeConversationEvent(rawEvent);
+  if (event.kind === "message.delta") {
+    process.stdout.write(event.delta);
+  }
+});
+subscription.onError((error) => console.error("Streaming error:", error));
+
+// 3. Send prompt (must provide a client-generated UUID as an idempotency key)
 const receipt = await client.conversations.send(
-  conv.conversation_id,
-  "帮我写个 REST API",
-  crypto.randomUUID(), // 必须显式幂等键
+  conversationId,
+  "Analyze the trade-offs of a single-binary architecture and outline key findings",
+  crypto.randomUUID(),
+);
+console.log(`Prompt accepted: ${receipt.accepted}`);
+```
+
+### 4.2 Dynamic atomic skill attachment (turn-level capability injection)
+
+Skill attachments apply solely to the current conversational turn and do not modify the persistent conversation snapshot:
+
+```ts
+// Discover available local skills
+const skills = await client.skills.list();
+const gitSkill = skills.find((item) => item.name === "git-workflow");
+
+if (!gitSkill) throw new Error("git-workflow skill not installed");
+
+// Attach skill for this specific turn via mentions without polluting conversation state
+await client.conversations.send(
+  conversationId,
+  "Audit git commit history against repository conventions",
+  crypto.randomUUID(),
+  {
+    mentions: [{ kind: "skill", id: gitSkill.id }],
+    // attachments: ["/absolute/path/to/diff.patch"], // Optional workspace attachment
+  },
 );
 ```
 
-### 7.2 Mount a Skill for one turn (`fp-3`)
-
-Skill attachments apply dynamically to the target turn only:
+### 4.3 Persona conversations and team orchestration (expert and team binding)
 
 ```ts
-const skills = await client.skills.list();
-const releaseNotes = skills.find((skill) => skill.name === "release-notes");
-
-await client.conversations.send(conv.conversation_id, "按这个技能的步骤发版", crypto.randomUUID(), {
-  mentions: [{ kind: "skill", id: releaseNotes!.id }],
-});
-// 同一轮也可以带图片附件（会话工作区内的绝对路径）：
-// { attachments: ["/abs/path/inside/workspace.png"] }
-```
-
-> `mentions` accepts only `kind: "skill"`. Non-skill kinds fail with `invalid_request`.
-
-### 7.3 Open a conversation as an expert (`fp-4`)
-
-```ts
+// Mode A: Single-expert binding (constrained from turn 1 by persona instructions, skills, and connector fences)
 const experts = await client.agents.list();
-const architect = experts.find((agent) => agent.name === "software-architect");
+const architect = experts.find((item) => item.name === "software-architect");
 
 const expertChat = await client.conversations.create({
-  name: "重构讨论",
-  agentId: architect!.id, // 未安装会得到 agent_not_installed
+  name: "Architecture Session",
+  agentId: architect!.id, // Throws agent_not_installed if not present locally
 });
-// 之后照常 send：每一轮都在这个专家的身份、技能与连接器栅栏下运行。
-await client.conversations.send(expertChat.conversation_id, "先看模块边界", crypto.randomUUID());
-```
+await client.conversations.send(expertChat.conversation_id, "Plan microkernel extensions", crypto.randomUUID());
 
-> Expert identities bind during conversation creation; switching experts requires creating a new session.
-
-### 7.4 Open a team's Leader conversation (`fp-5`)
-
-```ts
+// Mode B: Team binding (orchestrated by the Team Leader who delegates subtasks)
 const teams = await client.teams.list();
-const leader = await client.conversations.create({ teamId: teams[0].id });
-
-// 你的第一条消息就是 Leader 的首轮：它在这里调用 nomi_delegate 把活分下去。
-await client.conversations.send(leader.conversation_id, "把这版需求拆成计划", crypto.randomUUID());
-```
-
-> `teamId` and `agentId` are mutually exclusive; team conversations generate standard system display titles.
-
-### 7.5 Several conversations in one host
-
-A single host instance manages multiple concurrent sessions, multiplexed across a single WebSocket connection:
-
-```ts
-// ① 并存：三个普通会话（要用专家 / 团 Leader，给 create 加 agentId / teamId 即可，见 §7.3 / §7.4）
-const explain = await client.conversations.create({ name: "解释报错" });
-const review = await client.conversations.create({ name: "评审 A 分支" });
-const notes = await client.conversations.create({ name: "写发布说明" });
-const chats = [explain, review, notes];
-
-// ② 一条 WS 连接把它们全订上：服务端按连接维护订阅集合，事件按 conversation_id 分流
-for (const view of chats) {
-  const sub = await client.conversations.follow(view.conversation_id);
-  // 分流就是这一行：闭包记住是哪个会话，同一根连接上三个会话的事件不会串
-  sub.onEvent((event) => render(view.conversation_id, event));
-}
-
-// ③ 并发：两个会话同时各跑一轮，互不阻塞（忙判定按会话，没有宿主级并发闸）
-const receipts = await Promise.all([
-  client.conversations.send(explain.conversation_id, "解释一下这个报错", crypto.randomUUID()),
-  client.conversations.send(review.conversation_id, "评审 A 分支的改动", crypto.randomUUID()),
-]);
-// 回执是「已受理」不是「已跑完」（§14）：两轮在后台流式跑，终态从 ② 的事件里拿
-console.log(receipts.map((r) => ({ accepted: r.accepted, completed: r.completed })));
-
-// ④ 枚举续聊：list 默认 100，返回的都是这个宿主里的会话
-for (const view of await client.conversations.list()) {
-  console.log(view.conversation_id, view.name, view.is_processing);
-}
-```
-
-> Concurrency conflicts evaluate per-conversation; process-level isolation requires independent `dataDir` assignments.
-
-### 7.6 Run: start → await result → handle approval
-
-```ts
-const run = await client.runs.agent({
-  agentId: "frontend-backend-experts",
-  goal: "Generate a todo REST API",
+const teamChat = await client.conversations.create({
+  teamId: teams[0].id, // teamId and agentId are mutually exclusive
 });
-const result = await client.runs.result(run.run_id); // 终态后才成功
-console.log(result.status);
+await client.conversations.send(teamChat.conversation_id, "Break down refactoring requirements into role-specific subtasks", crypto.randomUUID());
+```
 
-// 若 Agent 需要人决策，follow 实时事件并回答
-const sub = await client.runs.follow(run.run_id);
-sub.onEvent((event) => {
-  if (event.event_type !== "approval.requested") return;
-  client.runs.answerDecision({
-    runId: run.run_id,
-    stepId: event.step_id!,
-    attemptId: event.attempt_id!,
-    answer: "批准，继续执行",
-    expectedExecutionVersion: event.expected_execution_version!,
-    expectedStepVersion: event.expected_step_version!,
-    expectedAttemptVersion: event.expected_attempt_version!,
+### 4.4 Concurrent conversations and multiplexing over a single WebSocket connection
+
+A single host manages multiple independent sessions while multiplexing streaming events over a single WebSocket connection:
+
+```ts
+// 1. Concurrently spawn multiple independent conversations
+const chatA = await client.conversations.create({ name: "Error Log Analysis" });
+const chatB = await client.conversations.create({ name: "API Schema Design" });
+const activeChats = [chatA, chatB];
+
+// 2. Subscribe to each conversation over the same WebSocket connection, dispatching via closures
+for (const chat of activeChats) {
+  const sub = await client.conversations.follow(chat.conversation_id);
+  sub.onEvent((event) => {
+    console.log(`[Conversation ${chat.name} event]`, event.event_type);
   });
-});
+}
+
+// 3. Dispatch parallel turns across conversations (isolated per conversation without cross-blocking)
+const receipts = await Promise.all([
+  client.conversations.send(chatA.conversation_id, "Analyze crash trace", crypto.randomUUID()),
+  client.conversations.send(chatB.conversation_id, "Draft user service API schema", crypto.randomUUID()),
+]);
+console.log("Acceptance status:", receipts.map((r) => r.accepted));
+
+// 4. Query all active conversations within the host
+const allViews = await client.conversations.list();
+for (const view of allViews) {
+  console.log(`Session: ${view.name}, processing: ${view.is_processing}`);
+}
 ```
 
-## 8. Connector OAuth end-to-end
+### 4.5 Standalone task (Run) orchestration and human-in-the-loop approvals
 
 ```ts
-// 1) 从目录取得 connectorId
-const catalog = await client.connectors.list();
-const github = catalog.find((c) => c.id === "github");
-if (!github) throw new Error("github connector not found in catalog");
+// 1. Dispatch an autonomous batch agent run
+const receipt = await client.runs.agent({
+  agentId: "frontend-backend-experts",
+  goal: "Generate OpenAPI definitions and mock fixtures for the order service",
+});
+const runId = receipt.run_id;
 
-// 2) 先看认证态：已认证则可跳过授权
-const before = await client.connectors.authStatus(github.id);
-if (before.state !== "authenticated") {
-  // 3) 发起宿主浏览器 OAuth 流（立即返回 started，不阻塞）
-  const started = await client.connectors.authStart(github.id);
-  if (started.state !== "started") {
-    // 浏览器之前的失败：当场就有原因
-    throw new Error(started.error ?? "auth start failed");
+// 2. Stream execution events and handle interactive decision approvals
+const runSub = await client.runs.follow(runId);
+runSub.onEvent(async (event) => {
+  if (event.event_type === "approval.requested") {
+    // Submit approval response with required optimistic concurrency versions
+    await client.runs.answerDecision({
+      runId,
+      stepId: event.step_id!,
+      attemptId: event.attempt_id!,
+      answer: "Approved to modify workspace files",
+      expectedExecutionVersion: event.expected_execution_version!,
+      expectedStepVersion: event.expected_step_version!,
+      expectedAttemptVersion: event.expected_attempt_version!,
+    });
+  }
+});
+
+// 3. Await terminal completion and inspect output status
+const result = await client.runs.result(runId);
+console.log(`Run status: ${result.status}`);
+```
+
+## 5. Marketplace and connector integration
+
+### 5.1 Marketplace entry discovery and lifecycle state machine
+
+```ts
+// 1. Query unified catalog and install an entry
+const store = await client.listStore();
+const targetItem = store.items.find((item) => item.entry_name === "frontend-backend-experts");
+
+if (targetItem && !targetItem.installed) {
+  await client.installStoreEntry(targetItem.marketplace_id, targetItem.entry_name);
+}
+
+// 2. Advanced installation state machine with readiness polling and OAuth detection
+const searchResults = await client.store.search("github", { kind: "connector" });
+const outcome = await client.store.install(searchResults[0], { waitForReady: true });
+
+if (!outcome.ok) {
+  console.warn("Component installation failures:", outcome.components.filter((c) => !c.ok));
+}
+if (outcome.ready === false && outcome.readyIssue === "authorization_required") {
+  console.log("Connector requires user authorization; proceed with OAuth flow");
+}
+
+// 3. Inspect installed entries and check for updates
+const installedEntries = await client.store.installed();
+const outdated = await client.store.checkUpdates();
+for (const entry of outdated) {
+  console.log(`Update strategy: ${client.store.updateHint(entry)}`); // Outputs "uninstall_reinstall"
+}
+
+// 4. Disable and uninstall entries cleanly
+await client.store.setEnabled(searchResults[0], false); // Toggles catalog active flag
+await client.store.uninstall(searchResults[0]);         // Purges runtime snapshot from disk
+```
+
+### 5.2 Dynamic marketplace source management
+
+```ts
+// 1. List configured marketplace sources
+const marketplaces = await client.listMarketplaces();
+
+// 2. Register a new remote marketplace source
+const added = await client.addMarketplace({
+  source_kind: "url",
+  source: "https://example.com/custom-market.json",
+});
+
+// 3. Force re-synchronization of marketplace catalog definitions
+await client.refreshMarketplace(added.marketplace_id);
+
+// 4. Remove marketplace source (cascade: true removes unpinned snapshots registered from it)
+await client.removeMarketplace(added.marketplace_id, /* cascade */ true);
+```
+
+### 5.3 Connector OAuth authorization workflow
+
+```ts
+const connectorId = "github";
+
+// 1. Check current credential status; skip if already authenticated
+const initialStatus = await client.connectors.authStatus(connectorId);
+
+if (initialStatus.state !== "authenticated") {
+  // 2. Trigger browser OAuth flow on host (returns immediately with started state)
+  const startResult = await client.connectors.authStart(connectorId);
+  if (startResult.state !== "started") {
+    throw new Error(startResult.error ?? "Failed to launch browser OAuth window");
   }
 
-  // 4) 等到结束（默认 120s 预算 = 宿主的回调窗口）
-  const auth = await client.connectors.waitForAuth(github.id);
-  if (auth.state === "error") {
-    // 浏览器之后的失败只有这一条通道：换 token 被拒 / 回调超时 / 被限流
-    throw new Error(auth.error);
+  // 3. Await user completion in browser (defaults to 120s timeout budget)
+  const authResult = await client.connectors.waitForAuth(connectorId);
+  if (authResult.state === "error") {
+    throw new Error(`OAuth authorization error: ${authResult.error}`);
   }
-  if (auth.state === "timeout") {
-    throw new Error("oauth did not finish in the browser");
+  if (authResult.state === "timeout") {
+    throw new Error("User browser authorization timed out");
   }
 }
 
-// 5) 授权后连接器状态应为 connected（认证就绪 + 最近探测成功）
-const status = await client.connectors.status(github.id);
-console.log(status.status);
+// 4. Verify connector operational readiness (expected status: connected)
+const health = await client.connectors.status(connectorId);
+console.log(`Connector status: ${health.status}`);
 
-// 6) 用完吊销令牌
-await client.connectors.logout(github.id);
+// 5. Revoke tokens upon session teardown
+await client.connectors.logout(connectorId);
 ```
 
-### 8.1 Calling a tool: read the signature first
+### 5.4 Connector tool probes and dynamic execution
 
 ```ts
-// 1) 现场探针：真连接一次（stdio 会 spawn 子进程），结果落库——get() 随后读的就是它
-const probe = await client.connectors.test(github.id);
-if (!probe.success) throw new Error(probe.error ?? "probe failed");
+// 1. Test live connectivity and probe available tool signatures
+const probe = await client.connectors.test("github");
+if (!probe.success) {
+  throw new Error(probe.error ?? "Connector probe failed");
+}
 if (probe.tools_truncated) {
-  // 名字与描述永不省略；只有 schema 会为控制体积被整份略去
-  console.warn("host omitted some schemas to stay inside its size budget");
+  console.warn("Tool schemas were truncated by the host to respect payload size budgets");
 }
 
-// 2) 挑一个工具，读它收什么参数
-const tool = probe.tools?.find((t) => t.name === "create_issue");
-console.log(tool?.description, tool?.input_schema);
+// 2. Discover tool signatures and expected parameters
+const targetTool = probe.tools?.find((tool) => tool.name === "create_issue");
+console.log("Tool description:", targetTool?.description);
+console.log("Input schema:", targetTool?.input_schema);
 
-// 3) 按签名传参调用
-const call = await client.connectors.call(github.id, "create_issue", {
-  owner: "acme",
-  repo: "site",
-  title: "flush the docs",
+// 3. Invoke tool with typed payload
+const invocation = await client.connectors.call("github", "create_issue", {
+  owner: "flowy-org",
+  repo: "agent-store",
+  title: "SDK Cookbook synchronization",
 });
-if (call.is_error) {
-  // 参数不对 / 服务器自己拒绝：promise 仍然 resolve，错误在结果对象里
-  console.error(call.result);
+
+if (invocation.is_error) {
+  // Upstream rejections resolve normally; errors are encapsulated in the result payload
+  console.error("Tool execution error:", invocation.result);
+} else {
+  console.log("Tool execution succeeded:", invocation.result);
 }
 ```
 
-## 9. Catalogue one-liners
+## 6. Resource export and host controls
 
-### 9.1 Catalogue calls: list / get
-
-```ts
-const agents = await client.agents.list();          // AgentSummary[]
-const one = await client.agents.get(agents[0].id);  // AgentDetail：含声明式 skills / connectors
-console.log(one.name, one.skills, one.preset_id);   // preset_id 在 install/* 之后才有
-
-const teams = await client.teams.list();            // TeamSummary[]
-const team = await client.teams.get(teams[0].id);   // TeamDetail：成员 + 可绑定的 Connector 面
-
-const skills = await client.skills.list();          // SkillSummary[]
-console.log(skills.filter((s) => s.writable).map((s) => s.name)); // 可写的用户技能
-
-const models = await client.models.list();          // ModelSummary[]：当前宿主可用模型
-```
-
-### 9.2 workspaces: create and revoke
+### 6.1 Workspace management and skill file inspection
 
 ```ts
-const workspaces = await client.workspaces.list();  // WorkspaceView[]
-const created = await client.workspaces.create("/abs/path/to/project"); // 服务端 canonicalize
-await client.workspaces.revoke(created.workspace_id); // 软删除，既有会话保留
-```
+// 1. Workspace lifecycle operations
+const workspaces = await client.workspaces.list();
+const newWorkspace = await client.workspaces.create("/abs/path/to/project");
+await client.workspaces.revoke(newWorkspace.workspace_id); // Soft delete; active sessions retain access
 
-### 9.3 Reading the files a Skill ships
-
-```ts
-if (client.initializeInfo?.capabilities.skill_files) {   // 宿主可以只接目录不接文件面
+// 2. Inspect skill files (governed by the host skill_files capability gate)
+if (client.initializeInfo?.capabilities.skill_files) {
   const inventory = await client.skills.files("release-notes");
   for (const file of inventory.files) {
-    console.log(file.path, file.size, file.digest);
+    console.log(`File: ${file.path}, size: ${file.size}, digest: ${file.digest}`);
   }
-  console.log("tree digest:", inventory.content_digest); // 该技能目录的摘要，不是快照摘要
-  if (inventory.truncated) console.warn("inventory incomplete");
 
-  const bytes = await client.skills.readFile("release-notes", "references/guide.md");
-  console.log(new TextDecoder().decode(bytes));
+  // Read binary file content from skill directory and decode
+  const fileBytes = await client.skills.readFile("release-notes", "references/guide.md");
+  const content = new TextDecoder().decode(fileBytes);
+  console.log("File content:", content);
 }
 ```
 
-### 9.4 Exporting an expert / team to an external runtime (`fp-8`)
-
-```ts
-if (client.initializeInfo?.capabilities.expert_export) {  // 报的是「这个面接没接」，不是「这个 id 能不能导」
-  const pack = await client.agents.export("wb-…");         // ExpertPack
-  console.log(pack.pack_format, pack.kind, pack.persona.instructions);
-  console.log(pack.model, pack.skills, pack.provenance.content_digest);
-
-  const team = await client.teams.export("wb-…", "1.0.0"); // 第二参是可选的版本钉；不匹配即 version_mismatch
-  for (const member of team.team!.members) console.log(member.id, member.name); // 团长在首位
-}
-```
-
-Export definitions and materialize to disk via `exportTeam`:
+### 6.2 Exporting experts and teams to local disk
 
 ```ts
 import { exportTeam } from "@flowy-agent-store/sdk";
-
-// 整包失败留在服务端：任一成员缺失 ⇒ 整个调用失败，不落任何文件
-const result = await exportTeam(client, teamId, "./frontend-backend-experts");
-result.pack;           // ExpertPack —— 内存里也拿得到，不需要二次调用
-result.writtenSkills;  // 实际写入的技能名（跨成员去重后）
-result.danglingSkills; // 声明了但本机取不到的技能：{ id, error } —— 如实上报，不静默跳过
-```
-
-Low-level directory assembly pattern:
-
-```ts
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-const pack = await client.agents.export(agentId);
-await mkdir(dir, { recursive: true });
-await writeFile(join(dir, "expert-pack.json"), JSON.stringify(pack, null, 2));
-await writeFile(join(dir, "persona.md"), pack.persona.instructions);
+// Mode A: High-level exportTeam helper to materialize full teams and shared skill trees
+const teamId = "frontend-backend-experts";
+const exportResult = await exportTeam(client, teamId, "./exported-team");
+console.log(`Materialized skills: ${exportResult.writtenSkills.length}`);
+if (exportResult.danglingSkills.length > 0) {
+  console.warn("Unresolved dangling skills:", exportResult.danglingSkills);
+}
+
+// Mode B: Assemble ExpertPack and write to disk manually
+const pack = await client.agents.export("wb-architect");
+const targetDir = "./exported-expert";
+await mkdir(targetDir, { recursive: true });
+await writeFile(join(targetDir, "expert-pack.json"), JSON.stringify(pack, null, 2));
+await writeFile(join(targetDir, "persona.md"), pack.persona.instructions);
+
 for (const skill of pack.skills) {
-  for (const file of (await client.skills.files(skill.id)).files) {
-    const target = join(dir, "skills", skill.name, file.path); // path 是技能目录内的 POSIX 相对路径
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, await client.skills.readFile(skill.id, file.path));
+  const files = await client.skills.files(skill.id);
+  for (const file of files.files) {
+    const dest = join(targetDir, "skills", skill.name, file.path);
+    await mkdir(dirname(dest), { recursive: true });
+    await writeFile(dest, await client.skills.readFile(skill.id, file.path));
   }
 }
 ```
 
-## 10. Controlling the tool surface: `AGENT_STORE_TOOLS`
+### 6.3 Host tool policy pruning and control
 
-Override host tool configurations dynamically via environment variables:
+Dynamic configuration of host tool policies via environment variables:
 
 ```ts
+import { launchHarness } from "@flowy-agent-store/sdk";
+
+// Inject tool policy via AGENT_STORE_TOOLS to override host defaults
 const harness = await launchHarness({
-  client: { name: "basic-only", version: "1.0.0" },
+  client: { name: "sandboxed-client", version: "1.0.0" },
   env: {
     AGENT_STORE_TOOLS: JSON.stringify({
-      web: true,       // 联网检索 / 读页面：保留为基础能力
-      computer: false, // 桌面控制（键鼠 / UIA）
-      browser: false,  // 浏览器自动化（带操作者 profile 与登录态）
+      web: true,       // Retain read-only web browsing and scraping
+      computer: false, // Disable mouse and keyboard automation
+      browser: false,  // Disable profile-based browser automation
       domains: {
         cron: false,
         meeting: false,
@@ -601,105 +561,70 @@ const harness = await launchHarness({
     }),
   },
 });
-```
 
-| Fact | Behavior |
-| --- | --- |
-| Value | JSON matching the `[tools]` table schema; `{}` resets to permissive defaults |
-| Precedence | Replaces the configuration file `[tools]` table completely |
-| Scope | Enforced exclusively by `apps/agent-store` |
-| Fallback | Parsing errors emit warnings and fallback to file configuration |
-| Lifecycle | Evaluated once during process initialization |
-
-## 11. Errors and retry
-
-```ts
-import { withRetry } from "@flowy-agent-store/client";
-
-const view = await withRetry(() => client.runs.get(runId), {
-  maxAttempts: 4,
-  onRetry: ({ attempt, delayMs }) => log(`retry ${attempt} in ${delayMs}ms`),
-});
-```
-
-Branch on structured error `code` fields:
-
-```ts
-import { AppServerError, formatError, isRetryableError } from "@flowy-agent-store/protocol";
-
-try {
-  await client.runs.result(runId);
-} catch (error) {
-  if (error instanceof AppServerError && error.code === "connector_unavailable") {
-    await enableConnector(); // 稳定 code 是唯一可分支的契约
-  } else if (isRetryableError(error)) {
-    // 交回 withRetry，或自行退避后重试
-  }
-  console.error(formatError(error)); // 唯一的人读文案
-}
-```
-
-## 12. Using it in CI and tests
-
-```ts
-const harness = await launchHarness({
-  bin: process.env.AGENT_STORE_BIN, // 预构建二进制；省略则按四条途径自动查找
-  dataDir: process.env.CI_DATA_DIR, // 自持目录 → 不删除；省略 = 临时目录 + close 时删除
-  readyTimeoutMs: 180_000,          // 冷启动建库
-  requestTimeoutMs: 120_000,        // store/list 不等市场注册（zip 归档在后台下载）
-  client: { name: "ci-smoke", version: "1.0.0" },
-  onExit: (info) => console.error("runtime exited", info.code, info.signal),
-});
 try {
   const store = await harness.listStore();
-  // 冷启动时目录可能是空的：markets_pending 为 true 表示内置市场仍在后台注册
-  if (store.items.length === 0) console.warn("store still warming:", store.markets_pending);
+  console.log(`Loaded items in sandboxed host: ${store.items.length}`);
 } finally {
   await harness.close();
 }
 ```
 
-- Provide precompiled binary paths in CI environments;
-- Assign unique `dataDir` directories to concurrent test jobs to prevent lock collisions;
-- The initial `store/list` call returns immediately; poll `markets_pending` to confirm background sync completion;
-- Ensure `harness.close()` is called within `afterAll` hooks to release process resources.
+| Property | Rule and operational behavior |
+| --- | --- |
+| Value format | Valid JSON string conforming to the `[tools]` table structure in `config.toml` |
+| Precedence | Environment variable **entirely replaces** the file `[tools]` section (no deep merge) |
+| Fallback behavior | Malformed JSON triggers warning logs and automatically falls back to file configuration |
+| Lifecycle scope | Evaluated once during host process bootstrap; `launchHarness` applies it to each run |
 
-## 13. Rolling your own transport: WebSocket or HTTP
+## 7. Production best practices and resilience
+
+### 7.1 Structured error handling and exponential backoff retry
 
 ```ts
-import { AppServerClient, HttpTransport, WebSocketTransport, httpRouteTable } from "@flowy-agent-store/client";
+import { withRetry } from "@flowy-agent-store/client";
+import { AppServerError, formatError, isRetryableError } from "@flowy-agent-store/protocol";
 
-// 实时事件 / 订阅：只能 WebSocket
-const ws = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", { token });
-const live = new AppServerClient({ transport: ws, client: { name: "ui", version: "1.0.0" } });
-await live.connect();
-const sub = await live.conversations.follow(conversationId); // 只有 WS 绑定的传输能订阅
+// Mode A: Automatic exponential backoff for idempotent operations via withRetry
+const runDetails = await withRetry(() => client.runs.get("run-12345"), {
+  maxAttempts: 4,
+  initialDelayMs: 500,
+  maxDelayMs: 5000,
+  onRetry: ({ attempt, delayMs, error }) => {
+    console.warn(`Retry attempt ${attempt} in ${delayMs}ms due to: ${formatError(error)}`);
+  },
+});
 
-// 纯请求-响应：HTTP 够用（每次调用独立握手，connect() 是 no-op）
-const http = new HttpTransport({ baseUrl: "http://127.0.0.1:8787" });
-const plain = new AppServerClient({ transport: http, client: { name: "cli", version: "1.0.0" } });
-await plain.connect();
-await plain.listStore();
-
-// 有 25 个方法没有 HTTP 绑定：调用会抛 TransportError；路由表可自查
-console.log(Object.keys(httpRouteTable()).length);
+// Mode B: Deterministic error dispatching via structured AppServerError error codes
+try {
+  await client.runs.result("run-12345");
+} catch (error) {
+  if (error instanceof AppServerError) {
+    switch (error.code) {
+      case "connector_unavailable":
+        console.error("Connector offline or unauthenticated; prompt user to reconnect");
+        break;
+      case "agent_not_installed":
+        console.error("Target expert not installed in local store");
+        break;
+      default:
+        console.error(`Server error [${error.code}]:`, formatError(error));
+    }
+  } else if (isRetryableError(error)) {
+    console.warn("Transient network error; retryable");
+  } else {
+    throw error;
+  }
+}
 ```
 
-| | `WebSocketTransport` | `HttpTransport` |
-| --- | --- | --- |
-| Real-time events and subscriptions (`follow`, `onNotification`) | Supported | **Unsupported** (`notify()` throws, `onNotification()` returns empty subscription) |
-| Connection mode | Persistent socket with single handshake | Independent handshake per invocation |
-| Best for | UI clients, continuous conversations, Run events | Scripts, CI jobs, one-off queries |
+### 7.2 Production operational norms and essential gotchas
 
-## 14. Traps (verified against the runtime)
-
-- **Ephemeral Data Directories**: Omitting `dataDir` creates a temporary directory deleted upon `close()`; process aborts may leave uncollected files.
-- **Single-Instance Locks**: Concurrent processes targeting the same `dataDir` fail fast.
-- **Asynchronous Acceptance**: `send()` resolving with `accepted: true` denotes persistence only; model generation streams must be observed via `follow()`.
-- **Asynchronous Marketplace Sync**: Initial `store/list` calls return immediately; poll `markets_pending` to detect background sync completion.
-- **Initial Connector State**: Connectors register in a `disabled` state by default; `store.install` handles activation automatically.
-- **Upgrade Semantics**: Upgrades execute via uninstall and reinstall (`uninstall_reinstall`).
-- **Skill Disable Boundaries**: Skills do not support dynamic unloading; `store.setEnabled(item, false)` sets a catalog flag only, requiring `uninstall` for full removal.
-- **Protocol Fingerprint Enforcement**: Mismatches in `protocol_version` between client and host terminate execution immediately.
-- **Binary Resolution**: Binaries are not retrieved over the network; paths must resolve via configuration or `PATH`.
-- **Event Stream Resync**: Real-time push events provide best-effort ordering; reliable consumption requires cursor replays via `run/events`.
+- **Data directory mutex locks**: A given `dataDir` enforces exclusive file locking; multiple concurrent processes cannot mount the same directory. Multi-instance testing requires distinct paths.
+- **Asynchronous prompt acceptance**: `conversations.send` returning `accepted: true` denotes queued ingestion, not completed inference; streaming responses require event subscriptions or polling `is_processing`.
+- **Marketplace background warming**: On cold starts, `store/list` does not block for archive unpacks; poll `markets_pending` until false when an empty catalog is received.
+- **Initial connector state**: Newly imported connectors default to `disabled`; high-level `store.install` automatically handles enablement and connectivity verification.
+- **Upgrade lifecycle conventions**: The system provides no in-place patching primitives; updates follow an uninstall-then-reinstall (`uninstall_reinstall`) workflow.
+- **Skill disabling vs uninstallation**: Skills cannot be hot-unloaded at runtime; `store.setEnabled(item, false)` sets a catalog flag, while full removal requires `uninstall`.
+- **Strict protocol version matching**: The host process and SDK enforce exact `protocol_version` equality; discrepancies cause immediate child process termination during bootstrap.
+- **Temporary directory cleanup**: When using `launchHarness` without an explicit `dataDir`, always call `close()` within a `finally` block to prevent orphaned temporary directory buildup.
