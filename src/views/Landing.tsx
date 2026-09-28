@@ -26,12 +26,12 @@ const META = {
   "zh-CN": {
     title: "Flowy Agent Store — 本地优先的 Agent 工作台",
     description:
-      "Flowy Agent Store 是本地优先的单文件 Agent 运行时：一条命令在浏览器中拉起工作台，导入专家、技能与连接器，执行与凭据只留本机。",
+      "Flowy Agent Store 是本地优先的轻量单文件 Agent 运行时：单命令启动浏览器工作台，支持专家、技能与连接器的本地导入与调度，执行、凭据与状态均保留在本机。",
   },
   "en-US": {
-    title: "Flowy Agent Store — Run your agent workbench locally",
+    title: "Flowy Agent Store — Local-First Agent Workbench",
     description:
-      "Flowy Agent Store is a local-first, single-file agent runtime. One command opens a workbench in your browser to import experts, skills and connectors — execution and credentials stay on your machine.",
+      "Flowy Agent Store is a local-first, lightweight single-file agent runtime. Launch the browser-based workbench with a single command to import and execute experts, skills, and connectors locally — with all execution and credentials remaining on your machine.",
   },
 } as const;
 
