@@ -22,7 +22,8 @@
 
 | 版本 | 发布时间（UTC） | 当前 dist-tag | 与上一版的实质差异 |
 | --- | --- | --- | --- |
-| `0.1.0-beta.7` | 2026-09-20T10:33:48Z | `beta` | **破坏性**：协议指纹递增至 `fp-8`（握手全等校验）；新增 WebSocket 专用接口 `agent/export` 与 `team/export`，方法总数扩充至 73；接口参数保持平稳（升级步骤见 §6.6） |
+| `0.1.0-beta.8` | 2026-09-28T10:23:47Z | `beta` | **破坏性**：协议指纹递增至 `fp-12`（握手全等校验）；新增 `store/update-entry` 商店条目原地更新与连接器用户凭据体系（`connector/credential/*`、`connector/register`），方法总数扩充至 78、HTTP 路由映射数扩充至 53；`updateHint()` 返回值收窄（升级步骤见 §6.7） |
+| `0.1.0-beta.7` | 2026-09-20T10:33:48Z | — | **破坏性**：协议指纹递增至 `fp-8`（握手全等校验）；新增 WebSocket 专用接口 `agent/export` 与 `team/export`，方法总数扩充至 73；接口参数保持平稳（升级步骤见 §6.6） |
 | `0.1.0-beta.6` | 2026-09-18T11:08:21Z | — | **破坏性**：SDK 入口与结构重构（`launchClient` 重命名为 `launchHarness`，移除 `.client` 包装，`initializeResult` 调整为 `handshake`），需同步修改调用代码；线协议维持 `fp-7`（升级步骤见 §6.5） |
 | `0.1.0-beta.5` | 2026-09-17T11:41:10Z | — | **破坏性**：协议指纹调整为 `fp-7`；扩充连接器工具 `input_schema`、单轮技能挂载、`agent_id`/`team_id` 会话参数及 `zip` 市场源协议（升级步骤见 §6.4） |
 | `0.1.0-beta.4` | 2026-09-16T10:24:02Z | — | **破坏性**：协议指纹调整为严格全等模式 `fp-1`；`event_type` 收窄为封闭联合 `ConversationEventType`；新增技能文件读取与连接器代理功能（升级步骤见 §6.3） |
@@ -37,7 +38,7 @@
 | dist-tag | 当前指向 |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.7` |
+| `beta` | `0.1.0-beta.8` |
 
 ```bash
 npm view @flowy-agent-store/sdk versions dist-tags --json
@@ -45,8 +46,8 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.7", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.8", "latest": "0.1.0-beta.2" }
 }
 ```
 
@@ -173,6 +174,19 @@ bun run typecheck
 - 协议指纹递增至 `fp-8`，客户端与运行时需保持版本对齐；
 - 新增 `agents.export` 与 `teams.export` 接口，支持资产结构导出。
 
+### 6.7 从 0.1.0-beta.7 升到 0.1.0-beta.8
+
+```bash
+bun add @flowy-agent-store/sdk@0.1.0-beta.8
+bun add @flowy-agent-store/protocol@0.1.0-beta.8
+bun run typecheck
+```
+
+- **协议指纹由 `fp-11` 递增到 `fp-12`**（叠加本次跨过的 `fp-9` 至 `fp-11`），握手执行严格全等校验：**客户端与运行时必须同批升级**，只升一边会直接连不上；
+- **有一处 TS 签名变化需要改代码**：`StoreClient.updateHint()` 的返回值由 `"uninstall_reinstall"` 改为 `"update"`，以它分支的调用方要同步；`StoreOperationOutcome` 另新增 `errors` 与 `warnings`（加法）；
+- 新增 `store.update()`：已安装的商店条目可以显式升级（协议方法 `store/update-entry`），不再需要「卸载再安装」；
+- 连接器用户凭据体系（`credential` 块、`connector/credential/{get,set,clear}`、`connector/register`）与 SDK 的 `exportAgent` / `exportTeam` / `materializePack` 随本版首次发布。
+
 ## 7. 自查当前安装的版本
 
 ```bash
@@ -188,10 +202,12 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. 已发布产物的差异与自查方法
 
-截至 `0.1.0-beta.7`，工作区与线上发布产物保持一致：
+截至 `0.1.0-beta.8`，工作区与线上发布产物保持一致：
 
-1. **资产导出协议接口 —— `fp-7` $\to$ `fp-8`**：新增 `agent/export` 与 `team/export` 方法，总协议方法扩充至 73。
-2. **宿主配置项对齐**：配置文件支持 `[memory]` 的 `enabled` 独立开关及 `max_output_size` 映射。
+1. **商店条目原地更新 —— `fp-11` $\to$ `fp-12`**：新增 `store/update-entry` 与客户端 `store.update()`，协议方法总数扩充至 78，HTTP 路由映射数扩充至 53。
+2. **连接器用户凭据体系 —— `fp-8` $\to$ `fp-11`**：`credential` 块与 `token-schema.json` 声明、`connector/credential/{get,set,clear}`、`connector/register`（模板即声明）；凭据按调用者键控。
+3. **SDK 资源物化助手**：`exportAgent` / `exportTeam` / `materializePack`。
+4. **条目版本与安装态的两处修复**：技能与连接器条目的版本不再被钉在占位版本 `1.0.0`；安装态写入按 `(snapshot_id, component_id)` 收窄。
 
 ### 8.1 迁移已有配置里的市场源
 

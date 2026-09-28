@@ -22,7 +22,8 @@ The following table documents published releases, distribution tags, and breakin
 
 | Version | Published (UTC) | Current dist-tag | Substantive changes from prior release |
 | --- | --- | --- | --- |
-| `0.1.0-beta.7` | 2026-09-20T10:33:48Z | `beta` | **Breaking**: Protocol fingerprint incremented to `fp-8` (strict equality check); adds WebSocket APIs `agent/export` and `team/export`, bringing total methods to 73 (steps in §6.6) |
+| `0.1.0-beta.8` | 2026-09-28T10:23:47Z | `beta` | **Breaking**: Protocol fingerprint incremented to `fp-12` (strict equality check); adds `store/update-entry` for in-place store upgrades and the connector user credential system (`connector/credential/*`, `connector/register`), bringing total methods to 78 and HTTP mapped routes to 53; `updateHint()` narrows its return value (steps in §6.7) |
+| `0.1.0-beta.7` | 2026-09-20T10:33:48Z | — | **Breaking**: Protocol fingerprint incremented to `fp-8` (strict equality check); adds WebSocket APIs `agent/export` and `team/export`, bringing total methods to 73 (steps in §6.6) |
 | `0.1.0-beta.6` | 2026-09-18T11:08:21Z | — | **Breaking**: SDK API reshaping (`launchClient` renamed to `launchHarness`, `.client` nesting removed, `initializeResult` renamed to `handshake`), requiring code updates; wire remains `fp-7` (steps in §6.5) |
 | `0.1.0-beta.5` | 2026-09-17T11:41:10Z | — | **Breaking**: Protocol fingerprint updated to `fp-7`; adds connector `input_schema`, per-turn skill mounting, session `agent_id`/`team_id`, and `zip` marketplace protocol (steps in §6.4) |
 | `0.1.0-beta.4` | 2026-09-16T10:24:02Z | — | **Breaking**: Protocol fingerprint enforces strict equality `fp-1`; `event_type` narrowed to closed union `ConversationEventType`; introduces skill file reads and tool proxying (steps in §6.3) |
@@ -37,7 +38,7 @@ The following table documents published releases, distribution tags, and breakin
 | dist-tag | Points at today |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.7` |
+| `beta` | `0.1.0-beta.8` |
 
 ```bash
 npm view @flowy-agent-store/sdk versions dist-tags --json
@@ -45,8 +46,8 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.7", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.8", "latest": "0.1.0-beta.2" }
 }
 ```
 
@@ -173,6 +174,19 @@ bun run typecheck
 - Protocol fingerprint advances to `fp-8`; host and client must align;
 - Introduces `agents.export` and `teams.export` methods for asset serialization.
 
+### 6.7 From 0.1.0-beta.7 to 0.1.0-beta.8
+
+```bash
+bun add @flowy-agent-store/sdk@0.1.0-beta.8
+bun add @flowy-agent-store/protocol@0.1.0-beta.8
+bun run typecheck
+```
+
+- The protocol fingerprint advances to `fp-12` (this release crosses `fp-9` through `fp-11` as well) and the handshake enforces strict equality: **host and client must be upgraded together** — one side alone cannot connect;
+- **One TypeScript signature needs a code change**: `StoreClient.updateHint()` now returns `"update"` instead of `"uninstall_reinstall"`; callers branching on it must be updated. `StoreOperationOutcome` also gains `errors` and `warnings` (additive);
+- Adds `store.update()`: an installed store entry can now be upgraded explicitly (wire method `store/update-entry`) instead of "uninstall, then install again";
+- The connector user credential system (`credential` block, `connector/credential/{get,set,clear}`, `connector/register`) and the SDK helpers `exportAgent` / `exportTeam` / `materializePack` ship for the first time in this release.
+
 ## 7. Verifying Installed Versions
 
 ```bash
@@ -188,10 +202,12 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. Artifact Diff Verification
 
-As of `0.1.0-beta.7`, repository contracts align with published packages:
+As of `0.1.0-beta.8`, repository contracts align with published packages:
 
-1. **Asset Serialization Surface — `fp-7` $\to$ `fp-8`**: Adds `agent/export` and `team/export`, bringing wire methods to 73.
-2. **Host Configuration Options**: Adds `[memory]` `enabled` flag and `max_output_size` mapping.
+1. **In-place store updates — `fp-11` $\to$ `fp-12`**: adds `store/update-entry` and the client's `store.update()`, bringing wire methods to 78 and HTTP mapped routes to 53.
+2. **Connector user credential system — `fp-8` $\to$ `fp-11`**: the `credential` block and `token-schema.json` declarations, `connector/credential/{get,set,clear}`, and `connector/register` (the template is the declaration); credentials are keyed per caller.
+3. **SDK pack materialization**: `exportAgent` / `exportTeam` / `materializePack`.
+4. **Two entry-version and install-state fixes**: skill and connector entry versions are no longer pinned at the `1.0.0` placeholder, and install-state writes narrow on `(snapshot_id, component_id)`.
 
 ### 8.1 Migrating Marketplace Sources in Existing Configurations
 

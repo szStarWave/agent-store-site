@@ -21,8 +21,8 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.7", "latest": "0.1.0-beta.2" },
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.8", "latest": "0.1.0-beta.2" },
   "time": {
     "0.1.0": "2026-09-09T09:09:04.795Z",
     "0.1.0-beta.2": "2026-09-09T09:27:36.122Z",
@@ -30,14 +30,16 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
     "0.1.0-beta.4": "2026-09-16T10:24:02.588Z",
     "0.1.0-beta.5": "2026-09-17T11:41:10.171Z",
     "0.1.0-beta.6": "2026-09-18T11:08:21.813Z",
-    "0.1.0-beta.7": "2026-09-20T10:33:48.685Z"
+    "0.1.0-beta.7": "2026-09-20T10:33:48.685Z",
+    "0.1.0-beta.8": "2026-09-28T10:23:47.656Z"
   }
 }
 ```
 
 | 版本 | 发布（UTC） | 变更类型 | 当前 dist-tag |
 | --- | --- | --- | --- |
-| `0.1.0-beta.7` | 2026-09-20 | 破坏性（协议指纹严格相等：`fp-7` → `fp-8`，**必须升级**） | `beta` |
+| `0.1.0-beta.8` | 2026-09-28 | 破坏性（协议指纹严格相等：`fp-8` → `fp-12`，**必须升级**） | `beta` |
+| `0.1.0-beta.7` | 2026-09-20 | 破坏性（协议指纹严格相等：`fp-7` → `fp-8`） | — |
 | `0.1.0-beta.6` | 2026-09-18 | 破坏性（SDK 入口改名 + 返回形状变更，**要改代码**） | — |
 | `0.1.0-beta.5` | 2026-09-17 | 破坏性（协议指纹严格相等：`fp-1` → `fp-7`） | — |
 | `0.1.0-beta.4` | 2026-09-16 | 破坏性（协议指纹严格相等 + 类型收窄） | — |
@@ -45,7 +47,28 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 | `0.1.0-beta.2` | 2026-09-09 | 加法（无破坏性） | `latest` |
 | `0.1.0` | 2026-09-09 | 首次发布 | 无 |
 
-### 2.1 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
+### 2.1 `0.1.0-beta.8` — 2026-09-28T10:23:47Z
+
+> **本版含破坏性变更**：协议指纹由 `fp-8` 递增至 `fp-12`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.7）。
+
+#### 破坏性
+
+- **协议契约指纹更新**：`fp-8` $\to$ **`fp-12`**。本次跨越四个指纹（`fp-9` 至 `fp-12`）：连接器凭据读面、凭据表单文案归位、`connector/register` 与 `store/update-entry`。协议方法总数由 73 扩充至 **78**，HTTP 路由映射数由 48 扩充至 **53**。
+- **TS 客户端签名变更**：`StoreClient.updateHint()` 的返回值由 `"uninstall_reinstall"` 改为 `"update"`，以该返回值分支的调用方需同步；`StoreOperationOutcome` 新增 `errors` 与 `warnings` 两个字段（加法，旧调用方无感）。
+
+#### 新增
+
+- **连接器用户凭据体系**：连接器元数据增加 `credential` 配置块与 `token-schema.json` 声明支持；新增 `connector/credential/{get,set,clear}` 凭据管理接口（值单向写入，回包只含键名与缺项）与 `connector/register` 私有 MCP 服务注册（模板即声明：`transport` 里的 `${secret:NAME}` 就是那张凭据表单）；凭据按调用者（principal）键控，宿主级旧键归安装所有者。
+- **商店条目原地安全更新**：新增 `store/update-entry` 协议动词，提供原子升级语义——先装新版本、装成功才释放旧版本，失败保留旧版并把新快照回滚；专家预设原地升级并保留预设 ID，连接器复用同一 `mcp_servers` 行，技能按快照各自成目录且解析取最新。客户端配套 `store.update()`。
+- **SDK 资源物化助手**：`@flowy-agent-store/sdk` 提供 `exportAgent`、`exportTeam` 与 `materializePack`，把资产定义与引用技能规范化物化到本地目录（`members/<id>/persona.md` 与去重后的 `skills/<name>/...`）。
+
+#### 修复
+
+- **技能与连接器条目的版本此前被钉在占位版本 `1.0.0`**：目录侧读市场索引、导入侧不读，后果是「有新版本」恒为真、内容一改就撞不可变快照的 digest 冲突。现在条目版本随导入请求落库（并补齐技能市场索引的读取）。
+- **安装态写入未按快照限定**：组件 ID 跨快照相同，释放旧版本会连带清掉新版本的安装记录；`install/uninstall` 等三处写入已按 `(snapshot_id, component_id)` 收窄。
+- **连接器传输配置里的空 `values` 会被写进存储**：下一次保存即被判为「配置变更」，从而停用该 server 并清空已探测工具；现仅在非空时写入。
+
+### 2.2 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
 
 > **本版含破坏性变更**：协议指纹更新为 `fp-8`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.6）。
 
@@ -62,7 +85,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - **模型输出上限映射修复**：修复 `[models.*]` 中的 `max_output_size` 与 `protocol` 在部分供应商中未正确生效的缺陷，采用非覆盖式写入填补数据库空值。
 
-### 2.2 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
+### 2.3 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
 
 > **本版含破坏性变更**：`@flowy-agent-store/sdk` 入口重命名与返回对象扁平化（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.5）。
 
@@ -73,7 +96,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - `initializeResult` 重命名为 **`handshake`**。
 - `close()` 增强为统一安全清理：退订事件通道、关闭底层传输、终止子进程并清理自动生成的临时数据目录。
 
-### 2.3 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
+### 2.4 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
 
 > **本版含破坏性变更**：协议指纹更新至 `fp-7`，旧版客户端与新版运行时互不兼容。
 
@@ -98,7 +121,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - 修复 `source_kind = "zip"` 市场源在特定配置解析时被意外过滤的问题。
 
-### 2.4 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
+### 2.5 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
 
 > **本版含破坏性变更**：协议指纹更新为 `fp-1`；`event_type` 收窄为封闭联合类型。
 
@@ -119,7 +142,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - HTTP 路由表映射数扩充至 48。
 
-### 2.5 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
+### 2.6 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
 
 #### 新增
 
@@ -130,7 +153,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - 补充软件包 `package.json` 中的 `engines.node >= 22` 与代码仓库元数据。
 
-### 2.6 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
+### 2.7 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
 
 #### 新增
 
@@ -140,7 +163,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - 修复 `0.1.0` 缺少平台依赖导致可执行文件定位失败的问题。
 
-### 2.7 `0.1.0` — 2026-09-09T09:09:04Z
+### 2.8 `0.1.0` — 2026-09-09T09:09:04Z
 
 #### 新增
 
@@ -156,12 +179,9 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-**近期落地与规划中功能特性（已完成方案落地或准备发版）**：
-- **连接器用户凭据体系（fp-9 至 fp-11）**：连接器元数据增加 `credential` 配置块与 `token-schema.json` 声明支持；新增 `connector/credential/{get,set,clear}` 凭据管理接口与 `connector/register` 私有 MCP 服务动态模板注册；敏感字段在网络传输中双向脱敏（`[REDACTED]`），值单向加密存储于安全金库。
-- **SDK 资源物化助手（0.1.0-beta.8）**：`@flowy-agent-store/sdk` 提供 `exportAgent`、`exportTeam` 与 `materializePack` 工具函数，支持将资产定义与引用技能文件规范化物化写入本地磁盘目录（`members/<id>/persona.md` 与去重后的 `skills/<name>/...`）。
-- **商店条目原地安全更新（fp-12）**：新增 `store/update-entry` 协议动词（线协议升级为 `fp-12`，协议方法总数扩充至 **78**，HTTP 路由映射数扩充至 **53**）；提供原子升级语义（先装新版、验证通过后才释放旧版、失败安全回退）；专家保预设 ID 原地升级；客户端增加 `store.update()` 与 `updateHint` 策略判断。
+**当前没有「已落地但未发布」的条目**：`0.1.0-beta.8` 的内容已按发布事实转入本文 §2。下一批改动落地后在此登记，发布时再转正。
 
-当前稳定发布版本为 `0.1.0-beta.7`（对应线协议 `fp-8`）。未收录于本页的版本特性不应假定为已生效。
+当前稳定发布版本为 `0.1.0-beta.8`（对应线协议 `fp-12`）。未收录于本页的版本特性不应假定为已生效。
 
 ## 5. 另见
 
