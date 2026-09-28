@@ -2,30 +2,33 @@
 
 Flowy Agent Store natively supports plugins and plugin marketplaces: a plugin packages functional assets (including experts, teams, skills, connectors, and commands), while a marketplace serves as the distribution channel. The plugin architecture adheres to the **local-first** paradigm — the marketplace manages discovery and distribution, while imported snapshots, credentials, and runtime execution remain entirely on the local machine.
 
-## 1. What a plugin contains
+---
 
-Importing a plugin converts assets into standardized, reusable component definitions within the Catalog:
+## 1. Plugin Architecture & Core Component Model
 
-| Component | Description |
-| --- | --- |
-| Expert (AgentDefinition) | Reusable agent configuration, mounted via the Preset mechanism at runtime |
-| Team (AgentTeamDefinition) | Multi-agent collaboration definition containing member rosters and policies |
-| Skill (SkillDefinition) | Atomic capability invoked by an Agent; does not maintain independent conversations |
-| Connector (ConnectorDefinition) | Managed integration component (MCP) with credential schema declarations |
-| Command (CommandDefinition) | User-invokable prompts and task execution templates |
-| Hooks / LSP | Runtime lifecycle hooks and language server extensions (metadata level) |
+Importing a plugin converts assets into standardized, reusable component definitions within the local Catalog:
 
-## 2. Where marketplaces come from
+| Component Type | Declaration Path | Runtime Mounting | State & Boundary |
+| --- | --- | --- | --- |
+| Expert (AgentDefinition) | `agents` array in `plugin.json` | Selected as active role via Preset mechanism at session initialization | Possesses dedicated system prompts and role constraints; maintains no independent session state |
+| Team (AgentTeamDefinition) | `teams` array in `plugin.json` | Loaded from roster; Leader dynamically derives a Planned DAG | Fixed member collaboration with fine-grained step concurrency and dynamic re-planning |
+| Skill (SkillDefinition) | `skills/<slug>/SKILL.md` | Injected into reasoning context dynamically on demand or via model routing | Atomic capability extension; does not establish independent conversational sessions |
+| Connector (ConnectorDefinition) | `connectors/<slug>/mcp.json` | Physical socket connection established by MCP Client after permission check | Strictly adheres to MCP standard; sensitive credentials physically stored in local vaults |
+| Command (CommandDefinition) | `commands` array in `plugin.json` | Invoked directly by user via `/cmd` syntax to expand prompt templates | Stateless task shortcut expanding into conversational prompts |
+
+---
+
+## 2. Marketplace Protocols & Configuration
 
 Marketplace sources are declared in [`~/.agent-store/config.toml`](/en-US/docs/configuration) across five supported `source_kind` protocols:
 
-| source_kind | source | Notes |
-| --- | --- | --- |
-| `zip` | HTTP(S) archive URL | **Official marketplace standard**: single archive package where the root directory matches the catalog manifest root; synchronizes full metadata in a single request |
-| `url` | HTTPS/HTTP manifest URL | Remote manifest directory; supplying an index file (`_files.txt`) is recommended for incremental tree mirroring |
-| `github` | GitHub repository | Synchronizes marketplace manifests directly from a GitHub repository |
-| `git` | Git repository URL | Clones and pulls updates using the Git protocol |
-| `directory` | Local directory path | Directly points to a local filesystem development directory |
+| source_kind | Source Format | Cache Verification | Target Scenario |
+| --- | --- | --- | --- |
+| `zip` | HTTP(S) archive URL | HTTP `HEAD` checks `X-Linked-Etag` (SHA-256 archive digest) | **Official marketplace standard**: single archive package, metadata synchronized in one request |
+| `url` | HTTPS/HTTP manifest URL | Incremental hash diffing based on root `_files.txt` manifest | Self-hosted static HTTP servers or unpacked directory trees on CDN |
+| `github` | GitHub repository identifier | Querying GitHub Releases assets and archive hashes via API | Automated open-source repository distribution |
+| `git` | Git remote repository URL | Fetching and commit tracking via standard Git protocol | Private internal Git collaboration and testing |
+| `directory` | Local filesystem absolute path | Real-time filesystem mtime and hash change detection | Local development and live debugging of experts and skills |
 
 ```toml
 # Each official market is a zip archive hosted on ModelScope;
@@ -43,164 +46,181 @@ source_kind = "zip"
 source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
 ```
 
-The `zip` source verifies cache freshness and archive integrity via content hashes: the client dispatches an HTTP `HEAD` request to read the `X-Linked-Etag` header (representing the sha256 archive digest), skipping re-download when unchanged and validating payload integrity upon transfer. When hosted via ModelScope LFS, stable URLs return HTTP 302 redirects to signed CDN URLs; **always configure stable URLs in settings, never hardcode temporary signed CDN URLs**.
+- **Content Digest Verification & Caching**: For `zip` sources, the client dispatches an HTTP `HEAD` request to inspect the `X-Linked-Etag` header (representing the sha256 archive digest), skipping re-download when unchanged and validating payload integrity upon transfer;
+- **ModelScope Stable URLs**: When hosted via ModelScope LFS, stable URLs return HTTP 302 redirects to signed CDN URLs; **always configure official stable URLs in settings, never hardcode temporary signed CDN URLs**;
+- **Full Tree Mirroring**: Other source kinds (`url`, `git`, `github`, `directory`) support full file tree mirroring using a precompiled `_files.txt` manifest list.
 
-Other source kinds (`url`, `git`, `github`, `directory`) support full file tree mirroring. For `url` sources, the server may provide a precompiled `_files.txt` in the root directory for automated mirror sync.
+---
 
-The runtime parses configured marketplace manifests at startup. Entries can be searched and inspected via the **Market** link in the Web UI navigation.
+## 3. Ingestion & Security Audit Pipeline
 
-## 3. Import: from market to Catalog
-
-Triggering an installation via the marketplace (`store/install-entry`) invokes the importer pipeline through the following deterministic sequence:
+Triggering an installation via the marketplace (`store/install-entry`) or local folder invokes the Importer pipeline through the following deterministic security sequence:
 
 ```text
-1. Locate the source (market entry / plugin root / skill or connector directory)
-2. Parse the manifest (plugin.json / marketplace.json / connectors.json)
-3. Path validation: reject ../ traversal and symlink escapes
-4. Copy into a versioned immutable cache and compute the content_digest
-5. Generate a PluginSnapshot (components + provenance + compatibility report)
-6. Emit standardized definitions per component type and register them in the local Catalog
+[ External Marketplaces / Plugin Archives / Local Dirs ]
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│ 1. Locate Source & Parse Manifest (plugin/marketplace) │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│ 2. Static Security Audit (Path traversal ../ & symlinks│
+└──────────────────────────┬─────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│ 3. Compute Full Tree SHA-256 Digest (content_digest)   │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│ 4. Copy to Versioned Archive (~/.agent-store/snapshots)│
+└──────────────────────────┬─────────────────────────────┘
+                           │
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│ 5. Generate PluginSnapshot & Register in Local Catalog │
+└────────────────────────────────────────────────────────┘
 ```
 
-Supported manifest and directory structures:
+The three primary manifest formats and directory layouts supported are:
 
-- **CodeBuddy / WorkBuddy plugins**: `.codebuddy-plugin/plugin.json` with associated component trees
-- **WorkBuddy skill marketplaces**: `.codebuddy-skill/marketplace.json` with `skills/<slug>/` layout (or standalone directories containing `SKILL.md`)
-- **WorkBuddy connector marketplaces**: `.codebuddy-connector/connectors.json` with `connectors/<slug>/` layout
-
-## 4. PluginSnapshot: immutable snapshots
-
-The primary output of ingestion is a **PluginSnapshot**, representing a frozen, immutable capture of the source assets:
-
-- Encapsulates source type, source URI, declared version, `content_digest`, component metadata, and compatibility evaluations;
-- Any change in source files mandates generating a new snapshot; existing snapshots remain strictly immutable;
-- Running Agent or Team instances bind to explicit snapshot IDs, insulating active runs from concurrent Catalog updates;
-- Enables complete traceability across Snapshot ID, definition revision, and content digest.
-
-Components failing static compatibility checks are marked with descriptive statuses rather than silently dropped; assets lacking explicit licensing are excluded from public catalogs.
-
-## 5. Credentials & security
-
-- **Schema-Only Ingestion**: Importing connectors registers credential schemas only; private keys are never accessed or stored during this phase;
-- **Dynamic Runtime Injection**: Secrets reside exclusively in local secure storage; external interfaces (Web / SDK) expose only configuration state and masked identifiers;
-- **Sandboxed Execution**: Manifest synchronization and asset ingestion never execute untrusted remote code; tool execution semantics are strictly isolated within the local `allo` Runtime.
-
-## 6. Integrating a self-developed MCP server / custom skills
-
-Developers can integrate custom MCP servers without publishing them to the public marketplace. MCP servers can be introduced through three distinct mechanisms:
-
-| Source | Lands in | Scope | Best for |
+| Manifest Category | Root Path | Core Fields | Asset Specification |
 | --- | --- | --- | --- |
-| The `~/.agent-store/mcp.json` declaration file | **No database record**; read at host startup | All host sessions | Private local services. See [Configuration](/en-US/docs/configuration) for syntax and validation rules |
-| The MCP configuration API (HTTP endpoints) | `mcp_servers` table | Explicitly bound in a session or run | Self-hosted services requiring connection testing and OAuth flows |
-| Marketplace / plugin distribution | Written to `mcp_servers` upon installation | Same as above | Packaged assets intended for public or team distribution |
+| Expert Plugin Manifest | `.codebuddy-plugin/plugin.json` | `name`, `version`, `agents`, `teams`, `commands` | Encapsulates system prompts, model preferences, and bound skills |
+| Skill Marketplace Manifest | `.codebuddy-skill/marketplace.json` | `name`, `skills` (with `id`, `name`, `source`) | Each skill lives in `skills/<slug>/` containing `SKILL.md` |
+| Connector Marketplace Manifest | `.codebuddy-connector/connectors.json` | `name`, `connectors` (with `id`, `source`) | Each connector lives in `connectors/<slug>/` containing `mcp.json` |
 
-Precedence hierarchy: for matching identifiers, **`mcp.json` declarations override `mcp_servers` records**; explicit bindings provided within an active invocation take highest precedence.
+---
 
-The two persistent registration paths operate as follows:
+## 4. PluginSnapshot Immutability Mechanism
 
-### Path A: direct registration (recommended for self-developed / private deployments)
+The primary output of ingestion is a **PluginSnapshot**, representing a frozen, immutable physical capture of source assets:
 
-Register servers by identifier via the host HTTP management API:
+- **Write-Once Read-Only**: Once archived to disk and registered in the database, directory permissions are locked as read-only. Any change in source files mandates generating a new snapshot;
+- **In-Flight Execution Version Pinning**: Running sessions and Runs bind to the specific `snapshot_id` active at creation time, insulating active executions from concurrent catalog refreshes;
+- **Deterministic Audit & Replay**: Execution event streams record Snapshot IDs, schema revisions, and SHA-256 digests, supporting 100% reproducible historical replays;
+- For execution engine layering and snapshot isolation details, refer to [Architecture & System Specification](/en-US/docs/architecture).
 
-- `POST /api/mcp/servers` — Upsert an MCP Server by name
-- `POST /api/mcp/servers/import` — Batch import server definitions
-- `POST /api/mcp/test-connection` — Test physical socket connectivity
-- `/api/mcp/oauth/*` — Standard OAuth (PKCE Loopback) endpoints
+---
+
+## 5. Custom MCP Connector Integration Guide
+
+Developers can integrate custom MCP servers without publishing them to the public marketplace across three flexible paths:
+
+| Integration Path | Storage Target | Active Scope | Best Suited For |
+| --- | --- | --- | --- |
+| Static `~/.agent-store/mcp.json` declaration | **No database record**; read at host startup | All host sessions | Private local services and developer debugging |
+| Dynamic HTTP management API | `mcp_servers` database table | Bound in explicit session or run | Self-hosted services requiring connection testing and OAuth |
+| Marketplace / plugin package import | Written to `mcp_servers` upon installation | Same as above | Packaged assets intended for team or community distribution |
 
 Three transport configurations are supported within the `transport` object:
 
-```jsonc
-// Local child process (stdio)
-{ "stdio": { "command": "./my-mcp-server", "args": [], "env": {} } }
-// Streamable HTTP (recommended for remote endpoints)
-{ "http": { "url": "https://mcp.example.com/mcp", "headers": { "Authorization": "Bearer <token>" } } }
-// SSE (legacy remote streaming)
-{ "sse": { "url": "https://mcp.example.com/sse", "headers": {} } }
+```json
+{
+  "stdio": {
+    "command": "./my-mcp-server",
+    "args": ["--port", "9000"],
+    "env": { "DEBUG": "1" }
+  },
+  "http": {
+    "url": "https://mcp.example.com/mcp",
+    "headers": { "Authorization": "Bearer secret:MY_MCP_TOKEN" }
+  },
+  "sse": {
+    "url": "https://mcp.example.com/sse",
+    "headers": { "X-Api-Key": "secret:MY_API_KEY" }
+  }
+}
 ```
 
-Static authentication headers are passed within `headers`; OAuth lifecycles are orchestrated by the runtime. Once registered, servers are bound via `selected_mcp_server_ids` in session or run payloads, allowing `McpManager` to establish connections and expose tools to model prompts.
+Orchestrate and invoke connectors programmatically via the object-oriented TypeScript SDK (`AppServerClient`):
 
-### Integrating via the TypeScript SDK
+```typescript
+import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
 
-The SDK connector client provides catalog queries, OAuth lifecycles, and tool call delegation (`list`, `get`, `status`, `test`, `call`). Custom MCP servers can be registered programmatically through the native **import $\to$ install** pipeline:
+// 1. Initialize client
+const client = new AppServerClient({
+  transport: new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws"),
+  client: { name: "connector-workflow-app", version: "1.0.0" },
+});
+await client.connect();
 
-1. Create a two-level directory structure for the connector source:
+// 2. Discover enabled connectors and verify socket connectivity
+const connectors = await client.connectors.list();
+const testResult = await client.connectors.test("conn_github_integration");
+console.log(`Connection test: ${testResult.ok ? "Success" : "Failed"}`);
 
-   ```text
-   my-market/
-   ├── .codebuddy-connector/
-   │   └── connectors.json        # market manifest: id/name + source (relative)
-   └── my-mcp/
-       └── mcp.json               # server declaration: mcpServers
-   ```
+// 3. Create a conversation (connectors are also callable directly via client.connectors.call)
+const conv = await client.conversations.create({
+  name: "GitHub Automation Workflow",
+});
 
-   ```json
-   {
-     "name": "my-connectors",
-     "connectors": [
-       { "id": "my-mcp", "name": "My MCP", "version": "0.1.0", "source": "my-mcp" }
-     ]
-   }
-   ```
+// 4. Dispatch inference prompt
+await client.conversations.send(
+  conv.id,
+  "List the 3 most recent pull requests and generate a report in the right panel.",
+  crypto.randomUUID(),
+);
+```
 
-   The `source` attribute must be a relative directory path; `mcpServers` adheres to standard definitions:
+For comprehensive connector method signatures and error handling, see [TypeScript SDK Reference](/en-US/docs/typescript-sdk).
 
-   ```json
-   {
-     "mcpServers": {
-       "my-mcp": { "url": "https://mcp.example.com/mcp" }
-     }
-   }
-   ```
+---
 
-2. Execute import and installation within an active harness session:
+## 6. Custom Skill Development & Guidelines
 
-   ```ts
-   import { launchHarness } from "@flowy-agent-store/sdk";
+Authoring a custom skill requires no complex backend server; simply organize a valid `SKILL.md` file for the agent to discover and invoke:
 
-   const harness = await launchHarness({ client: { name: "my-app", version: "0.1.0" } });
+```markdown
+---
+name: web-scraper
+display_name: Web Scraper
+version: 1.0.0
+description: Extract clean text and Markdown structure from any target URL
+tags: ["crawler", "html", "parser"]
+---
 
-   // 1. Import: produces an immutable PluginSnapshot (idempotent per digest, reused=true)
-   const snap = await harness.transport.request("import/run", {
-     source_path: "/abs/path/to/my-market", // the market root (holds .codebuddy-connector/)
-     source_kind: "workbuddy-connector-market",
-   });
+# Web Scraper Skill
 
-   // 2. Install: the connector component is registered into the runtime mcp_servers
-   await harness.transport.request("install/run", { snapshot_id: snap.snapshot_id });
+## Description
+Invoked when the user requires content extraction from public web pages or articles.
 
-   // 3. Discover the catalog and inject in a run
-   const connectors = await harness.connectors.list();
-   await harness.runs.agent({
-     agentId: "<agent-id>",
-     goal: "……",
-     mentions: [{ kind: "connector", id: connectors[0].id }],
-   });
+## Parameter Definitions
+- `url` (string, required): Full HTTP(S) address of the target web page
+- `format` (string, optional): Output format, supports `markdown` or `text`, defaults to `markdown`
 
-   await harness.close();
-   ```
+## Constraints
+1. Only scrape public web resources adhering to target robots.txt guidelines;
+2. Automatically sanitize `<script>`, `<style>`, and modal DOM elements;
+3. Return the parsed document content as Markdown into the session context.
+```
 
-3. Initiate OAuth via `connector.authStart(connectorId)` and await resolution with `connector.waitForAuth(connectorId)`;
-4. Inject components at execution time via `mentions`: `{ kind: "connector", id }` mounts an active MCP server, while `{ kind: "skill", id }` mounts a skill. State can be inspected with `install/status` and toggled via `install/enable` / `install/disable`.
+- **Directory Layout**: Save the file as `skills/<slug>/SKILL.md`;
+- **Local Ingestion & Installation**: Import the skill folder via the Web UI workbench or programmatically via `client.store.installEntry`;
+- **Dynamic Runtime Routing**: The Agent inspects its system instructions and task context to automatically bind and invoke the skill during relevant execution turns.
 
-### Path B: marketplace / plugin distribution (for public distribution)
+---
 
-For public distribution, MCP servers can be bundled into either:
+## 7. Credential Isolation & Access Control
 
-- **Dedicated Connector Packages**: `.codebuddy-connector/connectors.json` accompanied by `connectors/<slug>/`, hosted on any supported marketplace source;
-- **Plugin-Level MCP Bundles**: A `.mcp.json` file defining `mcpServers` placed inside `.codebuddy-plugin/`.
+The system enforces strict zero-leakage and sanitization rules when managing sensitive credentials:
 
-Client installations automatically populate the local `mcp_servers` table.
+- **`secret:<KEY>` Reference Pattern**: Plaintext tokens are strictly forbidden in connector manifests; use `secret:NAME` identifiers instead;
+- **Local Credential Enclave**: Actual secrets reside exclusively in OS-protected vaults (e.g. DPAPI / Keychain / encrypted local data files);
+- **Connector Proxy Access Control**: Controlled via `[connector_proxy]` in `~/.agent-store/config.toml`:
+  - `enabled = false`: Blocks all proxy tool execution requests;
+  - `enabled = true`: Allows enabled connectors to execute tools; granular `allow` and `deny` lists can be configured;
+- For detailed proxy parameters, see [Configuration](/en-US/docs/configuration).
 
-### Custom skills
+---
 
-- **SDK / Protocol Ingestion**: Execute `import/run` (`source_kind: "workbuddy-skill-market"`) $\to$ `install/run`, then mount via run `mentions`;
-- **Local Filesystem Import**: Dispatch `POST /api/skills/import` (pointing to a local directory or ZIP file) to register a private user skill;
-- **Marketplace Publishing**: Distribute using the `.codebuddy-skill/marketplace.json` + `skills/<slug>/` layout.
+## 8. Further Reading
 
-## 7. Further reading
-
-- Browse entries: [Market page](/en-US/market)
-- Marketplace configuration: [Configuration](/en-US/docs/configuration)
-- Architecture and import layering: [Architecture](/en-US/docs/architecture)
+- Browse curated assets: [Marketplace](/en-US/market)
+- Marketplace configuration and proxy policies: [Configuration](/en-US/docs/configuration)
+- Execution engine layering and models: [Architecture & System Specification](/en-US/docs/architecture)
+- Client orchestration and API reference: [TypeScript SDK Reference](/en-US/docs/typescript-sdk)
+- Real-world production recipes: [SDK Examples](/en-US/docs/examples-sdk)

@@ -69,12 +69,12 @@ Flowy Agent Store 采用**本地优先（Local-First）**、高度解耦且基�
 应用层（Web UI、TypeScript SDK、CLI）与 `allo` 核心运行时之间通过标准的 **App Server 协议** 进行交互：
 
 - **通讯载体**：采用双向 WebSocket 长连接传输主干数据流（会话生命周期、实时 Token 流、工具调用确认、DAG 步骤流转），辅以 HTTP 协议处理二进制上传、健康检查与连通性探针；
-- **JSON-RPC 2.0 规范**：全量控制指令（如 `session/create`、`session/prompt`、`run/cancel`）均遵循 JSON-RPC 2.0 规范，提供严格的请求响应匹配与强类型错误码；
-- **不透明资源标识（Opaque Identifiers）**：所有对客户端公开的实体 ID（例如 `sess_...`、`run_...`、`snap_...`）均为混淆后的不透明字符串，严格屏蔽底层数据库自增主键与宿主机文件物理路径；
+- **JSON-RPC 2.0 规范**：全量控制指令（如 `conversation/create`、`conversation/send`、`run/cancel`）均遵循 JSON-RPC 2.0 规范，提供严格的请求响应匹配与强类型错误码；
+- **不透明资源标识（Opaque Identifiers）**：所有对客户端公开的实体 ID（例如 `conv_...`、`run_...`、`snap_...`）均为混淆后的不透明字符串，严格屏蔽底层数据库自增主键与宿主机文件物理路径；
 - **协议版本指纹握手**：宿主进程启动成功后，向 stdout 打印单行包含协议指纹与鉴权模式的 JSON 通知，客户端建连时必须核对 `protocol_version` 是否全等：
 
 ```json
-{"agent_store":"listening","host":"127.0.0.1","port":8787,"url":"http://127.0.0.1:8787/","protocol_version":"2026.03.v1","version":"0.8.2","auth":"disabled-local"}
+{"agent_store":"listening","host":"127.0.0.1","port":8787,"url":"http://127.0.0.1:8787/","protocol_version":"fp-12","version":"0.8.2","auth":"disabled-local"}
 ```
 
 ### 2.3 资产摄取与不可变快照系统

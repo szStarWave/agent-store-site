@@ -160,7 +160,7 @@ client.teams.list(): Promise<TeamSummary[]>;
 client.teams.get(teamId: string): Promise<TeamDetail>;
 
 // 3. 导出团队全量定义包（支持传入可选的语义化版本进行校验）
-client.teams.export(teamId: string, teamVersion?: string): Promise<TeamExportResult>;
+client.teams.export(teamId: string, teamVersion?: string): Promise<ExpertPack>;
 ```
 
 #### `skills` — 技能检索与内部文件读取
@@ -173,10 +173,10 @@ client.skills.list(): Promise<SkillSummary[]>;
 client.skills.get(skillId: string): Promise<SkillDetail>;
 
 // 3. 列出指定技能目录下的所有静态资源清单
-client.skills.files(skillId: string): Promise<SkillInventory>;
+client.skills.files(skillId: string): Promise<SkillFileList>;
 
 // 4. 读取技能包内的指定文件字节数组
-client.skills.readFile(skillId: string, filePath: string): Promise<Uint8Array>;
+client.skills.readFile(skillId: string, path: string): Promise<Uint8Array>;
 ```
 
 #### `connectors` — 连接器管理、动态注册与工具代理
@@ -214,8 +214,9 @@ client.store.installed(): Promise<StoreItem[]>;
 
 // 2. 状态机安装与版本管理
 client.store.install(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
+client.store.update(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
 client.store.checkUpdates(): Promise<StoreItem[]>;
-client.store.updateHint(item: StoreItem): "none" | "uninstall_reinstall" | "unknown";
+client.store.updateHint(item: StoreItem): "none" | "update" | "unknown";
 
 // 3. 启用状态切换与完全卸载
 client.store.setEnabled(item: StoreItem, enabled: boolean): Promise<StoreOperationOutcome>;
@@ -244,6 +245,7 @@ client.conversations.cancel(conversationId: string): Promise<ConversationView>;
 
 // 3. 流式订阅与模型元数据
 client.conversations.follow(conversationId: string): Promise<ConversationSubscription>;
+client.conversations.subscribe(conversationId: string, onEvent: (event: ConversationEvent) => void): () => void;
 client.conversations.modelOptions(): Promise<ConversationModelOptions>;
 ```
 
@@ -261,8 +263,9 @@ client.runs.result(runId: string): Promise<RunResult>;
 client.runs.events(query: RunEventsQuery): Promise<RunEvent[]>;
 
 // 3. 任务干预、审批提交与流式追踪
-client.runs.cancel(input: RunCancelInput): Promise<RunView>;
-client.runs.answerDecision(input: DecisionAnswerInput): Promise<RunView>;
+client.runs.cancel(input: CancelRunInput): Promise<RunView>;
+client.runs.steer(input: SteerRunInput): Promise<RunView>;
+client.runs.answerDecision(input: AnswerDecisionInput): Promise<RunView>;
 client.runs.follow(runId: string): Promise<EventSubscription>;
 ```
 

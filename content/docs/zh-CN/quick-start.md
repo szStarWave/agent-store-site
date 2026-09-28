@@ -126,29 +126,34 @@ Flowy Agent Store 内置连接官方 ModelScope 资源市场，覆盖专家（Ag
 除了 Web UI 外，开发者亦可通过 TypeScript SDK 以代码化方式驱动全量执行：
 
 ```typescript
-import { AgentStoreClient } from "@flowy-agent-store/sdk";
+import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
 
 // 连接本地 App Server 实例
-const client = new AgentStoreClient({ endpoint: "ws://127.0.0.1:8787" });
+const client = new AppServerClient({
+  transport: new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws"),
+  client: { name: "my-quickstart-app", version: "1.0.0" },
+});
 await client.connect();
 
 // 创建会话并绑定专家
-const session = await client.sessions.create({
-  title: "快速体验会话",
-  expert_id: "expert_general_assistant",
+const conv = await client.conversations.create({
+  name: "快速体验会话",
+  agentId: "expert_general_assistant",
 });
 
-// 发起流式推理 Run
-const run = await client.sessions.prompt(session.session_id, {
-  prompt: "请用三句话介绍 Flowy Agent Store 的本地优先架构。",
-});
-
-// 监听实时事件流
-for await (const event of client.runs.streamEvents(run.run_id)) {
-  if (event.event_type === "message/delta") {
-    process.stdout.write(event.payload.delta);
+// 订阅会话实时事件流
+client.conversations.subscribe(conv.id, (event) => {
+  if (event.kind === "text_delta") {
+    process.stdout.write(event.delta);
   }
-}
+});
+
+// 发起流式推理
+await client.conversations.send(
+  conv.id,
+  "请用三句话介绍 Flowy Agent Store 的本地优先架构。",
+  crypto.randomUUID(),
+);
 ```
 
 更多 SDK 调用模式与事件订阅细节，请参考 [TypeScript SDK 接口](/zh-CN/docs/typescript-sdk) 与 [SDK 示例](/zh-CN/docs/examples-sdk)。

@@ -2,30 +2,33 @@
 
 Flowy Agent Store 原生支持插件（Plugin）与插件市场（Marketplace）：插件是预打包的功能资产集合（包含专家、专家团、技能、连接器及命令），市场则提供这些资产的发现与分发通道。系统遵循**本地优先（Local-First）**架构原则——市场负责资产编排与分发，导入后的数据快照、凭据托管与执行调度完全在本地进行。
 
-## 1. 插件包含什么
+---
 
-插件导入后转换为资源目录（Catalog）中标准化、可复用的组件定义：
+## 1. 插件体系与核心组件模型
 
-| 组件 | 说明 |
-| --- | --- |
-| 专家（AgentDefinition） | 可复用的 Agent 角色配置，运行时基于 Preset 机制挂载 |
-| 专家团（AgentTeamDefinition） | 多 Agent 协作编排定义，包含成员名册与协作策略 |
-| 技能（SkillDefinition） | 原子功能扩展，由 Agent 按需调用，不独立建立会话 |
-| 连接器（ConnectorDefinition） | 外部系统集成组件（MCP），附带凭据模式声明（Token Schema） |
-| 命令（CommandDefinition） | 用户交互指令与预置 Prompt 模板 |
-| 钩子 / LSP | 运行时生命周期钩子与语言服务扩展（元数据定义） |
+插件导入后转换为本地资源目录（Catalog）中标准化、可复用的组件定义：
 
-## 2. 市场从哪里来
+| 组件类型 | 声明位置 | 运行时挂载机制 | 状态与执行边界 |
+| --- | --- | --- | --- |
+| 专家（AgentDefinition） | `plugin.json` 中的 `agents` 数组 | 会话启动时通过 Preset 机制选定为当前角色 | 具备独立提示词与角色约束，不独立持久化状态 |
+| 专家团（AgentTeamDefinition） | `plugin.json` 中的 `teams` 数组 | 启动时加载名册，Leader 动态生成 Planned DAG | 固定成员名册协同，各步骤并发执行与动态重规划 |
+| 技能（SkillDefinition） | `skills/<slug>/SKILL.md` | 会话提问时按需声明或由模型自动路由 | 仅作为原子能力扩展注入上下文，不维护独立会话 |
+| 连接器（ConnectorDefinition） | `connectors/<slug>/mcp.json` | 经权限栅栏校验后由 MCP 客户端建立物理连接 | 严格遵循 MCP 规范，敏感凭据由本地金库物理托管 |
+| 命令（CommandDefinition） | `plugin.json` 中的 `commands` 数组 | 用户输入 `/cmd` 指令时直接激活 Prompt 模板 | 无状态交互快捷指令，展开为常规对话提示词 |
+
+---
+
+## 2. 市场源协议与配置规范
 
 市场源通过 [`~/.agent-store/config.toml`](/zh-CN/docs/configuration) 进行声明，支持五种 `source_kind` 协议：
 
-| source_kind | source | 说明 |
-| --- | --- | --- |
-| `zip` | HTTP(S) 归档地址 | **官方市场标准格式**：采用单归档分发，归档根目录即市场清单根路径，单次请求即可同步全量元数据 |
-| `url` | HTTPS/HTTP 清单地址 | 远程清单目录，建议提供文件索引清单（`_files.txt`）以支持增量树形镜像 |
-| `github` | GitHub 仓库 | 通过 GitHub 仓库分发市场清单 |
-| `git` | Git 仓库地址 | 基于 Git 协议克隆与同步 |
-| `directory` | 本地目录路径 | 直接映射本地文件系统的市场开发目录 |
+| source_kind | 声明协议格式 | 缓存更新机制 | 适用分发场景 |
+| --- | --- | --- | --- |
+| `zip` | HTTP(S) 归档地址 | HTTP `HEAD` 校验 `X-Linked-Etag`（SHA-256 内容摘要） | **官方市场标准格式**：单文件分发，单次请求同步全量元数据 |
+| `url` | HTTPS/HTTP 清单目录 | 依据根目录 `_files.txt` 清单进行增量哈希比对 | 自建静态 HTTP 服务器或 CDN 托管的解包市场树 |
+| `github` | GitHub 仓库标识 | 基于 GitHub API 查询 Release 资产与归档哈希 | 借助开源仓库自动发布与分发市场组件 |
+| `git` | Git 远程仓库地址 | 基于 Git 协议执行 fetch 与 commit 变更追踪 | 团队内部私有 Git 仓库协同维护与测试 |
+| `directory` | 本地文件系统绝对路径 | 本地文件系统 mtime 与哈希监听 | 本地开发阶段的专家与技能实时调试 |
 
 ```toml
 # 官方三个市场各是一个托管在 ModelScope 上的 zip 归档；
@@ -43,164 +46,181 @@ source_kind = "zip"
 source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
 ```
 
-`zip` 格式的缓存更新基于内容摘要：客户端发起 HTTP `HEAD` 请求获取响应头 `X-Linked-Etag`（即归档文件 sha256 摘要）；摘要未变更时跳过下载，下载后通过校验该摘要确保文件完整性。注意：ModelScope LFS 稳定下载地址会自动 302 重定向至附带时效签名的 CDN 节点，配置与文档中**必须始终使用官方持久稳定 URL**，禁止硬编码临时 CDN 地址。
+- **内容摘要校验与缓存**：对于 `zip` 格式，客户端发起 HTTP `HEAD` 请求获取响应头 `X-Linked-Etag`（即归档文件 SHA-256 摘要）；摘要未变更时跳过下载，下载完成后二次校验确保文件完整性；
+- **ModelScope 稳定下载地址**：ModelScope LFS 稳定下载地址会自动 302 重定向至附带时效签名的 CDN 节点，配置与文档中**必须始终使用官方持久稳定 URL**，禁止硬编码临时 CDN 地址；
+- **全树镜像支持**：对于 `url` / `git` / `github` / `directory` 等源类型，服务端可提供预编译的 `_files.txt`（包含相对路径清单），客户端据此同步镜像文件。
 
-`url` / `git` / `github` / `directory` 等源类型支持全树镜像同步：对于 `url` 类型，服务端可在根目录提供预编译的 `_files.txt`（包含相对路径清单），客户端据此同步镜像文件。
+---
 
-启动时运行时自动解析已配置的市场清单，通过 Web UI 顶部导航的 **市场** 入口即可检索专家、技能与连接器。
+## 3. 资产摄取与安全审计管线
 
-## 3. 导入：从市场到 Catalog
-
-通过市场触发安装（`store/install-entry`）时，导入引擎（Importer）执行以下标准化流程：
+通过市场触发安装（`store/install-entry`）或本地导入时，导入引擎（Importer）执行以下标准化安全管线：
 
 ```text
-1. 定位来源（市场清单条目 / 插件根 / 技能或连接器目录）
-2. 解析 Manifest（plugin.json / marketplace.json / connectors.json）
-3. 路径校验：拒绝 ../ 越界与符号链接逃逸
-4. 复制到版本化不可变缓存，计算 content_digest
-5. 生成 PluginSnapshot（组件清单 + 来源信息 + 兼容性报告）
-6. 按组件类型产出标准化定义，注册到本地 Catalog
+[ 外部市场源 / 插件压缩包 / 本地开发目录 ]
+                     │
+                     ▼
+┌────────────────────────────────────────────────────────┐
+│ 1. 来源定位与 Manifest 解析 (plugin/marketplace.json)   │
+└────────────────────┬───────────────────────────────────┘
+                     │
+                     ▼
+┌────────────────────────────────────────────────────────┐
+│ 2. 静态安全审计 (路径穿越 ../ 检测、符号链接逃逸防御)     │
+└────────────────────┬───────────────────────────────────┘
+                     │
+                     ▼
+┌────────────────────────────────────────────────────────┐
+│ 3. 计算全树 SHA-256 内容摘要 (content_digest)           │
+└────────────────────┬───────────────────────────────────┘
+                     │
+                     ▼
+┌────────────────────────────────────────────────────────┐
+│ 4. 复制至版本化快照目录 (~/.agent-store/snapshots/...)  │
+└────────────────────┬───────────────────────────────────┘
+                     │
+                     ▼
+┌────────────────────────────────────────────────────────┐
+│ 5. 生成 PluginSnapshot 并向本地 SQLite Catalog 登记定义 │
+└────────────────────────────────────────────────────────┘
 ```
 
-受支持的清单来源格式包括：
+支持的三大类清单文件与目录规范如下：
 
-- **CodeBuddy / WorkBuddy 插件包**：`.codebuddy-plugin/plugin.json` 与附属组件目录
-- **WorkBuddy Skill 市场包**：`.codebuddy-skill/marketplace.json` 与 `skills/<slug>/` 结构（同时兼容包含 `SKILL.md` 的独立目录）
-- **WorkBuddy Connector 市场包**：`.codebuddy-connector/connectors.json` 与 `connectors/<slug>/` 结构
-
-## 4. PluginSnapshot：不可变快照
-
-资产导入的核心产物为 **PluginSnapshot**，代表资源内容在特定时间点的不可变镜像：
-
-- 记录来源类型、来源 URI、声明版本、`content_digest`、组件元数据清单与兼容性评估报告；
-- 来源内容更新时必须生成新快照实例，既有快照保持只读不可变；
-- 执行中的 Agent / Team 强绑定执行快照版本，不受后续 Catalog 变动影响；
-- 审计与复盘可精确溯源至具体 Snapshot ID、定义版本与内容摘要。
-
-未通过静态兼容性检查的组件将记录降级状态而非静默丢弃；未明确版权或再分发授权的资源禁止加入公开分发。
-
-## 5. 凭据与安全
-
-- **凭据模式隔离**：连接器导入时仅注册凭据 Schema 结构，不读取或持久化敏感密钥；
-- **运行时动态注入**：敏感凭据仅留存于本地受控安全存储，外部接口（Web / SDK）仅暴露凭据配置状态与脱敏标识；
-- **本地执行闭环**：市场同步与导入解析全程不执行远程非受信代码，工具执行语义严格受限在本地 `allo` Runtime 沙箱内。
-
-## 6. 自研 MCP Server / 自定义技能怎么接入
-
-开发者接入自定义 MCP Server 无需发布到官方市场。MCP Server 支持三种接入路径：
-
-| 来源 | 落点 | 生效范围 | 适合 |
+| 清单类别 | 根文件路径 | 核心声明字段 | 资产规范 |
 | --- | --- | --- | --- |
-| `~/.agent-store/mcp.json` 声明文件 | **不写入持久数据库**；宿主启动时加载一次 | 当前宿主的所有会话 | 本机私有服务。配置语法与字段校验详见 [配置文件](/zh-CN/docs/configuration) |
-| MCP 配置接口（HTTP 管理接口） | `mcp_servers` 数据表 | 会话或 Run 中显式绑定 | 自研/私有部署服务，支持连通性探测与 OAuth 鉴权 |
-| 市场 / 插件分发包 | 安装后写入 `mcp_servers` 数据表 | 同上 | 面向组织或公开分发的集成包 |
+| 专家插件清单 | `.codebuddy-plugin/plugin.json` | `name`, `version`, `agents`, `teams`, `commands` | 包含专家系统提示词模板、模型推荐参数与专属技能挂载声明 |
+| 技能市场清单 | `.codebuddy-skill/marketplace.json` | `name`, `skills` (包含 `id`, `name`, `source`) | 每个技能独立放置于 `skills/<slug>/`，必须包含 `SKILL.md` |
+| 连接器市场清单 | `.codebuddy-connector/connectors.json` | `name`, `connectors` (包含 `id`, `source`) | 每个连接器独立放置于 `connectors/<slug>/`，必须包含 `mcp.json` |
 
-优先级规则：同名配置下，**`mcp.json` 声明文件优先于 `mcp_servers` 数据表**；而在具体调用时显式指定的绑定拥有最高优先级。
+---
 
-以下详细说明持久化注册的两种实现路径：
+## 4. PluginSnapshot 不可变快照机制
 
-### 路径 A：直接注册（自研 / 私有部署推荐）
+资产导入的核心产物为 **PluginSnapshot**，代表资源内容在特定时间点的不可变物理镜像：
 
-通过宿主提供的 HTTP 管理接口按名称注册：
+- **写一次只读（Write-Once Read-Only）**：快照一旦完成物理归档并写入本地数据库，其目录属性设为只读。来源内容的任何修改或上游更新均触发生成全新的快照实体；
+- **运行期执行版本锁定**：执行中的会话（Session）与运行实例（Run）强绑定启动时的 `snapshot_id`，杜绝因外部源或本地库动态更新导致的运行时漂移；
+- **确定性溯源与审计**：执行事件流中记录完整的快照 ID、定义版本与 SHA-256 摘要，支持 100% 确定性历史审计与场景重放；
+- 系统的执行引擎分层与快照隔离原理详见 [架构设计与系统规范](/zh-CN/docs/architecture)。
 
-- `POST /api/mcp/servers` — 注册或更新 MCP Server（按名称 upsert）
-- `POST /api/mcp/servers/import` — 批量导入配置
-- `POST /api/mcp/test-connection` — 执行连通性测试
-- `/api/mcp/oauth/*` — 标准 OAuth（PKCE Loopback）鉴权端点
+---
 
-传输层支持三种形态（`transport` 载荷结构）：
+## 5. 自定义 MCP 连接器接入指南
 
-```jsonc
-// 本地子进程 (stdio)
-{ "stdio": { "command": "./my-mcp-server", "args": [], "env": {} } }
-// Streamable HTTP (远程推荐)
-{ "http": { "url": "https://mcp.example.com/mcp", "headers": { "Authorization": "Bearer <token>" } } }
-// SSE (兼容模式远程)
-{ "sse": { "url": "https://mcp.example.com/sse", "headers": {} } }
+开发者接入自定义 MCP Server 无需发布到官方市场，支持三种灵活路径：
+
+| 接入途径 | 存储落点 | 生效作用域 | 最佳适用场景 |
+| --- | --- | --- | --- |
+| `~/.agent-store/mcp.json` 本机静态配置 | **不写入数据库**；宿主启动时自动加载 | 当前宿主的所有会话 | 本机私有服务、开发者本地调试 |
+| HTTP 管理接口动态注册 | `mcp_servers` 数据表 | 会话或 Run 中显式绑定 | 自研/私有部署服务，支持连通性探测与 OAuth 鉴权 |
+| 市场 / 插件分发包导入 | 安装后写入 `mcp_servers` 数据表 | 同上 | 面向团队组织或社区公开发布的集成包 |
+
+传输层支持三种标准形态（`transport` 载荷结构）：
+
+```json
+{
+  "stdio": {
+    "command": "./my-mcp-server",
+    "args": ["--port", "9000"],
+    "env": { "DEBUG": "1" }
+  },
+  "http": {
+    "url": "https://mcp.example.com/mcp",
+    "headers": { "Authorization": "Bearer secret:MY_MCP_TOKEN" }
+  },
+  "sse": {
+    "url": "https://mcp.example.com/sse",
+    "headers": { "X-Api-Key": "secret:MY_API_KEY" }
+  }
+}
 ```
 
-静态 API Key 与自定义鉴权头通过 `headers` 注入；OAuth 流程由运行时代理登录、密钥持久化及请求签名。注册完成后，在会话或 Run 启动配置中声明 `selected_mcp_server_ids`，运行时将在执行时按需建连并注入工具定义。
+通过统一的面向对象 TypeScript SDK（`AppServerClient`）实现连接器的编排与调用：
 
-### 通过 TypeScript SDK 接入
+```typescript
+import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
 
-TypeScript SDK 提供目录查询、OAuth 流程代理及工具调用功能（`list` / `get` / `status` / `test` / `call`）。针对自研 MCP Server，可通过原生的**导入 $\to$ 安装**链路实现程序化编排：
+// 1. 初始化客户端
+const client = new AppServerClient({
+  transport: new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws"),
+  client: { name: "connector-workflow-app", version: "1.0.0" },
+});
+await client.connect();
 
-1. 组织两级目录结构的连接器市场源：
+// 2. 检查已启用的连接器并测试物理连通性
+const connectors = await client.connectors.list();
+const testResult = await client.connectors.test("conn_github_integration");
+console.log(`连通性测试: ${testResult.ok ? "成功" : "失败"}`);
 
-   ```text
-   my-market/
-   ├── .codebuddy-connector/
-   │   └── connectors.json        # 市场清单：id/name + source（相对路径）
-   └── my-mcp/
-       └── mcp.json               # server 声明：mcpServers
-   ```
+// 3. 在会话中调度连接器（亦可通过 client.connectors.call 直接调用指定工具）
+const conv = await client.conversations.create({
+  name: "GitHub 自动化工作流",
+});
 
-   ```json
-   {
-     "name": "my-connectors",
-     "connectors": [
-       { "id": "my-mcp", "name": "My MCP", "version": "0.1.0", "source": "my-mcp" }
-     ]
-   }
-   ```
+// 4. 发起交互推理
+await client.conversations.send(
+  conv.id,
+  "请列出当前仓库最新的 3 个 Pull Request 并在右侧生成报告。",
+  crypto.randomUUID(),
+);
+```
 
-   `source` 必须为相对路径；`mcp.json` 内的 `mcpServers` 结构遵循标准规范：
+更多连接器接口与错误处理范式详见 [TypeScript SDK 接口](/zh-CN/docs/typescript-sdk)。
 
-   ```json
-   {
-     "mcpServers": {
-       "my-mcp": { "url": "https://mcp.example.com/mcp" }
-     }
-   }
-   ```
+---
 
-2. 在 SDK 会话中执行导入与安装：
+## 6. 自研 Skill 开发与规范
 
-   ```ts
-   import { launchHarness } from "@flowy-agent-store/sdk";
+自研技能无需编写复杂的后端常驻服务，仅需按规范组织 `SKILL.md` 即可被 Agent 智能感知与调度：
 
-   const harness = await launchHarness({ client: { name: "my-app", version: "0.1.0" } });
+```markdown
+---
+name: web-scraper
+display_name: 网页正文抓取
+version: 1.0.0
+description: 抓取指定 URL 网页的纯文本与 Markdown 结构，剥离干扰元素
+tags: ["crawler", "html", "parser"]
+---
 
-   // 1. 导入：生成不可变 PluginSnapshot（同 digest 重复导入幂等，返回 reused=true）
-   const snap = await harness.transport.request("import/run", {
-     source_path: "C:/abs/path/to/my-market", // 市场根目录（含 .codebuddy-connector/）
-     source_kind: "workbuddy-connector-market",
-   });
+# 网页正文抓取技能
 
-   // 2. 安装：connector 组件自动注册进运行时 mcp_servers
-   await harness.transport.request("install/run", { snapshot_id: snap.snapshot_id });
+## 描述
+当用户需要获取公开网页的详细内容、文档或博文正文时触发本技能。
 
-   // 3. 查询目录并在 Run 中注入
-   const connectors = await harness.connectors.list();
-   await harness.runs.agent({
-     agentId: "<agent-id>",
-     goal: "……",
-     mentions: [{ kind: "connector", id: connectors[0].id }],
-   });
+## 参数声明
+- `url` (string, required): 目标网页完整的 HTTP(S) 地址
+- `format` (string, optional): 输出格式，支持 `markdown` 或 `text`，默认为 `markdown`
 
-   await harness.close();
-   ```
+## 执行与约束
+1. 仅限抓取公开网络资源，遵守目标站点 robots.txt 规范；
+2. 自动移除 `<script>`、`<style>` 与广告弹窗 DOM 节点；
+3. 将最终解析结果通过 Markdown 格式回填至会话上下文。
+```
 
-3. OAuth 鉴权通过 `connector.authStart(connectorId)` 与 `connector.waitForAuth(connectorId)` 完成异步等待；
-4. 运行时通过 `mentions` 动态挂载组件：连接器使用 `{ kind: "connector", id }`，技能使用 `{ kind: "skill", id }`。状态可通过 `install/status` 查询，并支持 `install/enable` / `install/disable` 管理。
+- **目录结构规范**：将上述文件保存至 `skills/<slug>/SKILL.md`；
+- **本地导入与安装**：在 Web UI 工作台直接导入该技能目录，或通过 SDK `client.store.installEntry` 进行程序化安装；
+- **运行时动态路由**：Agent 根据系统提示词与任务需求，自动选择匹配的技能并注入当前轮次的推理上下文中。
 
-### 路径 B：市场 / 插件分发（面向公开分发）
+---
 
-公开发布资产时，可将 MCP Server 打包为以下形式：
+## 7. 凭据隔离与权限控制
 
-- **独立连接器市场包**：`.codebuddy-connector/connectors.json` 搭配 `connectors/<slug>/`，托管至任一市场源；
-- **组合插件包内置 MCP**：在插件包的 `.codebuddy-plugin/` 目录下提供 `.mcp.json`（配置 `mcpServers` 键值）。
+系统在处理敏感凭据时遵循「零泄漏与物理脱敏」原则：
 
-用户安装后自动同步至本地 `mcp_servers` 注册表。
+- **`secret:<KEY>` 占位符机制**：连接器配置中禁止硬编码明文密钥，统一采用 `secret:NAME` 格式；
+- **安全金库隔离存储**：实际明文仅持久化在本地受操作系统保护的安全存储（如 DPAPI / Keychain / 加密数据文件）中；
+- **反向代理权限控制**：通过 `~/.agent-store/config.toml` 中的 `[connector_proxy]` 控制工具执行权限：
+  - `enabled = false`：完全禁止外部代理调用工具；
+  - `enabled = true`：允许已启用的连接器执行工具；可进一步配置 `allow` 与 `deny` 名单执行细粒度白名单过滤；
+- 详细配置参数详见 [配置文件](/zh-CN/docs/configuration)。
 
-### 自定义 Skill
+---
 
-- **SDK / 协议接入**：调用 `import/run`（`source_kind: "workbuddy-skill-market"`）生成快照，调用 `install/run` 完成注册，并在 Run 中通过 `mentions` 挂载；
-- **本机文件导入**：通过 `POST /api/skills/import`（支持本地目录或 ZIP 归档）导入为私有技能；
-- **市场源分发**：按照 `.codebuddy-skill/marketplace.json` + `skills/<slug>/` 标准结构发布。
+## 8. 延伸阅读
 
-## 7. 延伸阅读
-
-- 市场条目浏览：[市场页面](/zh-CN/market)
-- 市场源配置：[配置文件](/zh-CN/docs/configuration)
-- 架构与导入分层：[架构说明](/zh-CN/docs/architecture)
+- 浏览官方预置资产：[资源市场](/zh-CN/market)
+- 市场源配置与代理策略：[配置文件](/zh-CN/docs/configuration)
+- 运行时分层与架构模型：[架构设计与系统规范](/zh-CN/docs/architecture)
+- 客户端编排与接口参考：[TypeScript SDK 接口](/zh-CN/docs/typescript-sdk)
+- 真实工程场景范式：[SDK 示例](/zh-CN/docs/examples-sdk)
