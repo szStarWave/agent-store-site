@@ -81,7 +81,7 @@ Table keyed by unique provider identifier. Credentials resolve strictly from thi
 
 Omitting `type` or assigning `""` defaults to `custom` (OpenAI Chat Completions-compatible protocol). Specific enums map as follows:
 
-| What you write | Protocol actually used | Notes |
+| Declared value (type) | Resolved protocol | Notes |
 | --- | --- | --- |
 | omitted / `""` / `custom` / `openai` / `kimi` | OpenAI Chat Completions | Services adhering to the OpenAI wire specification (`kimi`, `mimo`, `deepseek`) map to this category |
 | `anthropic` | Anthropic Messages | Requires strict adherence to the Anthropic specification; enforces mandatory `max_output_size` declarations |
@@ -114,13 +114,13 @@ Bad request: the anthropic protocol requires an explicit output ceiling;
 set Max output tokens on the <provider>/<model> model in Settings -> Models
 ```
 
-| Protocol | `max_output_size` omitted | Declared |
+| Protocol | `max_output_size` omitted | Declared explicitly |
 | --- | --- | --- |
 | `anthropic` | **Error**: Request construction fails with `BAD_REQUEST` | Emitted as `max_tokens` payload argument |
 | OpenAI Chat Completions | Allowed: Request omits parameter, deferring to server defaults | Emitted as `max_tokens` (or `max_completion_tokens`) |
 | OpenAI Responses | Allowed: Same as above | Emitted as `max_output_tokens` |
 
-### Declared value not necessarily sent as-is
+### Dynamic downward convergence constraints on output ceiling
 
 The effective `max_output_size` parameter is subject to two downward convergence constraints:
 
@@ -141,7 +141,7 @@ When an upstream endpoint rejects requests with a `supported range is from L to 
 - Negotiation requires strict error message format matching; unsupported formats propagate immediately.
 - The OpenAI Responses protocol excludes this auto-negotiation mechanism.
 
-### Two registration behaviors for this key
+### Model registration and legacy backfill semantics
 
 - **Non-destructive writes**: Model registration populates output limits only when unconfigured, preserving adjustments made via the Web UI.
 - **Legacy backfilling**: Models registered in earlier versions without explicit output limits are backfilled automatically during subsequent evaluation without requiring record recreation.
@@ -185,7 +185,7 @@ Configures policies for the local file-based memory system across two independen
 
 Disabling this switch simultaneously halts the following subsystems:
 
-| Surface | Disabled behavior |
+| Controlled subsystem | Disabled behavior |
 | --- | --- |
 | System prompt memory injection | Suspends injection (excludes `MEMORY.md` index references) |
 | `remember` tool | Unregistered; models cannot persist new memory entries |
@@ -202,7 +202,7 @@ enabled = false
 - Operates independently from `distill_enabled`; `enabled = false` invalidates distillation settings.
 - Enforced exclusively by the Agent Store host process; requires a process restart to take effect.
 
-### distill_enabled: turn off post-turn distillation only
+### distill_enabled: disable post-turn memory distillation
 
 Memory distillation extracts salient dialogue facts asynchronously at the conclusion of an interaction turn. This extra invocation occurs prior to turn completion, introducing 6~15 seconds of latency. Setting this field to `false` removes this overhead.
 
@@ -255,7 +255,7 @@ Host-level tool configuration defining the tool catalog exposed to sessions. Sup
 
 ### tools.domains
 
-| Key | Disabled capability |
+| Business domain (domain) | Disabled capability and impact |
 | --- | --- |
 | `cron` | Scheduled task execution (`cron_create` / `cron_list` / `cron_delete`) |
 | `meeting` | Meeting audio analysis and listening contexts (`meeting.*`) |
@@ -285,11 +285,11 @@ companion = false
 requirement = false
 ```
 
-### Override with an environment variable (AGENT_STORE_TOOLS)
+### Environment variable override (AGENT_STORE_TOOLS)
 
 The host supports overriding tool configurations dynamically via environment variables:
 
-| Fact | Behavior |
+| Property | Rule and operational behavior |
 | --- | --- |
 | Format | JSON string matching the `[tools]` table schema; `{}` resets to permissive defaults |
 | Precedence | `AGENT_STORE_TOOLS` env variable > `config.toml` > default permissive policy |
@@ -301,7 +301,7 @@ The host supports overriding tool configurations dynamically via environment var
 AGENT_STORE_TOOLS='{"computer":false,"domains":{"knowledge":false}}' agent-store
 ```
 
-For complete integration examples, refer to the [TypeScript SDK cookbook](/en-US/docs/examples-sdk) §10.
+For complete integration examples, refer to the [TypeScript SDK cookbook](/en-US/docs/examples-sdk) §6.3.
 
 ## connector_proxy
 
@@ -326,7 +326,7 @@ deny = ["mcp__*__delete_*"]       # Filter destructive operations
 
 Evaluation order:
 
-| # | Gate | Failure code |
+| # | Authorization gate | Failure error code |
 | --- | --- | --- |
 | 1 | Table absent or `enabled != true` | `policy_denied` |
 | 2 | Target connector not found | `not_found` |
@@ -389,7 +389,7 @@ The presence of `command` defines a stdio process; providing `url` without `tran
 
 Strict schema validation rejects entries containing unrecognized keys or mismatched transport properties without invalidating surrounding definitions.
 
-### Five differences from the reference implementation
+### Divergences from reference implementation
 
 Key behavioral differences from standard CLI reference implementations:
 
@@ -399,7 +399,7 @@ Key behavioral differences from standard CLI reference implementations:
 - **No global timeout inheritance**: Timeout properties must be configured per server definition.
 - **Strict timeout limits**: Timeouts are capped at 600,000 ms (10 minutes); entries exceeding this ceiling fail validation.
 
-### server key, tool name and tool filtering
+### Server keys, tool names, and tool filtering
 
 Server keys prefix derived tool identifiers (`mcp__<key>__<tool>`). Keys must consist of alphanumeric characters, underscores, and hyphens, start and end with an alphanumeric character, and not exceed 40 characters in length.
 
@@ -415,7 +415,7 @@ To restrict all tools from a server globally, declare the rule in `[tools]`:
 disabled = ["mcp__<key>__*"]
 ```
 
-### secret:NAME: credentials stay out of the declaration file
+### Sensitive credential references (`secret:NAME`)
 
 The `env` and `headers` sections support `secret:NAME` syntax. During process initialization, the host resolves references against `[credentials]` (or process environment variables) directly into memory, preventing plain-text token exposure.
 
@@ -427,14 +427,14 @@ UPSTREAM_TOKEN = "…"    # Injected into secret:UPSTREAM_TOKEN
 
 > The `[credentials]` table is inaccessible via management APIs. Unresolved secret references emit system warnings and omit the corresponding parameter.
 
-### Read, toggle and edit in the Web UI
+### Web UI management and persistent editing
 
 The Web UI "MCP Management" interface reflects the status of this configuration directly:
 - Summarizes registered servers, transport modes, active states, and validation error diagnostics.
 - The interface toggles the `enabled` field using text-level minimal edits, preserving indentation and comments.
 - Saving edits executes schema validation, blocking corrupt writes and highlighting invalid line positions.
 
-## Differences from Kimi Code / Claude Code configs
+## Comparison with third-party configurations (Kimi Code / Claude Code)
 
 | Dimension | Agent Store | Kimi Code and others |
 | --- | --- | --- |

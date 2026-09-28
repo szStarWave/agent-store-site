@@ -1,78 +1,71 @@
 # TypeScript SDK reference
 
-Flowy Agent Store distributes three companion TypeScript packages providing strongly-typed integration with the local App Server across Node.js, Electron, and browser environments:
+Flowy Agent Store provides three layered, decoupled official TypeScript packages supporting strongly typed access to the local App Server across Node.js, Electron, and browser environments:
 
-| Package | Responsibility | Environment | Dependencies |
+| Package | Architectural role | Runtime environment | Core dependencies |
 | --- | --- | --- | --- |
-| `@flowy-agent-store/protocol` | Wire protocol type definitions (requests, responses, notifications, errors) | Universal (zero-runtime, no DOM/Node dependencies) | None |
-| `@flowy-agent-store/client` | `AppServerClient` core client, 9 domain sub-clients, and `Transport` abstractions | Universal (unbound from specific I/O mechanisms) | `@flowy-agent-store/protocol` |
-| `@flowy-agent-store/sdk` | Host runtime process management (binary spawning, loopback socket binding, client bootstrapping) | Node.js (requires `node:child_process` and related modules) | `@flowy-agent-store/client`, `@flowy-agent-store/protocol` |
+| `@flowy-agent-store/protocol` | Wire protocol type definitions (requests/responses/notifications/errors) and utilities | Universal (zero-runtime overhead, no Node/DOM dependencies) | None |
+| `@flowy-agent-store/client` | `AppServerClient` core client, 9 business subclients, and `Transport` abstractions | Universal (transport decoupled, no direct I/O binding) | `@flowy-agent-store/protocol` |
+| `@flowy-agent-store/sdk` | Host runtime process management (binary discovery, loopback binding, port discovery, and readiness wrapper) | Node.js ≥ 22 or Bun | `@flowy-agent-store/client`, `@flowy-agent-store/protocol` |
 
-Combine packages according to integration context: consume `protocol` for **pure type contracts**; initialize `client` with `WebSocketTransport` to **connect to an active App Server**; or use `sdk`'s `launchHarness` to **manage local runtime lifecycles programmatically**.
+The three packages combine across usage patterns: consume `protocol` when **only type contracts are needed**; consume `client` when **connecting to an active App Server instance**; consume `sdk`'s `launchHarness` when **managing runtime lifecycles programmatically from Node.js**.
 
-Complete runnable recipes (Node, browser, Electron, store management, sessions, and run execution) are available in the [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
+For comprehensive end-to-end integration examples, refer to the companion [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
 
-> **Integration Notice**: This document targets software developers. Desktop end-users should install precompiled binary installers directly; see [Quick start](/en-US/docs/quick-start).
+> **Integration Notice**: This document targets software developers. Desktop end-users should install precompiled binary releases, as described in the [Quick start](/en-US/docs/quick-start).
 
 ---
 
-## 1. Installation
+## 1. Installation and package architecture
 
 ```bash
-# Usually sdk alone is sufficient (re-exports client and bundles child process orchestration)
-bun add @flowy-agent-store/sdk        # or npm install / pnpm add
+# Standard workflow: install the unified SDK package (bundles client and process management)
+bun add @flowy-agent-store/sdk # or npm install @flowy-agent-store/sdk
 
-# Explicitly declare when consuming protocol types standalone
+# Consume protocol types standalone
 bun add @flowy-agent-store/protocol
 ```
 
-All packages distribute in dual ESM and CJS formats (providing `import`, `require`, and `types` declarations).
+All packages distribute standard dual ESM and CommonJS bundles, exposing TypeScript type declarations through `package.json` `exports`.
 
-> **Version Status**: Packages currently publish under `0.1.0-beta.*` prerelease semantics. Production environments should pin exact package revisions (such as `0.1.0-beta.7` documented here). Consult the [Upgrade and migration guide](/en-US/docs/upgrade) for lifecycle policies.
-> **Protocol Scope**: `APP_SERVER_PROTOCOL_VERSION` in §2 and method coverage metrics in §5.3 reflect current repository contracts. Protocol fingerprints enforce strict equality; cross-version clients and hosts are strictly incompatible.
-> **Runtime Environment**: Node.js **≥ 22** (requires global `WebSocket`) or Bun; version floors declared in respective package `engines.node` manifests.
+> **Release Versioning**: Packages currently publish under `0.1.0-beta.*` prerelease semantics. Production environments should pin exact versions (such as `0.1.0-beta.7`). For upgrade procedures, refer to the [Upgrade and migration guide](/en-US/docs/upgrade).
+> **Runtime Prerequisites**: Requires Node.js **≥ 22.0.0** (relying on global native `WebSocket`) or Bun ≥ 1.1.
 
 ---
 
-## 2. `@flowy-agent-store/protocol` — Protocol Layer
+## 2. @flowy-agent-store/protocol — Protocol layer
 
-### 2.1 Role
+### 2.1 Role and scope
 
-The single source of truth for the wire specification: exports all request, response, and notification contracts, the `APP_SERVER_PROTOCOL_VERSION` constant, and structured error models. The package is zero-I/O and contains only pure validation and utility routines.
+The protocol package serves as the definitive source of truth for wire interactions: declaring all JSON-RPC requests, responses, streaming notification payloads, constants, and structured error hierarchies. The package performs no network I/O, providing purely functional utilities for event decoding, state assertions, and error formatting.
 
-### 2.2 Core exports
+### 2.2 Core exports and type contracts
 
-| Export | Description |
+| Export symbol | Contract definition and usage |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | Protocol contract fingerprint (format `fp-<n>` monotonic identifier, currently `"fp-11"`). Enforces strict equality during initialization |
-| `InitializeRequest` / `InitializeResult` | Handshake request/response payload models (carrying `protocol_version` and host server metadata) |
-| `ClientInfo` / `ClientCapabilities` | Client self-description and feature negotiation claims |
-| `StoreList` / `StoreInstallResult` | Unified package catalog interfaces |
-| `AgentSummary` / `AgentDetail` | Agent expert catalog views |
-| `TeamSummary` / `TeamDetail` | Agent Team collaboration catalog views |
-| `SkillSummary` / `SkillDetail` | Skill capability catalog views |
-| `ConnectorSummary` / `ConnectorDetail` / `ConnectorStatusView` / `ConnectorProbeResult` | Connector catalog views, lifecycle statuses, and physical probe outcomes |
-| `OAuthStartResult` / `OAuthStatusView` | OAuth authorization flow lifecycle states |
-| `ConversationView` / `ConversationMessage` / `ConversationEvent` / `ConversationSendReceipt` | Persistent conversation session and message contracts |
-| `RunReceipt` / `RunView` / `RunResult` / `RunEvent` | Execution run lifecycle and event stream models |
-| `JsonRpcRequest` / `JsonRpcResponse` / `JsonRpcNotification` | Core wire framing types |
-| `ServerNotification` | Downstream server push notifications (events, list changes, resync signals) |
-| `WireError` | Standardized server error payloads |
+| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-12"`). Enforces strict equality during handshakes |
+| `InitializeRequest` / `InitializeResult` | Protocol handshake payloads exchanging protocol versions, client identities, and host capabilities |
+| `ClientInfo` / `ClientCapabilities` | Client identity declarations (name, version) and feature subscriptions (`events`, `approvals`, `team_runtime`) |
+| `StoreList` / `StoreItem` / `StoreInstallResult` | Unified catalog structures and installation receipt models |
+| `AgentSummary` / `AgentDetail` | Agent expert catalog summaries and detailed configuration views |
+| `TeamSummary` / `TeamDetail` | Expert team summaries and multi-agent topologies |
+| `SkillSummary` / `SkillDetail` | Atomic skill metadata and permission flags |
+| `ConnectorSummary` / `ConnectorDetail` / `ConnectorStatusView` | Connector catalog views, runtime health statuses, and probe outcomes |
+| `ConnectorRegistration` / `ConnectorCredential` | Dynamic MCP connector registration inputs and credential form state models |
+| `ConversationView` / `ConversationMessage` / `ConversationEvent` | Conversation models, transcript message structures, and streaming delta events |
+| `RunReceipt` / `RunView` / `RunResult` / `RunEvent` | Batch task execution lifecycle models and decision events |
+| `ServerNotification` / `WireError` | Downstream server push notifications and standardized wire error payloads |
 
-> The protocol exposes a unified interface without experimental branches. Team orchestration and event cursor catch-up mechanics ship across the standard export surface.
+### 2.3 Structured error models and inspection utilities
 
-### 2.3 Error models (package `errors.ts`)
+Callers should always branch logic based on the structured `code` property rather than parsing human-readable `message` strings:
 
-Callers must branch on stable `code` identifiers rather than human-readable `message` strings:
-
-| Type | Trigger | Key fields |
+| Error class | Trigger conditions | Key properties |
 | --- | --- | --- |
-| `AppServerError` | Server-returned JSON-RPC error payload | `code`, `requestId` (`request_id` on the wire), `retryable`, `details` |
-| `TransportError` | Transport socket failure (connect, send, receive, close) | `phase` (`connect`/`send`/`receive`/`close`), `retryable` |
-| `ProtocolError` | Client-side protocol contract validation failure | `kind` (`invalid_message` / `version_mismatch` / `unexpected_response`) |
-| `RequestTimeoutError` | Request timeout exceeded | `method`, `timeoutMs` |
-
-Utility error helpers:
+| `AppServerError` | Server returned a JSON-RPC error response | `code` (standard enum), `requestId`, `retryable`, `details` |
+| `TransportError` | Physical network transport failure (disconnects, send errors, socket timeouts) | `phase` (`connect`/`send`/`receive`/`close`), `retryable` |
+| `ProtocolError` | Local protocol contract violations (malformed envelopes, version incompatibilities) | `kind` (`invalid_message`/`version_mismatch`/`unexpected_response`) |
+| `RequestTimeoutError` | Individual RPC invocation exceeded timeout budget | `method`, `timeoutMs` |
 
 ```ts
 import { isAppServerError, isRetryableTransportError, formatError } from "@flowy-agent-store/protocol";
@@ -81,522 +74,462 @@ try {
   await client.runs.agent({ agentId, goal });
 } catch (error) {
   if (isAppServerError(error)) {
-    // Branch on stable code; do not parse message text
-    console.log(error.code, error.retryable);
+    // Deterministic branching based on stable error codes (e.g. agent_not_installed / conflict)
+    console.error(`Business error: code=${error.code}, retryable=${error.retryable}`);
   } else if (isRetryableTransportError(error)) {
-    // Socket disconnected; retryable
+    // Transient network glitch, safe to enter retry loops
+    console.warn("Transient transport failure, preparing reconnection");
   }
-  console.log(formatError(error)); // Canonical UI error formatting
+  console.error("Standardized error formatting:", formatError(error));
 }
 ```
-
-> Idempotency conflicts (`conflict`) and policy denials (`policy_denied`) are strictly non-retryable (`retryable: false`).
 
 ---
 
-## 3. `@flowy-agent-store/client` — Transport-Agnostic Client
+## 3. @flowy-agent-store/client — Client layer
 
-### 3.1 Role
+### 3.1 Client lifecycle and Transport abstraction
 
-Domain client abstraction: all methods execute across an injected `Transport` interface without binding to concrete I/O implementations. Lifecycle state transitions (`connect → initialize → version check → initialized → ready`) are encapsulated within this layer.
-
-### 3.2 `Transport` interface
+`AppServerClient` encapsulates domain operations while decoupling underlying network transports via an injected `Transport` interface. The client enforces an explicit state machine: `idle → connecting → initializing → ready → closed`.
 
 ```ts
 export interface Transport {
-  connect(): Promise<void>;                          // Idempotent socket setup
-  request<T>(method: string, params: unknown): Promise<T>;  // Request-response
-  notify(method: string, params: unknown): void;     // Unidirectional notification
-  onNotification(listener: NotificationListener): () => void; // Event subscription returning unsubscribe fn
-  close(): void;
-  onLifecycle?(listener: (state: "open" | "closed") => void): () => void; // Optional socket state hooks
+  connect(): Promise<void>;                                      // Establish physical socket connection (idempotent)
+  request<T>(method: string, params: unknown): Promise<T>;       // Bidirectional request-response RPC
+  notify(method: string, params: unknown): void;                  // Unidirectional notification (no response)
+  onNotification(listener: NotificationListener): () => void;     // Subscribe to downstream notifications, returns unsubscribe
+  close(): void;                                                 // Physically close transport connection
+  onLifecycle?(listener: (state: "open" | "closed") => void): () => void; // Channel state change listener
 }
 ```
 
-Built-in `WebSocketTransport` (compatible with modern browsers, Node 22+, and Bun via global `WebSocket`):
+The package provides a built-in `WebSocketTransport` implementation supporting browsers and Node.js 22+:
 
 ```ts
 import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
 
-const transport = new WebSocketTransport({ url: "ws://127.0.0.1:8787/api/app-server/ws" });
-const client = new AppServerClient(transport);
+const transport = new WebSocketTransport("ws://127.0.0.1:8787/api/app-server/ws", {
+  token: process.env.AGENT_STORE_TOKEN,
+  requestTimeoutMs: 30_000,
+});
+const client = new AppServerClient({
+  transport,
+  client: { name: "desktop-app", version: "1.0.0" },
+});
 await client.connect();
 ```
 
-### 3.3 Domain Sub-Clients
+### 3.2 Top-level client methods
 
-#### `connectors` — Connector Management and Invocation
+The `AppServerClient` instance exposes top-level lifecycle and catalog management methods:
+
+| Method signature | Parameter description | Return contract | Underlying protocol method |
+| --- | --- | --- | --- |
+| `connect()` | None | `Promise<InitializeResult>` | `initialize` → `initialized` |
+| `close()` | None | `void` | Resets client state and closes transport |
+| `onNotification(listener)` | Downstream callback | Unsubscribe closure `() => void` | Listens to server broadcasts |
+| `listStore()` | None | `Promise<StoreList>` | `store/list` |
+| `installStoreEntry(marketplaceId, entryName)` | Marketplace ID and entry name | `Promise<StoreInstallResult>` | `store/install-entry` |
+| `listMarketplaces()` | None | `Promise<MarketplaceSummary[]>` | `market/list` |
+| `addMarketplace(input)` | Marketplace add payload | `Promise<MarketplaceSummary>` | `market/add` |
+| `refreshMarketplace(marketplaceId)` | Target marketplace ID | `Promise<MarketplaceRefreshResult>` | `market/refresh` |
+| `removeMarketplace(marketplaceId, cascade)` | Target marketplace ID and cascade deletion flag | `Promise<MarketplaceRemoveResult>` | `market/remove` |
+
+### 3.3 Complete reference for business subclients
+
+#### `agents` — Expert catalog and export
 
 ```ts
-client.connectors.list(): Promise<ConnectorSummary[]>;
-client.connectors.get(connectorId: string): Promise<ConnectorDetail>;        // Namespaced tools and auth state
-client.connectors.status(connectorId: string): Promise<ConnectorStatusView>; // Connected requires active auth and successful probe
-client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;  // Physical socket test; tool signatures resolved here
-client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>; // Diagnostic failure details in error field
-client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>; // Initiates host browser OAuth flow
-client.connectors.waitForAuth(connectorId: string, options?: { timeoutMs?, pollMs? }): Promise<WaitForAuthOutcome>; // Polls until resolution
-client.connectors.logout(connectorId: string): Promise<void>;                // Revokes credentials
-client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>; // Proxies tool execution
-client.connectors.register(registration: ConnectorRegistration): Promise<ConnectorDetail>; // Programmatic MCP server registration (fp-11)
-client.connectors.credentials(connectorId: string): Promise<ConnectorCredential>;      // Form definition and status (fp-11)
-client.connectors.setCredentials(connectorId: string, values: Record<string, string>): Promise<ConnectorCredential>; // Persists secrets
-client.connectors.clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;              // Clears secrets
+// 1. Query all installed and available agent expert summaries
+client.agents.list(): Promise<AgentSummary[]>;
+
+// 2. Retrieve detailed configuration view for an expert (including skill and connector bindings)
+client.agents.get(agentId: string): Promise<AgentDetail>;
+
+// 3. Export complete expert definition pack (including persona instructions and manifests)
+client.agents.export(agentId: string): Promise<ExpertPack>;
 ```
 
-> **Dynamic Connector Registration** (introduced in `fp-11`): Custom MCP servers can be registered programmatically via template definitions without bundling catalog manifests:
->
-> ```ts
-> const created = await client.connectors.register({
->   name: "acme-mcp",
->   transport: {
->     type: "http",
->     url: "https://mcp.acme.com/mcp",
->     headers: { Authorization: "Bearer ${secret:ACME_KEY}" },
->     values: {},                       // Non-secret connector configuration
->   },
-> });
-> created.credential?.missing;          // ["ACME_KEY"] —— Missing key names
-> await client.connectors.setCredentials(created.id, { ACME_KEY: process.env.ACME_KEY! });
-> const probe = await client.connectors.test(created.id);   // Validate physical connectivity
-> ```
->
-> Templates reference credentials using `${secret:KEY}` syntax. The host derives the credential schema automatically, with `missing` reporting unfilled keys.
->
-> Architectural invariants:
-> - **Write-Only Credential Safety**: Registration accepts no plaintext secrets; sensitive values are populated via `setCredentials()`, and responses mask secret values.
-> - **Disabled Initial State**: Dynamically registered connectors initialize as `disabled`, requiring a successful probe before activation.
-> - **Owner Scoping**: Registration is restricted to the host owner; duplicate names update existing configurations.
-
-> **Credential Model** (introduced in `fp-9`): `credentials(id)` returns form schema blocks (`mode`, `status`, `missing`, and `fields[]`). Secrets are scoped to the caller principal (`<principal>:NAME`) and masked in query outputs.
->
-> Set credentials via `setCredentials(id, values)`; revoke via `clearCredentials(id, keys?)`.
-
-> **Tool Invocation Proxy**: `call()` invokes MCP tools through connections maintained by the host. Callers supply the tool name and arguments; underlying parameters and tokens remain encapsulated on the host. Host policy (`[connector_proxy]`) governs access, rejecting unauthorized calls with `policy_denied`.
->
-> **Parameter Validation**: `get()` and `test()` provide raw tool `input_schema` definitions. Parameter errors return `{ is_error: true }` without rejecting the invocation promise.
-
-> **Tool Error Semantics**: Business-level tool failures resolve with `{ is_error: true, content }`. Promises reject only upon infrastructure or transport failures (timeouts, network errors, policy denials, not found).
-
-> **OAuth Lifecycle**: OAuth authorization is managed via trusted host browser flows; clients initiate and monitor state changes asynchronously. `waitForAuth(id)` provides structured polling (default timeout 120s).
-
-#### `store` — Catalog Operations (Search / Install / Enable / Uninstall)
+#### `teams` — Expert team catalog and orchestration
 
 ```ts
+// 1. Query configured expert teams
+client.teams.list(): Promise<TeamSummary[]>;
+
+// 2. Retrieve topology configuration for a team (member roles and delegation rules)
+client.teams.get(teamId: string): Promise<TeamDetail>;
+
+// 3. Export complete team definition package (supports optional semver validation)
+client.teams.export(teamId: string, teamVersion?: string): Promise<TeamExportResult>;
+```
+
+#### `skills` — Skill discovery and file inspection
+
+```ts
+// 1. List local atomic skill summaries
+client.skills.list(): Promise<SkillSummary[]>;
+
+// 2. Retrieve detailed skill definition
+client.skills.get(skillId: string): Promise<SkillDetail>;
+
+// 3. List static file inventory within a skill directory
+client.skills.files(skillId: string): Promise<SkillInventory>;
+
+// 4. Read binary file bytes from skill package
+client.skills.readFile(skillId: string, filePath: string): Promise<Uint8Array>;
+```
+
+#### `connectors` — Connector management, registration, and tool proxying
+
+```ts
+// 1. Discovery and status inspection
+client.connectors.list(): Promise<ConnectorSummary[]>;
+client.connectors.get(connectorId: string): Promise<ConnectorDetail>;
+client.connectors.status(connectorId: string): Promise<ConnectorStatusView>;
+client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;
+
+// 2. OAuth authorization workflow
+client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>;
+client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>;
+client.connectors.waitForAuth(connectorId: string, options?: { timeoutMs?: number }): Promise<WaitForAuthOutcome>;
+client.connectors.logout(connectorId: string): Promise<void>;
+
+// 3. Tool dynamic proxy invocation
+client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>;
+
+// 4. Dynamic connector registration and credential management
+client.connectors.register(registration: ConnectorRegistration): Promise<ConnectorDetail>;
+client.connectors.credentials(connectorId: string): Promise<ConnectorCredential>;
+client.connectors.setCredentials(connectorId: string, values: Record<string, string>): Promise<ConnectorCredential>;
+client.connectors.clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;
+```
+
+#### `store` — Marketplace comprehensive lifecycle
+
+```ts
+// 1. Unified catalog discovery
 client.store.list(): Promise<StoreItem[]>;
 client.store.search(query: string, filter?: { kind?: StoreItemKind }): Promise<StoreItem[]>;
 client.store.installed(): Promise<StoreItem[]>;
-client.store.checkUpdates(): Promise<StoreItem[]>;                 // Installed items with pending updates
-client.store.updateHint(item): "none" | "uninstall_reinstall" | "unknown";
-client.store.install(item, opts?: { waitForReady?, timeoutMs?, signal? }): Promise<StoreOperationOutcome>;
-client.store.setEnabled(item, enabled: boolean, opts?: { componentIds? }): Promise<StoreOperationOutcome>;
-client.store.uninstall(item, opts?: { componentIds? }): Promise<StoreOperationOutcome>;
+
+// 2. State-machine installation and update tracking
+client.store.install(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
+client.store.checkUpdates(): Promise<StoreItem[]>;
+client.store.updateHint(item: StoreItem): "none" | "uninstall_reinstall" | "unknown";
+
+// 3. Toggle activation and complete uninstallation
+client.store.setEnabled(item: StoreItem, enabled: boolean): Promise<StoreOperationOutcome>;
+client.store.uninstall(item: StoreItem): Promise<StoreOperationOutcome>;
 ```
 
-> The `store` sub-client coordinates multi-step state transitions. `install` defaults `waitForReady: true`, performing static imports for skills and probe validation for connectors. Detailed component statuses return in `outcome.components`.
-
-#### `conversations` — Persistent Sessions
+#### `conversations` — Conversation creation, model options, and interaction
 
 ```ts
-client.conversations.create(input): Promise<ConversationView>;  // Omitted model resolves to config.toml defaults
-client.conversations.update(id, input): Promise<ConversationView>;
+// 1. Conversation lifecycle
+client.conversations.create(input: ConversationCreateInput): Promise<ConversationView>;
+client.conversations.get(conversationId: string): Promise<ConversationView>;
+client.conversations.list(limit?: number): Promise<ConversationView[]>;
+client.conversations.update(conversationId: string, input: ConversationUpdateInput): Promise<ConversationView>;
+client.conversations.delete(conversationId: string): Promise<{ conversation_id: string; deleted: boolean }>;
+
+// 2. Turn execution and messaging
+client.conversations.messages(query: ConversationMessagesQuery): Promise<ConversationMessagesPage>;
+client.conversations.send(
+  conversationId: string,
+  content: string,
+  idempotencyKey: string,
+  options?: ConversationSendOptions,
+): Promise<ConversationSendReceipt>;
+client.conversations.cancel(conversationId: string): Promise<ConversationView>;
+
+// 3. Streaming subscriptions and model metadata
+client.conversations.follow(conversationId: string): Promise<ConversationSubscription>;
 client.conversations.modelOptions(): Promise<ConversationModelOptions>;
-client.conversations.list(limit = 100): Promise<ConversationView[]>;
-client.conversations.get(id): Promise<ConversationView>;
-client.conversations.messages(query): Promise<ConversationMessagesPage>; // page/page_size/cursor
-client.conversations.send(id, content, idempotencyKey, options?): Promise<ConversationSendReceipt>; // Requires explicit idempotency key
-client.conversations.cancel(id): Promise<ConversationView>;
-client.conversations.delete(id): Promise<{ conversation_id: string; deleted: boolean }>;
-await client.conversations.follow(id): Promise<ConversationSubscription>;
 ```
 
-The fourth parameter of `send()` configures per-turn parameters:
+#### `runs` — Standalone task execution, plans, and approvals
 
 ```ts
-client.conversations.send(id, content, key, {
-  attachments: ["/abs/path/inside/workspace.png"],   // Absolute path within conversation workspace
-  mentions: [{ kind: "skill", id: "release-notes" }], // Attached skill definition
-});
+// 1. Trigger batch tasks
+client.runs.agent(input: AgentRunInput): Promise<RunReceipt>;
+client.runs.team(input: TeamRunInput): Promise<TeamRunReceipt>;
+
+// 2. Execution monitoring and plans
+client.runs.get(runId: string): Promise<RunView>;
+client.runs.plan(runId: string): Promise<RunPlan>;
+client.runs.result(runId: string): Promise<RunResult>;
+client.runs.events(query: RunEventsQuery): Promise<RunEvent[]>;
+
+// 3. Task intervention, approvals, and streaming
+client.runs.cancel(input: RunCancelInput): Promise<RunView>;
+client.runs.answerDecision(input: DecisionAnswerInput): Promise<RunView>;
+client.runs.follow(runId: string): Promise<EventSubscription>;
 ```
 
-> **Dynamic Skill Mentions**: `mentions` accepts only `kind: "skill"`. Skills attach per-turn without mutating the frozen conversation snapshot. Supplying unsupported mention kinds returns `invalid_request`.
-
-`send()` also supports adjusting model choices and reasoning effort dynamically:
+#### `workspaces` — Local workspace registration and management
 
 ```ts
-await client.conversations.send(id, content, key, {
-  model: { provider_id: "opencode", model: "mimo-v2.5" }, // Maps to provider keys in config.toml
-  reasoningEffort: "high",                                 // low | medium | high | xhigh | max
-});
-```
-
-> **Session Configuration Persistence**: Modifications persist across subsequent conversation turns. Model mutations during an active turn (`running`) fail with `conflict`.
-
-`create()` supports binding an expert identity via `agentId`:
-
-```ts
-const experts = await client.agents.list();
-const architect = experts.find((agent) => agent.name === "software-architect");
-
-const conv = await client.conversations.create({
-  name: "Architecture Review",
-  agentId: architect!.id,     // Must match agent/list; returns agent_not_installed if missing
-});
-```
-
-> **Expert Immutability**: The expert identity and associated preset snapshots freeze at conversation creation; changing identities requires a new conversation.
-
-`create()` also initializes an Agent Team Leader session via `teamId`:
-
-```ts
-const teams = await client.teams.list();
-const company = teams.find((team) => team.name === "Software Company");
-
-const leader = await client.conversations.create({ teamId: company!.id });
-// Orchestrates team context and launches into the interactive Leader session
-await client.conversations.send(leader.conversation_id, "Decompose requirements into steps", crypto.randomUUID());
-```
-
-> `teamId` and `agentId` are mutually exclusive. Sessions fail fast during creation if member agents or connectors are missing or disabled.
-
-`modelOptions()` provides catalog metadata from models.dev (such as token pricing `cost_input`/`cost_output` and context capacities). Omitted for uncataloged models.
-
-Real-time subscription object:
-
-```ts
-const sub = await client.conversations.follow(convId);
-sub.onEvent((event) => console.log("seq", event.sequence, event)); // Deduplicates by sequence
-sub.onResync((reason) => console.log("resync required:", reason)); // Disconnect catch-up notification
-sub.lastSequence; // Highest observed sequence number
-await sub.rearm(); // Re-register listeners and reset cursor on reconnect
-await sub.close(); // Server-side unsubscription
-```
-
-> Call `conversation/messages` following `rearm()` to backfill transcript deltas missed during disconnects.
-
-#### `runs` — Execution Lifecycle and Event Streams
-
-```ts
-client.runs.agent(input: AgentRunInput): Promise<RunReceipt>; // Asynchronous receipt
-client.runs.team(input: TeamRunInput): Promise<TeamRunReceipt>; // Team run: Leader session + planned delegation
-client.runs.get(runId): Promise<RunView>;                     // Authoritative status
-client.runs.plan(runId): Promise<RunPlan>;                    // Execution plan graph (run/plan)
-client.runs.result(runId): Promise<RunResult>;                // Resolves on terminal completion
-client.runs.events({ runId, afterSequence, limit }): Promise<RunEvent[]>; // Cursor-based event replay
-client.runs.cancel({ runId, expectedVersion, commandId, idempotencyKey }): Promise<RunView>;
-await client.runs.follow(runId): Promise<EventSubscription>;
-```
-
-`runs.agent()` allows overriding model and reasoning parameters for a specific run:
-
-```ts
-await client.runs.agent({
-  agentId: architect!.id,
-  goal: "Decompose requirements into steps",
-  model: { provider_id: "opencode", model: "mimo-v2.5" },
-  reasoningEffort: "high",
-});
-```
-
-> Parameter precedence: Explicit invocation parameters > Preset defaults > Host configuration defaults (`default_model`).
-
-```ts
-const sub = await client.runs.follow(runId);
-sub.onEvent((event) => console.log(event));       // Best-effort event stream
-sub.onResync(({ run_ids, reason }) => …);         // Reconnection catch-up signal
-sub.onError((error) => …);                        // Transport error callback
-sub.lastSequence;
-const replayed = await sub.rearm();               // Reconnect: resets sequence and replays history
-await sub.close();
-```
-
-> Event streams provide best-effort ordering; clients must deduplicate sequences using `run/events` replay cursors.
-
-#### `workspaces` — Workspace Registration
-
-```ts
+// 1. Query registered workspaces
 client.workspaces.list(): Promise<WorkspaceView[]>;
-client.workspaces.create(path: string): Promise<WorkspaceView>; // Canonical path resolution; rejects symlink loops
-client.workspaces.revoke(workspaceId: string): Promise<WorkspaceRevokeResult>; // Soft revocation preserving sessions
+
+// 2. Register and canonicalize path as a secure workspace
+client.workspaces.create(path: string): Promise<WorkspaceView>;
+
+// 3. Revoke workspace (soft delete reference without wiping disk content)
+client.workspaces.revoke(workspaceId: string): Promise<WorkspaceRevokeResult>;
+```
+
+#### `models` — Available model metadata discovery
+
+```ts
+// Query all configured models available for invocation along with token pricing parameters
+client.models.list(): Promise<ModelSummary[]>;
 ```
 
 ---
 
-## 4. `@flowy-agent-store/sdk` — Node Host Operations
+## 4. @flowy-agent-store/sdk — Node host orchestration
 
-### 4.1 `launchHarness(options): Promise<Harness>`
+### 4.1 launchHarness integration entrypoint
 
-Spawns the local runtime binary, awaits the standard output readiness notification, binds a loopback connection, and performs the `initialize` / `initialized` protocol handshake. The returned `Harness` instance extends `AppServerClient` with process lifecycle management.
+`launchHarness` is the primary entrypoint for Node.js integrations and automated test suites. It resolves the runtime binary, spawns child processes, allocates ephemeral loopback ports, and establishes WebSocket handshakes:
 
 ```ts
-interface HarnessOptions extends SpawnOptions {
-  client: ClientInfo;             // { name, version }
-  capabilities?: ClientCapabilities;
-  token?: string;                 // Forwarded to WebSocketTransport
-  requestTimeoutMs?: number;      // Default 30s
+export interface HarnessOptions extends SpawnOptions {
+  client: ClientInfo;                  // Client identity declaration (name, version)
+  capabilities?: ClientCapabilities;   // Feature subscriptions (events, approvals, team_runtime)
+  token?: string;                      // Authentication token passed to WebSocketTransport
+  requestTimeoutMs?: number;           // Default RPC timeout (30,000 ms)
 }
 
-interface Harness extends AppServerClient {
-  server: SpawnedServer;          // readiness / dataDir / exited / close
-  handshake: InitializeResult;    // Handshake payload (non-null)
-  close(): Promise<void>;         // Unsubscribe → close socket → kill process → clean temp data-dir
+export interface Harness extends AppServerClient {
+  server: SpawnedServer;               // Low-level daemon control handle (readiness, dataDir, exited, close)
+  handshake: InitializeResult;         // Handshake receipt returned by host
+  close(): Promise<void>;              // Unsubscribes events → closes transport → kills child → cleans temp dir
 }
 ```
 
-`HarnessOptions` configuration fields:
+Configuration field contract:
 
-| Field | Default | Description |
+| Option | Default | Behavior |
 | --- | --- | --- |
-| `client` | — | **Required**; client identification recorded in server audit logs |
-| `capabilities` | omitted | Capability declarations (`{ events?, approvals?, team_runtime?, artifacts? }`) |
-| `token` | omitted | Authentication token supplied to `WebSocketTransport` via query parameter |
-| `requestTimeoutMs` | `30000` | RPC request timeout in milliseconds |
+| `client` | — | **Required**; Unique client identity recorded in server audit logs |
+| `capabilities` | `{}` | Capability declarations enabling optional features like `events` and `approvals` |
+| `token` | Omitted | Authentication token appended as `?token=...` query parameter |
+| `requestTimeoutMs` | `30000` | Per-request RPC timeout budget (milliseconds) |
 
 `Harness` instance members:
 
-| Member | Content | Purpose |
+| Member property | Type contract | Core purpose |
 | --- | --- | --- |
-| `conversations` / `agents` / `teams` / `skills` / `connectors` / `models` / `workspaces` / `runs` / `store` | `AppServerClient` domain interfaces | Direct entry points for business operations |
-| `handshake` | Handshake response payload | Access protocol version fingerprints and host capabilities |
-| `initializeInfo` | Current readiness state | Connection readiness check (`null` after `close()`) |
-| `server.readiness` | Parsed readiness metadata | Contains host, port, url, protocol_version, auth, etc. |
-| `server.dataDir` | Active data directory | Validates directory paths and test isolation |
-| `server.exited` | Process exit Promise | Observes process crashes or exit signals |
-| `close()` | Teardown function | Closes transports, terminates child processes, and cleans temporary files |
+| `conversations` and 8 other subclients | `AppServerClient` domain clients | Directly dispatch typed domain operations via `harness.<subclient>` |
+| `handshake` | `InitializeResult` | Access verified protocol fingerprint and server capabilities |
+| `server.readiness` | `ReadinessInfo` | Access dynamically allocated host, port, URL, and operational state |
+| `server.dataDir` | `string` | Inspect current local storage directory |
+| `server.exited` | `Promise<SpawnExitInfo>` | Await abnormal child process exits and termination signals |
+| `close()` | `() => Promise<void>` | Closes connection, terminates child processes, and cleans temp storage |
 
-> **Operational Boundaries**: `launchHarness` does not modify external model configurations (`config.toml`); runs against an ephemeral sandbox directory when `dataDir` is omitted; and does not register implicit process exit hooks.
+### 4.2 Low-level process primitives and options
 
-### 4.2 Low-Level Primitives
-
-| Export | Description |
+| Exported primitive | Signature and operational role |
 | --- | --- |
-| `spawnAppServer(options: SpawnOptions)` | Spawns child process and awaits readiness notification (without opening sockets) |
-| `resolveAppServerBin(explicit?)` | Resolves runtime binary path across known locations |
-| `parseReadinessLine(line)` | Parses standard output single-line JSON readiness payloads |
-| `ReadinessInfo` | Structured readiness metadata `{ host, port, url, protocol_version, version, auth }` |
-| `assertProtocolCompatible(runtimeVersion)` | Asserts protocol compatibility, throwing on mismatch |
-| `SpawnExitInfo` | Process exit payload `{ code, signal }` |
-
-`SpawnOptions` interface:
+| `spawnAppServer(options)` | Spawns daemon child process and awaits stdout readiness line (no client connection) |
+| `resolveAppServerBin(path?)` | Resolves absolute path to executable binary |
+| `parseReadinessLine(line)` | Parses single-line JSON readiness payload from stdout |
+| `assertProtocolCompatible(ver)` | Verifies strict protocol equality, throwing `ProtocolError` on mismatch |
 
 ```ts
-interface SpawnOptions {
-  bin?: string;            // Explicit binary path override
-  dataDir?: string;        // Dedicated data directory; temporary directory if omitted
-  port?: number;           // Defaults to 0 (dynamic OS allocation)
-  extraArgs?: string[];    // Additional command-line flags
-  readyTimeoutMs?: number; // Defaults to 120s
-  env?: Record<string, string | undefined>; // Merged with process.env
-  cwd?: string;            // Working directory override
-  onExit?: (info: SpawnExitInfo) => void;   // Exit callback
+export interface SpawnOptions {
+  bin?: string;                             // Explicit binary path override
+  dataDir?: string;                         // Persistent storage path (omitted creates temp directory cleaned on close)
+  port?: number;                            // Listening port (default 0 assigns ephemeral OS port)
+  extraArgs?: string[];                     // Additional CLI flags passed to executable
+  readyTimeoutMs?: number;                  // Maximum readiness timeout budget (default 120,000 ms)
+  env?: Record<string, string | undefined>; // Environment variables merged with parent process.env
+  cwd?: string;                             // Working directory for child process
+  onExit?: (info: SpawnExitInfo) => void;    // Child process exit callback
 }
 ```
 
-### 4.3 Binary Discovery
+### 4.3 Binary resolution order and runtime contract
 
-Binaries resolve sequentially: explicit `bin` flag $\to$ `AGENT_STORE_BIN` environment variable $\to$ optional platform runtime package `@flowy-agent-store/runtime-<platform>-<arch>` $\to$ system `PATH`. Unresolved paths trigger immediate errors.
+The SDK resolves the runtime executable in the following order:
+1. Explicit path specified in `options.bin`;
+2. Operating system environment variable `AGENT_STORE_BIN`;
+3. Bundled binary inside optional platform packages `@flowy-agent-store/runtime-<platform>-<arch>`;
+4. System `PATH` environment variable.
 
 ```bash
-AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node your-app.mjs
+# Explicitly pin runtime binary location
+AGENT_STORE_BIN=/opt/flowy-agent-store/flowy-agent-store node app.mjs
 ```
 
-### 4.4 Process Contract
-
-- **Loopback Enforcement**: Child processes bind `--host 127.0.0.1 --no-open`; clients connect strictly to loopback addresses.
-- **Data Directory Mutual Exclusion**: Omitting `dataDir` generates an isolated temporary directory via `mkdtemp`; existing directories enforce single-instance file locks.
-- **Protocol Version Verification**: Handshake mismatches terminate the child process immediately with an explanatory error.
-- **Readiness Line Matching**: The SDK scans stdout for single-line JSON containing `"agent_store":"listening"` to discover port assignments.
-- **Continuous Output Draining**: stdout continues draining after readiness to prevent OS pipe buffer saturation and process deadlocks.
-- **Environment Inheritance**: `env` merges with `process.env`; `cwd` defaults to the parent process directory.
-
-### 4.5 Teardown and Cleanup
-
-- Spawning failures capture the final 50 lines of stderr;
-- Failure to reach readiness within `readyTimeoutMs` terminates the process;
-- Implement `try/finally` blocks to guarantee invocation of `harness.close()`, releasing file handles and temporary directories.
+Instances spawned without an explicit `dataDir` treat the workspace as temporary scratch storage, wiping it on `close()`. Providing an explicit `dataDir` preserves persistent storage across runs.
 
 ```ts
-const harness = await launchHarness({ client: { name: "x", version: "1" } });
+const harness = await launchHarness({ client: { name: "test-runner", version: "1.0.0" } });
 try {
   await harness.connectors.list();
 } finally {
-  await harness.close();
+  await harness.close(); // Ensures child process termination and scratch directory cleanup
 }
 ```
 
-### 4.6 Export Helpers: `exportAgent` / `exportTeam` / `materializePack`
+### 4.4 Export helper utilities
 
-Serializes agent and team definitions alongside referenced skill files into a local directory. Coordinates existing wire APIs (`agent/export`, `team/export`, `skill/files`, `skill/file`) without altering wire contracts.
+The SDK provides higher-level utilities to materialize expert and team configurations directly to local disk:
 
 ```ts
 import { exportAgent, exportTeam, materializePack } from "@flowy-agent-store/sdk";
 
-// Single agent export; use exportTeam for multi-agent bundles
-const result = await exportAgent(client, agentId, "./my-expert");
-result.pack;           // ExpertPack object in memory
-result.writtenSkills;  // Written skill names
-result.danglingSkills; // Unresolved skills: { id, error }
-```
+// Export individual expert definition and referenced skill files to disk
+const result = await exportAgent(client, "software-architect", "./dist/architect");
+console.log(`Exported skills: ${result.writtenSkills.join(", ")}`);
 
-- **Output Structure**: Writes `expert-pack.json` (metadata manifest), `persona.md` (persona instructions), and `skills/<name>/...` (associated assets).
-- **Execution Invariants**: Fetches and verifies all assets before initiating disk writes to prevent partial artifacts.
+// Export complete multi-agent team package
+await exportTeam(client, "dev-team", "./dist/dev-team");
+```
 
 ---
 
-## 5. Method API Reference
+## 5. Protocol communication and HTTP route binding
 
-### 5.1 `AppServerClient` Top-Level Methods
+### 5.1 HTTP route mapping table (httpRouteTable)
 
-| Method | Parameters | Return | Protocol method |
-| --- | --- | --- | --- |
-| `connect()` | — | `InitializeResult` | `initialize` → `initialized` |
-| `onNotification(listener)` | `(notification) => void` | Unsubscribe function | — (Server notifications) |
-| `close()` | — | `void` | — |
-| `runImport(input)` | `ImportRequest` | `ImportResult` | `import/run` |
-| `listImports()` | — | `ImportSummary[]` | `import/list` |
-| `getImport(snapshotId)` | `string` | `ImportDetail` | `import/get` |
-| `runInstall(input)` | `InstallRequest` | `InstallResult` | `install/run` |
-| `getInstallStatus(snapshotId)` | `string` | `InstallStatus` | `install/status` |
-| `disableInstall(snapshotId, componentIds)` | `string, string[]` | `InstallStatus` | `install/disable` |
-| `enableInstall(snapshotId, componentIds)` | `string, string[]` | `InstallStatus` | `install/enable` |
-| `uninstallInstall(snapshotId, componentIds)` | `string, string[]` | `InstallStatus` | `install/uninstall` |
-| `addMarketplace(input)` | `MarketplaceAddRequest` | `MarketplaceSummary` | `market/add` |
-| `listMarketplaces()` | — | `MarketplaceSummary[]` | `market/list` |
-| `getMarketplace(marketplaceId)` | `string` | `MarketplaceDetail` | `market/get` |
-| `removeMarketplace(marketplaceId, cascade)` | `string, boolean` | `MarketplaceRemoveResult` | `market/remove` |
-| `setMarketplaceAutoUpdate(marketplaceId, enabled)` | `string, boolean` | `MarketplaceSummary` | `market/auto-update` |
-| `refreshMarketplace(marketplaceId)` | `string` | `MarketplaceRefreshResult` | `market/refresh` |
-| `importMarketplaceEntry(marketplaceId, entryName)` | `string, string` | `ImportResult` | `market/entry-import` |
-| `listStore()` | — | `StoreList` | `store/list` |
-| `installStoreEntry(marketplaceId, entryName)` | `string, string` | `StoreInstallResult` | `store/install-entry` |
-
-### 5.2 Sub-Clients
-
-| Sub-client | Methods | Protocol method |
-| --- | --- | --- |
-| `agents` | `list()` / `get(agentId)` / `export(agentId)` | `agent/list` / `agent/get` / `agent/export` |
-| `teams` | `list()` / `get(teamId)` / `export(teamId, teamVersion?)` | `team/list` / `team/get` / `team/export` |
-| `skills` | `list()` / `get(skillId)` / `files(skillId)` / `readFile(skillId, path)` / `readFileWithType(skillId, path)` | `skill/list` / `skill/get` / `skill/files` / `skill/file` |
-| `connectors` | `list()` / `get(id)` / `status(id)` / `test(id)` / `authStatus(id)` / `authStart(id)` / `waitForAuth(id, opts?)` / `logout(id)` / `call(id, tool, args?)` | `connector/list` · `get` · `status` · `test` · `auth/status` · `auth/start` · `auth/logout` · `call` |
-| `store` | `list()` / `search(query, filter?)` / `installed()` / `checkUpdates()` / `updateHint(item)` / `install(item, opts?)` / `setEnabled(item, enabled, opts?)` / `uninstall(item, opts?)` | Composite client mapping: `store/list` · `store/install-entry` · `install/run` · `install/status` · `install/disable` · `install/enable` · `install/uninstall` |
-| `conversations` | `create(input)` / `update(id, input)` / `modelOptions()` / `list(limit?)` / `get(id)` / `messages(query)` / `send(id, content, idempotencyKey, options?)` / `cancel(id)` / `delete(id)` / `follow(id, options?)` | `conversation/*` corresponding methods |
-| `runs` | `agent(input)` / `team(input)` / `get(id)` / `plan(id)` / `result(id)` / `events(query)` / `cancel(input)` / `steer(input)` / `answerDecision(input)` / `follow(id, options?)` | `agent/run` · `team/run` · `run/get` · `run/plan` · `run/result` · `run/events` · `run/cancel` · `run/steer` · `run/answer-decision` |
-| `workspaces` | `list()` / `create(path)` / `revoke(id)` | `workspace/list` / `workspace/create` / `workspace/revoke` |
-| `models` | `list()` | `models/list` |
-
-### 5.3 HTTP Bindings
-
-HTTP and WebSocket bindings represent two transport options for the same wire specification. `httpRouteTable()` exports the mapping programmatically:
+Read-only queries and stateless writes can be invoked directly over HTTP without establishing a persistent socket. The route table is exported directly by the client:
 
 ```ts
 import { httpRouteTable } from "@flowy-agent-store/client";
 
 const routes = httpRouteTable();
-// { "market/remove": { verb: "POST", path: "/markets/:marketplace_id/remove", source: "…" }, … }
+// Outputs: { "market/list": { verb: "GET", path: "/markets", ... }, ... }
+console.log(`Mapped HTTP endpoints: ${Object.keys(routes).length}`);
 ```
 
-- Maps **52 of 77** protocol methods. Unmapped methods represent handshakes, continuous streaming interfaces, or privileged local management APIs.
-- Privileged host operations (e.g. `config/get`, `config/set`, `config/get-mcp`, `skill/create`) are restricted to authenticated local connections.
+- Public HTTP endpoints map **53 / 78** protocol methods;
+- Stateful real-time streaming methods (such as `follow`) and privileged local administrative operations are excluded from HTTP bindings.
 
-### 5.4 Human-in-the-Loop Approvals: `run/answer-decision`
+### 5.2 Approval decision CAS optimistic concurrency control
 
-When an execution pauses awaiting user interaction, `run/events` emits `approval.requested`. Callers submit decisions via `runs.answerDecision(input)`:
+When an execution pauses awaiting user approval (`waiting_input`), callers submit decisions via `runs.answerDecision`:
 
 ```ts
-const pending = (await client.runs.events({ runId })).find(
-  (event) => event.event_type === "approval.requested",
+const pendingEvent = (await client.runs.events({ runId })).find(
+  (e) => e.event_type === "approval.requested",
 );
 
 await client.runs.answerDecision({
   runId,
-  stepId: pending.step_id!,                    // Scoped step identifier
-  attemptId: pending.attempt_id!,
+  stepId: pendingEvent.step_id!,
+  attemptId: pendingEvent.attempt_id!,
   answer: "Approved to proceed",
-  expectedExecutionVersion: pending.expected_execution_version!,  // Three CAS tokens
-  expectedStepVersion: pending.expected_step_version!,
-  expectedAttemptVersion: pending.expected_attempt_version!,
+  expectedExecutionVersion: pendingEvent.expected_execution_version!,
+  expectedStepVersion: pendingEvent.expected_step_version!,
+  expectedAttemptVersion: pendingEvent.expected_attempt_version!,
 });
 ```
 
-- **Optimistic Concurrency Control**: The three `expected*Version` parameters enforce CAS token checks, returning `conflict` if any version drifts.
-- Decisions are valid only when the target attempt is in the `waiting_input` state.
+All three `expected*Version` tokens are strictly enforced. Version mismatches reject immediately with a `conflict` status.
 
-## 6. Events Reference: `sequence` and Catch-Up
+---
 
-### 6.1 Event Types
+## 6. Event streaming model and catch-up mechanism
 
-`ConversationEventType` consists of 9 distinct event kinds:
+### 6.1 Conversation event discriminated union (ConversationEventType)
 
-| Event type | Meaning | Decoded kind |
+Live conversation event streams deliver 9 discriminated union types:
+
+| Event type | Operational trigger | Standard decoded kind |
 | --- | --- | --- |
-| `message.created` | New message record committed | `message.created` |
-| `message.delta` | Incremental message body chunk | `message.delta` |
-| `message.thinking` | Incremental reasoning block | `message.thinking` |
-| `message.tips` | Operational tips and warnings | `message.tips` |
-| `message.tool` | Tool invocation lifecycle event | `message.tool` |
-| `message.error` | Terminal execution error | `message.error` |
-| `message.activity` | Activity and turn completion events | `message.activity` |
-| `turn.status` | Turn state transition notification | `turn.status` |
-| `context.usage` | Context token consumption report | `context.usage` |
+| `message.created` | New message committed to persistent database | `message.created` |
+| `message.delta` | Streaming token delta emitted by model | `message.delta` |
+| `message.thinking` | Streaming reasoning thought delta | `message.thinking` |
+| `message.tips` | Runtime tips and warning advisories | `message.tips` |
+| `message.tool` | Tool invocation lifecycle transitions | `message.tool` |
+| `message.error` | Terminal turn error payload | `message.error` |
+| `message.activity` | Interactive turn actions and completion marks | `message.activity` |
+| `turn.status` | Execution turn state transition | `turn.status` |
+| `context.usage` | Context token usage and billing statistics | `context.usage` |
 
-### 6.2 `sequence` Guarantees
+### 6.2 sequence sequence number semantics
 
-- `sequence` numbers increment monotonically per conversation per connection, resetting upon socket reconnection;
-- A delta where `sequence > lastSeen + 1` indicates network frame loss, triggering catch-up routines;
-- Duplicated or disordered events are silently dropped by client filters.
+- Every downstream event carries a connection-local strictly increasing integer `sequence`;
+- When the client detects `currentSequence > lastSeenSequence + 1`, a network gap is identified, triggering catch-up logic;
+- Client subscription instances automatically discard duplicated sequence numbers locally.
 
-### 6.3 Catch-Up Mechanics
+### 6.3 Disconnection detection and incremental catch-up strategies
 
-| Scenario | Server signal | Catch-up mechanism | Client entry |
+| Subscription domain | Server signal | Catch-up mechanism | Client entrypoint |
 | --- | --- | --- | --- |
-| Conversation | `conversation/resync-required` | Re-fetch messages via `conversation/messages` | `follow(..., { fetchMessages })` → `onBackfill` |
-| Run | `run/resync-required` | Replay events via `run/events` with `after_sequence` | `follow()` auto catch-up or manual `resync()` |
+| Conversation streams | `conversation/resync-required` | Refetches transcript messages to rebuild state | Subscribe via `follow()`, listen via `onBackfill` |
+| Task runs | `run/resync-required` | Replays events from last contiguous cursor sequence | Handled automatically by `follow()`; manual replay via `client.runs.events({ afterSequence })` |
 
 ```ts
 const subscription = await client.conversations.follow(conversationId);
 subscription.onEvent((event) => {
   const decoded = decodeConversationEvent(event);
-  if (decoded.kind === "message.delta") render(decoded.delta, decoded.replace);
+  if (decoded.kind === "message.delta") {
+    process.stdout.write(decoded.delta);
+  }
 });
-subscription.onBackfill((snapshot) => resetTranscript(snapshot.messages));
-subscription.onError((error) => report(error));
+subscription.onBackfill((snapshot) => {
+  console.log(`Backfilled state after reconnect. Total messages: ${snapshot.messages.length}`);
+});
 ```
 
-## 7. Error Models and Retries
+---
 
-| Class | Trigger scenario | `retryable` |
+## 7. Production retry strategies and fault recovery
+
+### 7.1 Exponential backoff retry (withRetry)
+
+`@flowy-agent-store/client` includes a production-grade exponential backoff execution utility:
+
+| Configuration option | Default value | Description |
 | --- | --- | --- |
-| `AppServerError` | Server-side domain error payload (`code` / `requestId` / `details`) | Determined by server hint |
-| `TransportError` | Transport socket failure (`phase`) | Evaluated by client phase |
-| `ProtocolError` | Malformed message or schema mismatch (`kind`) | No |
-| `RequestTimeoutError` | Timeout exceeded (`method` / `timeoutMs`) | No |
+| `maxAttempts` | `3` | Maximum attempts including initial request |
+| `baseDelayMs` | `500` | Initial backoff wait duration (milliseconds) |
+| `maxDelayMs` | `8000` | Maximum cap for delay intervals (milliseconds) |
+| `jitter` | `0.25` | Random jitter ratio to mitigate thundering herds |
+| `onRetry` | Omitted | Interception callback before retries `({ attempt, delayMs, error })` |
 
-`withRetry(operation, options)` coordinates exponential backoff:
+```ts
+import { withRetry } from "@flowy-agent-store/client";
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `maxAttempts` | `3` | Total invocation attempts |
-| `baseDelayMs` | `500` | Initial delay in milliseconds |
-| `maxDelayMs` | `8000` | Maximum backoff delay cap |
-| `jitter` | `0.25` | Delay jitter ratio in `[0.75×, 1.0×]` |
-| `onRetry` | — | Retry notification callback `{ attempt, delayMs, error }` |
-| `shouldRetry` | Protocol `retryable` | Custom retry predicate |
-| `sleep` | `setTimeout` | Delay function injection |
+const result = await withRetry(() => client.runs.get(runId), {
+  maxAttempts: 4,
+  baseDelayMs: 300,
+  maxDelayMs: 5000,
+  onRetry: ({ attempt, delayMs, error }) => {
+    console.warn(`Attempt ${attempt} failed, retrying in ${delayMs}ms:`, error);
+  },
+});
+```
 
-Write operations carrying an `idempotency_key` are safe for retry attempts.
+### 7.2 Idempotency guarantees and retry safety boundaries
 
-## 8. MCP Integration Guide
+- **Non-idempotent write boundaries**: Sending conversation prompts (`conversations.send`) requires an explicit UUID `idempotencyKey`; identical keys deduplicate safely without duplicate inference.
+- **Mutex lock contention**: Distinct processes sharing a `dataDir` trigger immediate fast-fail lock rejections; do not blindly retry without directory isolation.
+- **Permanent failure termination**: Non-retryable errors (`retryable: false`), such as policy rejections, version mismatches (`conflict`), and validation failures terminate immediately without burning retry budgets.
 
-Connector declaration locations:
+---
 
-| Scenario | Declaration location |
+## 8. MCP connector declaration specification
+
+Physical file locations for MCP connector definitions:
+
+| Scenario | Physical configuration location |
 | --- | --- |
-| Marketplace entry | Entries within `.codebuddy-connector/connectors.json` |
-| Plugin bundled server | `mcpServers` object inside plugin manifests |
+| Marketplace connectors | `.codebuddy-connector/connectors.json` entry manifest |
+| Plugin bundled MCP servers | `mcpServers` field within plugin manifest |
 
-Sensitive configuration properties are mapped to `secret:<KEY>` references during ingestion, populated at runtime exclusively from secure local credential storage. Refer to [Plugins & Marketplace](/en-US/docs/plugins-market) for schema details.
+Sensitive parameters are mapped to `secret:<KEY>` references during ingestion, populated at runtime exclusively from secure storage. For full syntax, refer to [Plugins & Marketplace](/en-US/docs/plugins-market).
 
-## 9. Next Steps
+---
 
-- Protocol specification: `docs/agent-store/05-flowy-agent-store-app-server-protocol.md`.
-- Implementation source: `web/packages/{protocol,client,sdk}/src`.
-- Integration recipes: [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
+## 9. References and related documentation
+
+- Integration recipes and practical code: [TypeScript SDK cookbook](/en-US/docs/examples-sdk).
+- Host runtime configuration schema: [Configuration](/en-US/docs/configuration).
+- Operating system and Node.js support: [Compatibility matrix](/en-US/docs/compatibility).
+- Release notes and migration instructions: [Upgrade and migration guide](/en-US/docs/upgrade).
