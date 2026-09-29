@@ -43,7 +43,7 @@ The protocol package serves as the definitive source of truth for wire interacti
 
 | Export symbol | Contract definition and usage |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-12"`). Enforces strict equality during handshakes |
+| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-13"`). Enforces strict equality during handshakes |
 | `InitializeRequest` / `InitializeResult` | Protocol handshake payloads exchanging protocol versions, client identities, and host capabilities |
 | `ClientInfo` / `ClientCapabilities` | Client identity declarations (name, version) and feature subscriptions (`events`, `approvals`, `team_runtime`) |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | Unified catalog structures and installation receipt models |
@@ -422,7 +422,7 @@ const routes = httpRouteTable();
 console.log(`Mapped HTTP endpoints: ${Object.keys(routes).length}`);
 ```
 
-- Public HTTP endpoints map **53 / 78** protocol methods;
+- Public HTTP endpoints map **55 / 80** protocol methods;
 - Stateful real-time streaming methods (such as `follow`) and privileged local administrative operations are excluded from HTTP bindings.
 
 ### 5.2 Approval decision CAS optimistic concurrency control
