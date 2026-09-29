@@ -43,7 +43,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出符号 | 类型定义与用途 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-12"`）。建连握手时执行全等校验，跨版本不兼容 |
+| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-13"`）。建连握手时执行全等校验，跨版本不兼容 |
 | `InitializeRequest` / `InitializeResult` | 协议初始化握手载荷（交换协议版本、客户端标识及服务端能力集） |
 | `ClientInfo` / `ClientCapabilities` | 客户端身份声明（名称、版本）与能力声明（`events`、`approvals`、`team_runtime`） |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | 统一资源商店目录结构与安装回执模型 |
@@ -422,7 +422,7 @@ const routes = httpRouteTable();
 console.log(`已映射 HTTP 接口总数: ${Object.keys(routes).length}`);
 ```
 
-- 公共 HTTP 接口覆盖 **53 / 78** 个协议方法；
+- 公共 HTTP 接口覆盖 **55 / 80** 个协议方法；
 - 需保持持续双向通信的实时流式推送方法（如 `follow`）以及宿主本地特权接口不在 HTTP 中开放。
 
 ### 5.2 审批决策 CAS 乐观并发控制
