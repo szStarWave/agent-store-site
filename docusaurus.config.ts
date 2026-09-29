@@ -63,9 +63,8 @@ assertDocOrderCoversAllPages();
 /**
  * docs 插件实例。
  *
- * 本分支（`test/docs-default-theme`）**回归 theme-classic 原生文档页**：不再 swizzle
- * `@theme/DocItem`，侧边栏、页内目录、面包屑、上下页导航全部交给原生主题渲染，
- * 排版交给 Infima。
+ * 文档页**采用 theme-classic 原生文档页**：不 swizzle `@theme/DocItem`，
+ * 侧边栏、页内目录、面包屑、上下页导航全部交给原生主题渲染，排版交给 Infima。
  */
 function docsPlugin(lang: string): [string, DocsOptions] {
   return [
@@ -110,7 +109,7 @@ const config: Config = {
   url: "https://agent-store.flowyaipc.cn",
   baseUrl: process.env.BASE_PATH ?? "/",
 
-  organizationName: "Michael-Lfx",
+  organizationName: "szStarWave",
   projectName: "agent-store-site",
 
   onBrokenLinks: "throw",
@@ -127,12 +126,6 @@ const config: Config = {
 
   // 只声明一个 locale：站点用 URL 前缀区分语言，不借 Docusaurus 的 i18n 机制（见文件头说明）。
   i18n: { defaultLocale: "zh-CN", locales: ["zh-CN"] },
-
-  /**
-   * 纯 Markdown 解析。文档正文含 `<n>`、`{...}` 这类 CommonMark 文本，走 MDX 会被当成
-   * JSX / 表达式解析并报错；站点不写 MDX，所以整站按 `md` 处理（GFM 表格与代码块不受影响）。
-   */
-  // （已并入上面的 `markdown` 配置块。）
 
   // 市场树（约 22.6k 文件）刻意不放 `static/`：构建期拷贝会拖垮构建，
   // 且线上只托管目录页头像（见 scripts/copy-market-tree.mjs）。
@@ -181,9 +174,15 @@ const config: Config = {
   ],
 
   themeConfig: {
+    metadata: [
+      {
+        name: "keywords",
+        content: "flowy, agent store, mcp, model context protocol, skills, connectors, agents, typescript sdk",
+      },
+    ],
     colorMode: {
       /**
-       * 本分支交给**原生** ColorModeToggle：`disableSwitch: false` 让 Navbar 右侧出现
+       * 采用**原生** ColorModeToggle：`disableSwitch: false` 让 Navbar 右侧出现
        * Docusaurus 原生的明暗切换按钮（此前站点用自己的 ThemeToggle 写 `data-theme`）。
        */
       disableSwitch: false,
@@ -196,7 +195,7 @@ const config: Config = {
      * 单页有二三十条，标题本身又长、在窄栏里多数要折成两行，反而看不出结构；
      * 只收 h2 后单页落在 4–14 条（`typescript-sdk` 9 条、`examples-sdk` 14 条）。
      *
-     * 这里**只调原生配置，不加 CSS**——本分支的前提就是文档页用原生样式。
+     * 这里**只调原生配置，不加 CSS**——文档页遵循使用原生主题样式。
      * 若个别页面需要放宽，用 front matter 的 `toc_max_heading_level`；
      * 但 `content/docs/` 的 Markdown 从上游同步、不带 front matter，所以只能走全局设置。
      */
