@@ -21,8 +21,8 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.8", "latest": "0.1.0-beta.2" },
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.9", "latest": "0.1.0-beta.2" },
   "time": {
     "0.1.0": "2026-09-09T09:09:04.795Z",
     "0.1.0-beta.2": "2026-09-09T09:27:36.122Z",
@@ -31,14 +31,16 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
     "0.1.0-beta.5": "2026-09-17T11:41:10.171Z",
     "0.1.0-beta.6": "2026-09-18T11:08:21.813Z",
     "0.1.0-beta.7": "2026-09-20T10:33:48.685Z",
-    "0.1.0-beta.8": "2026-09-28T10:23:47.656Z"
+    "0.1.0-beta.8": "2026-09-28T10:23:47.656Z",
+    "0.1.0-beta.9": "2026-10-10T04:34:35.842Z"
   }
 }
 ```
 
 | Version | Published (UTC) | Change type | Current dist-tag |
 | --- | --- | --- | --- |
-| `0.1.0-beta.8` | 2026-09-28 | Breaking (strict protocol fingerprint `fp-8` → `fp-12`) | `beta` |
+| `0.1.0-beta.9` | 2026-10-10 | Breaking (strict protocol fingerprint `fp-12` → `fp-13`) | `beta` |
+| `0.1.0-beta.8` | 2026-09-28 | Breaking (strict protocol fingerprint `fp-8` → `fp-12`) | — |
 | `0.1.0-beta.7` | 2026-09-20 | Breaking (strict protocol fingerprint `fp-7` → `fp-8`) | — |
 | `0.1.0-beta.6` | 2026-09-18 | Breaking (SDK entry rename + flattened return shape) | — |
 | `0.1.0-beta.5` | 2026-09-17 | Breaking (strict protocol fingerprint `fp-1` → `fp-7`) | — |
@@ -47,7 +49,26 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 | `0.1.0-beta.2` | 2026-09-09 | Additive (non-breaking) | `latest` |
 | `0.1.0` | 2026-09-09 | Initial release | none |
 
-### 2.1 `0.1.0-beta.8` — 2026-09-28T10:23:47Z
+### 2.1 `0.1.0-beta.9` — 2026-10-10T04:34:35Z
+
+> **Breaking change**: The protocol fingerprint incremented from `fp-12` to `fp-13`; clients and runtimes must align versions (see [Upgrade and migration guide](/en-US/docs/upgrade) §6.8).
+
+#### Breaking
+
+- **Protocol Fingerprint Increment**: `fp-12` $\to$ **`fp-13`**. Adds two methods on the same face: `market/settings` (read the market source policy) and `market/settings-set` (write through to `config.toml`). Wire methods grow from 78 to **80**; HTTP mapped routes from 53 to **55**. There is **no** TypeScript signature change in this release, so caller code is unaffected.
+
+#### Added
+
+- **Configurable market source download policy**: each `[default_marketplaces.<id>]` entry accepts `download_on_start` (defaults to `true`, keeping the old "writing the entry downloads it at boot" semantics; `false` registers the row and leaves the archive to an explicit refresh). `AGENT_STORE_MARKET_DOWNLOAD=eager|lazy|none` overrides the whole process (`none` does not even register), and `AGENT_STORE_CONFIG=<path>` points the host at a caller-owned config file — the precondition that makes the per-source field usable from the SDK.
+- **Market policy is readable and writable while running**: adds `market/settings` and `market/settings-set` (`GET` / `POST /api/app-server/market-settings`). The single source of truth is `~/.agent-store/config.toml`: the write face edits only the named keys and answers by reading the file back, so saving takes effect without a restart, while unknown entry kinds, out-of-range cadences, empty patches and non-whitelisted fields are refused without touching the file. The TS client adds `getMarketSettings()` / `setMarketSettings()`, and the SDK's `SpawnOptions` gains `marketDownload` / `configPath`.
+- **Bounded auto-upgrade**: a market's `auto_update` grows from "refresh the index" to "refresh the index and upgrade the entries installed from that market", with the default whitelist `["agent","team","skill"]`. **Connectors are never implicit** (upgrading one runs `upsert_server`, which disables a server whose configuration changed — unattended that is a silent outage). Entries you switched off by hand, entries carrying a `blocked_reason`, and entries that were only imported are never touched; `entry_auto_update_kinds = []` restores the index-only behaviour. The scheduler moved from a fixed interval at startup to a 60-second due check, so the cadence is now hot-changeable; the reading `last_sweep { at, refreshed, upgraded, failed[] }` comes back with `market/settings` (in memory only, never written to disk).
+- **Market policy card in Settings**: the WebUI's Settings → Market Sources page gains a host-level policy card (sweep cadence, upgradable entry kinds, the connector exclusion warning, and the last sweep reading with its failures), in both Chinese and English.
+
+#### Fixed
+
+- **`exportTeam()` now exports a team's own package-level skills**: a team `ExpertPack`'s top-level `skills` used to be hard-coded to an empty array while member skills came only from each member agent's frontmatter, so teams that declare their skills once at the package level — for example `stock-partner-team`, three package skills and zero declarations across seven members — exported with no skills at all. It now reads the skill components **that team's own snapshot installed**, and `materializePack` deduplicates them with the member declarations into `skills/<name>/...`. No wire or type shape change (see the [TypeScript SDK reference](/en-US/docs/typescript-sdk) §4.4).
+
+### 2.2 `0.1.0-beta.8` — 2026-09-28T10:23:47Z
 
 > **Breaking change**: The protocol fingerprint incremented from `fp-8` to `fp-12`; clients and runtimes must align versions (see [Upgrade and migration guide](/en-US/docs/upgrade) §6.7).
 
@@ -68,7 +89,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - **Install-state writes were not snapshot-scoped**: component ids are shared across snapshots, so releasing an old version also cleared the new version's install record; the three write paths now narrow on `(snapshot_id, component_id)`.
 - **An empty `values` map was written into the stored connector transport config**: the next save was read as a configuration change, disabling the server and clearing its probed tools; it is now written only when non-empty.
 
-### 2.2 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
+### 2.3 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
 
 > **Breaking change**: The protocol fingerprint incremented to `fp-8`; clients and runtimes must align versions (see [Upgrade and migration guide](/en-US/docs/upgrade) §6.6).
 
@@ -85,7 +106,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - **Model Output Limit Wiring**: Resolves issue where `max_output_size` and `protocol` in `[models.*]` were unpopulated during registration, using non-destructive writes to backfill missing limits.
 
-### 2.3 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
+### 2.4 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
 
 > **Breaking change**: SDK entry point renamed and interface shape flattened (see [Upgrade and migration guide](/en-US/docs/upgrade) §6.5).
 
@@ -96,7 +117,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - `initializeResult` renamed to **`handshake`**.
 - `close()` teardown expanded to manage unsubscription, socket closure, process termination, and temporary data directory deletion.
 
-### 2.4 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
+### 2.5 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
 
 > **Breaking change**: Protocol fingerprint incremented to `fp-7`, breaking compatibility with older runtimes.
 
@@ -121,7 +142,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - Resolves issue where `source_kind = "zip"` entries were filtered during configuration parsing.
 
-### 2.5 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
+### 2.6 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
 
 > **Breaking change**: Fingerprint updated to `fp-1`; `event_type` narrowed.
 
@@ -142,7 +163,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - HTTP route table mapping coverage expanded to 48.
 
-### 2.6 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
+### 2.7 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
 
 #### Added
 
@@ -153,7 +174,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - Adds `engines.node >= 22` and repository metadata in `package.json`.
 
-### 2.7 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
+### 2.8 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
 
 #### Added
 
@@ -163,7 +184,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - Resolves missing runtime dependencies in `0.1.0`.
 
-### 2.8 `0.1.0` — 2026-09-09T09:09:04Z
+### 2.9 `0.1.0` — 2026-09-09T09:09:04Z
 
 #### Added
 
@@ -179,9 +200,9 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. Unpublished changes and release cadence
 
-**There are currently no landed-but-unpublished entries**: the `0.1.0-beta.8` content moved into §2 above as published fact. The next batch is registered here and promoted to §2 on release.
+**There are currently no landed-but-unpublished entries**: the `0.1.0-beta.9` content moved into §2 above as published fact. The next batch is registered here and promoted to §2 on release.
 
-The current stable release is `0.1.0-beta.8` (wire protocol `fp-12`). Features not listed on this page should not be considered active.
+The current stable release is `0.1.0-beta.9` (wire protocol `fp-13`). Features not listed on this page should not be considered active.
 
 ## 5. See also
 
