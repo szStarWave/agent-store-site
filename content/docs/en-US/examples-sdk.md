@@ -562,6 +562,8 @@ const customResult = await materializePack(client, pack, "./exported-custom");
 console.log(`Custom materialized skills: ${customResult.writtenSkills.join(", ")}`);
 ```
 
+A team's skills come from two sources — the package-level declarations plus the members' own declarations — and `exportTeam` unions them, deduplicating by id. Where `teamId` comes from, how to fetch skill bytes only, and the four prerequisites and pitfalls are in the [TypeScript SDK guide](/en-US/docs/typescript-sdk) §4.4.
+
 ### 6.3 Host tool policy pruning and control
 
 Dynamic configuration of host tool policies via environment variables:

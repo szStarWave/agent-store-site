@@ -385,26 +385,103 @@ The SDK provides higher-level utilities to materialize expert and team configura
 ```ts
 import { exportAgent, exportTeam, materializePack, type ExportResult } from "@flowy-agent-store/sdk";
 
-// 1. Export individual expert definition and referenced skill files to disk
-const result: ExportResult = await exportAgent(client, "software-architect", "./dist/architect");
+// 1. Export one expert and its referenced skills to a local directory (agentId comes from agents.list())
+const [agent] = await client.agents.list();
+const result: ExportResult = await exportAgent(client, agent.id, "./dist/expert");
 console.log(`Exported skills: ${result.writtenSkills.join(", ")}`);
 if (result.danglingSkills.length > 0) {
-  console.warn("Unresolved dangling skill references:", result.danglingSkills);
+  console.warn("Skill references this host cannot resolve:", result.danglingSkills);
 }
 
-// 2. Export complete multi-agent team package (Leader member positioned first)
-await exportTeam(client, "dev-team", "./dist/dev-team");
+// 2. Export a complete team definition (leader first; teamId comes from teams.list(), see the next section)
+const [team] = await client.teams.list();
+const teamResult = await exportTeam(client, team.id, "./dist/team");
+console.log(`Team skills: ${teamResult.writtenSkills.join(", ")}`);
 
-// 3. Materialize in-memory ExpertPack structure directly to disk directory
-const pack = await client.agents.export("software-architect");
-await materializePack(client, pack, "./dist/architect-manual");
+// 3. Materialize an in-memory ExpertPack (a cached or remotely fetched pack works the same way)
+const pack = await client.agents.export(agent.id);
+await materializePack(client, pack, "./dist/expert-manual");
 ```
 
 Materialized assets adhere to the following standard directory tree layout:
 - `expert-pack.json`: Complete serialized `ExpertPack` specification (including `pack_format`, metadata, and dependency lists);
 - `persona.md`: Individual agent Prompt instructions (generated only when `kind === "agent"`);
 - `members/<member.id>/persona.md`: Member-specific Persona instructions (generated only when `kind === "team"`);
-- `skills/<name>/...`: Referenced skill file trees, automatically deduplicated and aggregated at top level.
+- `skills/<name>/...`: Skill file trees, deduplicated by skill id at the top level.
+
+#### Two sources of a team's skills
+
+A team (`kind === "team"`) draws its skills from **two sources**. The server deliberately does **not** merge them; `materializePack` unions them and deduplicates by `id` (`id === name`):
+
+| Source | Pack field | What it is once installed | Typical case |
+| --- | --- | --- | --- |
+| The team's own package-level skills | `pack.skills` | Skills declared in the package's `plugin.json` under `skills`, materialized into the host's managed skills root at install time | **Most official teams declare skills only here** |
+| Member declarations | `pack.team.members[].skills` | The `skills:` list in each member's Markdown frontmatter | Frequently an empty array |
+
+Reading only one side loses skills: the official market package `stock-partner-team` declares three skills at the package level and none on any of its seven members — walking the members alone yields zero skills. So **call `exportTeam` / `materializePack` instead of iterating members yourself**. The server also never spreads package-level skills across members, because that would invent a binding the runtime does not have.
+
+#### Exporting a team's skills in one call
+
+```ts
+import { exportTeam } from "@flowy-agent-store/sdk";
+
+// teamId comes from teams.list(): it is the component id (shaped like wb-<package>-team), not the package name.
+// The team must also be installed: one missing or disabled member fails the whole export and names that member
+// (all-or-nothing, never a partial directory).
+const team = (await client.teams.list()).find((entry) => entry.name === "stock-partner-team")!;
+const result = await exportTeam(client, team.id, "./dist/stock-partner-team");
+
+console.log(result.writtenSkills); // ["westock-data", "westock-tool", "md-to-html"]
+console.log(result.danglingSkills); // [{ id, error }]: declared but unresolvable on this host
+console.log(result.dir); // the directory that was written
+console.log(result.pack); // the live ExpertPack itself, usable without touching disk
+```
+
+```text
+./dist/stock-partner-team/
+├── expert-pack.json                  # the live pack, byte for byte (with pack_format and provenance)
+├── members/<member id>/persona.md     # member personas; a team has no top-level persona.md
+└── skills/                           # the union of both sources, deduplicated
+    ├── westock-data/{SKILL.md, package.json, references/...}
+    ├── westock-tool/{SKILL.md, package.json, references/...}
+    └── md-to-html/{SKILL.md, shell.html, scripts/...}
+```
+
+#### Skill bytes only, without writing a directory
+
+Beyond `exportTeam`, the public primitives are `skills.files(id)` and `skills.readFile(id, path)`. Both sit behind the host's `skill_files` capability bit:
+
+```ts
+// Without the skill read face wired up, skill/files rejects everything and every skill looks dangling
+if (!client.initializeInfo?.capabilities.skill_files) throw new Error("host does not expose skill_files");
+
+const pack = await client.teams.export(team.id); // definition only, nothing written yet
+const refs = [...pack.skills, ...(pack.team?.members ?? []).flatMap((member) => member.skills)];
+
+const seen = new Set<string>();
+for (const ref of refs) {
+  if (seen.has(ref.id)) continue; // deduplicate across members
+  seen.add(ref.id);
+  try {
+    const { files } = await client.skills.files(ref.id); // [{ path, size, digest }]
+    for (const file of files) {
+      // file.path is a POSIX-relative path inside the skill directory; the server already rejected traversal
+      const bytes = await client.skills.readFile(ref.id, file.path); // Uint8Array, byte for byte
+      console.log(ref.name, file.path, bytes.length);
+    }
+  } catch (error) {
+    console.warn("Dangling skill (not installed here, or the capability bit is off):", ref.name, String(error));
+  }
+}
+```
+
+#### Prerequisites and pitfalls
+
+1. **`teamId` is neither a package name nor any expert package**: it must be the component id `teams.list()` returns (`wb-<package>-team`), and the package must really be a team (its manifest carries `teamInfo`). Use `exportAgent` for an expert package; the two channels are not interchangeable.
+2. **The team must be installed first**: `exportTeam` requires every member to be installed and enabled, otherwise it answers `agent_not_installed` / `agent_disabled` and names the member. That is deliberate all-or-nothing behaviour; it never produces a partial team directory.
+3. **`danglingSkills` has two causes**: the skill genuinely is not installed here, or the host has no `skill_files` capability bit wired up (in which case **every** skill dangles). Only an empty list means the directory carries complete skills and can be moved to another machine.
+4. **Re-exporting into the same directory does not clean up stale files**: materialization only does `mkdir -p` followed by writes, never deletes. Use a fresh directory per version, or empty the target first, otherwise skills removed upstream linger.
+5. **Skill bytes are never inlined into the pack**: `pack.skills` holds `{name, id}` references only, and the bytes always come from `skill/files` / `skill/file`. To relocate a team, take the `skills/` directory with you.
 
 ---
 

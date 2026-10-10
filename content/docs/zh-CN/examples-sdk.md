@@ -562,6 +562,8 @@ const customResult = await materializePack(client, pack, "./exported-custom");
 console.log(`自定义物化技能: ${customResult.writtenSkills.join(", ")}`);
 ```
 
+团队的技能来自「包级声明 + 成员声明」两个来源，`exportTeam` 会自动取并集并按 id 去重；`teamId` 怎么取、只想要技能字节怎么写、以及四个前置条件与注意事项，见 [TypeScript SDK 指南](/zh-CN/docs/typescript-sdk) §4.4。
+
 ### 6.3 宿主工具域裁剪与策略控制
 
 通过环境变量动态重载宿主工具策略：
