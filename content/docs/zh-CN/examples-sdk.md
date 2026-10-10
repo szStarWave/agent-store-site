@@ -542,8 +542,10 @@ if (client.initializeInfo?.capabilities.skill_files) {
 ```ts
 import { exportAgent, exportTeam, materializePack } from "@flowy-agent-store/sdk";
 
-// 模式 A：使用 SDK 高阶函数 exportTeam 完整物化团队及跨成员技能
-const teamId = "frontend-backend-experts";
+// 模式 A：使用 SDK 高阶函数 exportTeam 完整物化团队（落盘技能 = 团自身包级技能 + 各成员声明，按 id 去重）
+// teamId 必须是真正的团，且取自 teams.list() 的组件 id（形如 wb-<包名>-team）；
+// 专家包（expertType: "agent"）请用 exportAgent —— 两种条目身份不通用
+const teamId = "wb-stock-partner-team-team";
 const exportResult = await exportTeam(client, teamId, "./exported-team");
 console.log(`已物化技能数: ${exportResult.writtenSkills.length}`);
 if (exportResult.danglingSkills.length > 0) {
