@@ -542,8 +542,10 @@ if (client.initializeInfo?.capabilities.skill_files) {
 ```ts
 import { exportAgent, exportTeam, materializePack } from "@flowy-agent-store/sdk";
 
-// Mode A: High-level exportTeam helper to materialize full teams and shared skill trees
-const teamId = "frontend-backend-experts";
+// Mode A: High-level exportTeam helper to materialize a full team (written skills = the team's own package skills + every member declaration, deduplicated by id)
+// Note: teamId must be a real team, taken from the component id teams.list() returns (shaped like wb-<package>-team);
+// use exportAgent for an expert package (expertType: "agent") — the two identities are not interchangeable
+const teamId = "wb-stock-partner-team-team";
 const exportResult = await exportTeam(client, teamId, "./exported-team");
 console.log(`Materialized skills: ${exportResult.writtenSkills.length}`);
 if (exportResult.danglingSkills.length > 0) {
@@ -559,6 +561,8 @@ const pack = await client.agents.export("wb-architect");
 const customResult = await materializePack(client, pack, "./exported-custom");
 console.log(`Custom materialized skills: ${customResult.writtenSkills.join(", ")}`);
 ```
+
+A team's skills come from two sources — the package-level declarations plus the members' own declarations — and `exportTeam` unions them, deduplicating by id. Where `teamId` comes from, how to fetch skill bytes only, and the four prerequisites and pitfalls are in the [TypeScript SDK guide](/en-US/docs/typescript-sdk) §4.4.
 
 ### 6.3 Host tool policy pruning and control
 

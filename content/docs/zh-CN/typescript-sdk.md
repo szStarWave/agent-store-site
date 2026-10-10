@@ -385,26 +385,102 @@ SDK 提供高阶导出工具，用于将专家与团队资产完整解构物化�
 ```ts
 import { exportAgent, exportTeam, materializePack, type ExportResult } from "@flowy-agent-store/sdk";
 
-// 1. 导出单专家定义及关联技能资源到本地目录
-const result: ExportResult = await exportAgent(client, "software-architect", "./dist/architect");
+// 1. 导出单个专家及其技能资源到本地目录（agentId 取自 agents.list()）
+const [agent] = await client.agents.list();
+const result: ExportResult = await exportAgent(client, agent.id, "./dist/expert");
 console.log(`成功导出技能: ${result.writtenSkills.join(", ")}`);
 if (result.danglingSkills.length > 0) {
-  console.warn("未在宿主安装的悬空技能引用:", result.danglingSkills);
+  console.warn("本机取不到的悬空技能引用:", result.danglingSkills);
 }
 
-// 2. 导出专家团队全量定义包（Leader 成员优先排列）
-await exportTeam(client, "dev-team", "./dist/dev-team");
+// 2. 导出专家团队全量定义包（Leader 在首位；teamId 取自 teams.list()，详见下一节）
+const [team] = await client.teams.list();
+const teamResult = await exportTeam(client, team.id, "./dist/team");
+console.log(`团队技能: ${teamResult.writtenSkills.join(", ")}`);
 
-// 3. 将内存中的 ExpertPack 结构物理物化为磁盘目录
-const pack = await client.agents.export("software-architect");
-await materializePack(client, pack, "./dist/architect-manual");
+// 3. 把内存里的 ExpertPack 物化成目录（缓存或远端拿到的 pack 同样适用）
+const pack = await client.agents.export(agent.id);
+await materializePack(client, pack, "./dist/expert-manual");
 ```
 
 物化产物遵循以下标准目录树规范：
 - `expert-pack.json`：完整的标准化 `ExpertPack` 格式定义（包含 `pack_format`、角色信息及依赖清单）；
 - `persona.md`：单专家的 Prompt 指令正文（仅 `kind === "agent"` 时生成）；
 - `members/<member.id>/persona.md`：团队成员的专属 Persona 指令（仅 `kind === "team"` 时生成）；
-- `skills/<name>/...`：引用的原子技能文件树，自动在顶层去重聚合。
+- `skills/<name>/...`：技能文件树，默认按技能 id 在顶层去重聚合。
+
+#### 团队技能的两个来源
+
+一个团队（`kind === "team"`）的技能有**两个来源**，它们在服务端**不会**被合并，由 `materializePack` 取并集后按 `id` 去重（`id === name`）：
+
+| 来源 | 包内字段 | 安装后是什么 | 常见情况 |
+| --- | --- | --- | --- |
+| 团队自身的包级技能 | `pack.skills` | 包的 `plugin.json` 中 `skills` 声明的技能，安装时被物化到宿主的托管技能根目录 | **官方团队大多只在这里声明** |
+| 成员的声明 | `pack.team.members[].skills` | 成员 Markdown frontmatter 里的 `skills:` 列表 | 经常是空数组 |
+
+只读其中一侧会漏东西：官方市场包 `stock-partner-team` 在包级声明 3 个技能，7 名成员一个都不写——只看成员就会导出 0 个技能。因此**请直接用 `exportTeam` / `materializePack`，不要自己遍历成员**；服务端也刻意不把包级技能摊给每个成员，因为那等于发明一份运行期并不存在的绑定。
+
+#### 一行导出团队的技能
+
+```ts
+import { exportTeam } from "@flowy-agent-store/sdk";
+
+// teamId 取自 teams.list()：那是组件 id（形如 wb-<包名>-team），不是包名。
+// 且该团队必须已安装：成员缺一个或被停用，整个导出都会失败并指名到成员（要么全给，要么明确失败）。
+const team = (await client.teams.list()).find((entry) => entry.name === "stock-partner-team")!;
+const result = await exportTeam(client, team.id, "./dist/stock-partner-team");
+
+console.log(result.writtenSkills); // ["westock-data", "westock-tool", "md-to-html"]
+console.log(result.danglingSkills); // [{ id, error }]：声明了但本机取不到的技能
+console.log(result.dir); // 落盘目录
+console.log(result.pack); // 线上 ExpertPack 原件，不落盘也能用
+```
+
+```text
+./dist/stock-partner-team/
+├── expert-pack.json                  # 线上 pack 逐字节（含 pack_format 与 provenance）
+├── members/<成员 id>/persona.md       # 团队成员人设；团队本身没有顶层 persona.md
+└── skills/                           # 两个来源并集去重后的技能文件
+    ├── westock-data/{SKILL.md, package.json, references/...}
+    ├── westock-tool/{SKILL.md, package.json, references/...}
+    └── md-to-html/{SKILL.md, shell.html, scripts/...}
+```
+
+#### 只要技能字节，不落盘
+
+`exportTeam` 之外的公开原语是 `skills.files(id)` 与 `skills.readFile(id, path)`；两者都受宿主能力位 `skill_files` 门禁：
+
+```ts
+// 宿主没接技能读面时，skill/files 一律被拒，所有技能都会变成「悬空」
+if (!client.initializeInfo?.capabilities.skill_files) throw new Error("宿主未提供 skill_files");
+
+const pack = await client.teams.export(team.id); // 只要定义，先不落盘
+const refs = [...pack.skills, ...(pack.team?.members ?? []).flatMap((member) => member.skills)];
+
+const seen = new Set<string>();
+for (const ref of refs) {
+  if (seen.has(ref.id)) continue; // 跨成员去重
+  seen.add(ref.id);
+  try {
+    const { files } = await client.skills.files(ref.id); // [{ path, size, digest }]
+    for (const file of files) {
+      // file.path 是技能目录内的 POSIX 相对路径，服务端已做穿越校验
+      const bytes = await client.skills.readFile(ref.id, file.path); // Uint8Array，逐字节
+      console.log(ref.name, file.path, bytes.length);
+    }
+  } catch (error) {
+    console.warn("悬空技能（本机没装或能力位未接线）:", ref.name, String(error));
+  }
+}
+```
+
+#### 前置条件与注意事项
+
+1. **`teamId` 不是包名，也不是任意专家包**：它必须是 `teams.list()` 返回的组件 id（`wb-<包名>-team`），且该包确实是团队（清单里有 `teamInfo`）。专家包请用 `exportAgent`，两条通道不通用。
+2. **必须先安装**：`exportTeam` 要求全部成员已安装且启用，否则返回 `agent_not_installed` / `agent_disabled` 并指名成员；这是刻意的「要么全给、要么明确失败」，不会产出残缺的团队目录。
+3. **`danglingSkills` 有两种成因**：本机确实没装该技能，或宿主没接 `skill_files` 能力位（那时是**全部**技能悬空）。只有它为空，才说明这个目录自带完整技能，可以离机使用。
+4. **重复导出到同一目录不会清理旧文件**：物化只做 `mkdir -p` 后写入，不删除任何既有文件。换版本时请用新目录，或先把目标目录清空，否则上一版已移除的技能会残留。
+5. **技能字节永不内联在包里**：`pack.skills` 只有 `{name, id}` 引用，字节始终经 `skill/files` / `skill/file` 取回。要搬迁到另一台机器，必须把 `skills/` 目录一起带走。
 
 ---
 
