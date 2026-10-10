@@ -21,8 +21,8 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.8", "latest": "0.1.0-beta.2" },
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.9", "latest": "0.1.0-beta.2" },
   "time": {
     "0.1.0": "2026-09-09T09:09:04.795Z",
     "0.1.0-beta.2": "2026-09-09T09:27:36.122Z",
@@ -31,14 +31,16 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
     "0.1.0-beta.5": "2026-09-17T11:41:10.171Z",
     "0.1.0-beta.6": "2026-09-18T11:08:21.813Z",
     "0.1.0-beta.7": "2026-09-20T10:33:48.685Z",
-    "0.1.0-beta.8": "2026-09-28T10:23:47.656Z"
+    "0.1.0-beta.8": "2026-09-28T10:23:47.656Z",
+    "0.1.0-beta.9": "2026-10-10T04:34:35.842Z"
   }
 }
 ```
 
 | 版本 | 发布（UTC） | 变更类型 | 当前 dist-tag |
 | --- | --- | --- | --- |
-| `0.1.0-beta.8` | 2026-09-28 | 破坏性（协议指纹严格相等：`fp-8` → `fp-12`，**必须升级**） | `beta` |
+| `0.1.0-beta.9` | 2026-10-10 | 破坏性（协议指纹严格相等：`fp-12` → `fp-13`，**必须升级**） | `beta` |
+| `0.1.0-beta.8` | 2026-09-28 | 破坏性（协议指纹严格相等：`fp-8` → `fp-12`，**必须升级**） | — |
 | `0.1.0-beta.7` | 2026-09-20 | 破坏性（协议指纹严格相等：`fp-7` → `fp-8`） | — |
 | `0.1.0-beta.6` | 2026-09-18 | 破坏性（SDK 入口改名 + 返回形状变更，**要改代码**） | — |
 | `0.1.0-beta.5` | 2026-09-17 | 破坏性（协议指纹严格相等：`fp-1` → `fp-7`） | — |
@@ -47,7 +49,26 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 | `0.1.0-beta.2` | 2026-09-09 | 加法（无破坏性） | `latest` |
 | `0.1.0` | 2026-09-09 | 首次发布 | 无 |
 
-### 2.1 `0.1.0-beta.8` — 2026-09-28T10:23:47Z
+### 2.1 `0.1.0-beta.9` — 2026-10-10T04:34:35Z
+
+> **本版含破坏性变更**：协议指纹由 `fp-12` 递增至 `fp-13`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.8）。
+
+#### 破坏性
+
+- **协议契约指纹更新**：`fp-12` $\to$ **`fp-13`**。新增两个同面方法 `market/settings`（读市场源策略）与 `market/settings-set`（写穿 `config.toml`）。协议方法总数由 78 扩充至 **80**，HTTP 路由映射数由 53 扩充至 **55**。本次**没有** TypeScript 签名变化，调用方代码不受影响。
+
+#### 新增
+
+- **市场源下载策略可配置**：`[default_marketplaces.<id>]` 新增 per-source `download_on_start`（缺省 `true`，保持「写进配置即启动下载」的旧语义；置 `false` 时只写注册行，归档留给显式刷新）；`AGENT_STORE_MARKET_DOWNLOAD=eager|lazy|none` 在进程级覆盖整机行为（`none` 连注册都不做）；`AGENT_STORE_CONFIG=<path>` 让 SDK 使用者把宿主指向自己的配置文件——这也是 per-source 字段对 SDK 使用者可用的前提。
+- **市场策略可在运行期读写**：新增 `market/settings` 与 `market/settings-set`（HTTP `GET` / `POST /api/app-server/market-settings`）。真源是 `~/.agent-store/config.toml`：写面只改指名键并**回读文件**作答，因此保存即生效、无需重启；未知条目类型、超范围周期、空补丁与白名单外字段一律拒绝且文件不动。TS 客户端配套 `getMarketSettings()` / `setMarketSettings()`，SDK 的 `SpawnOptions` 新增 `marketDownload` / `configPath`。
+- **受控自动升级**：市场级 `auto_update` 的语义从「只刷新索引」扩为「刷新索引 + 自动升级从该市场安装的条目」，默认白名单 `["agent","team","skill"]`；**连接器绝不隐式包含**（其升级会走 `upsert_server`，配置一变就把 server 置为停用，无人值守等于静默掉线）。用户手动停用的条目、带 `blocked_reason` 的条目、只导入未安装的条目一律不碰；`entry_auto_update_kinds = []` 即回到旧的「只刷索引」行为。调度器从「启动时定死周期」改为 60 秒判定到期，周期因此可热改；读数 `last_sweep { at, refreshed, upgraded, failed[] }` 随 `market/settings` 返回（纯内存，不写盘）。
+- **设置页市场策略卡片**：WebUI 的「设置 → 市场源」新增宿主级策略卡片（扫掠周期、可升级条目类型多选、连接器排除警告、上次扫掠读数与失败明细），中英双语齐备。
+
+#### 修复
+
+- **`exportTeam()` 现在会导出团队自身的包级技能**：团队 `ExpertPack` 的顶层 `skills` 此前被硬编码为空数组，而成员技能只从成员 Agent 的 frontmatter 读取；官方市场里「技能只在包级声明、成员一个都不写」的团队（例如 `stock-partner-team`：包级 3 个技能、7 名成员零声明）导出后一个技能都没有。现在改为读取该团队**自身快照已安装**的技能组件，与成员声明一并由 `materializePack` 去重落盘到 `skills/<name>/...`。协议与类型**无形态变化**（用法见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §4.4）。
+
+### 2.2 `0.1.0-beta.8` — 2026-09-28T10:23:47Z
 
 > **本版含破坏性变更**：协议指纹由 `fp-8` 递增至 `fp-12`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.7）。
 
@@ -68,7 +89,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - **安装态写入未按快照限定**：组件 ID 跨快照相同，释放旧版本会连带清掉新版本的安装记录；`install/uninstall` 等三处写入已按 `(snapshot_id, component_id)` 收窄。
 - **连接器传输配置里的空 `values` 会被写进存储**：下一次保存即被判为「配置变更」，从而停用该 server 并清空已探测工具；现仅在非空时写入。
 
-### 2.2 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
+### 2.3 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
 
 > **本版含破坏性变更**：协议指纹更新为 `fp-8`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.6）。
 
@@ -85,7 +106,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - **模型输出上限映射修复**：修复 `[models.*]` 中的 `max_output_size` 与 `protocol` 在部分供应商中未正确生效的缺陷，采用非覆盖式写入填补数据库空值。
 
-### 2.3 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
+### 2.4 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
 
 > **本版含破坏性变更**：`@flowy-agent-store/sdk` 入口重命名与返回对象扁平化（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.5）。
 
@@ -96,7 +117,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - `initializeResult` 重命名为 **`handshake`**。
 - `close()` 增强为统一安全清理：退订事件通道、关闭底层传输、终止子进程并清理自动生成的临时数据目录。
 
-### 2.4 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
+### 2.5 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
 
 > **本版含破坏性变更**：协议指纹更新至 `fp-7`，旧版客户端与新版运行时互不兼容。
 
@@ -121,7 +142,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - 修复 `source_kind = "zip"` 市场源在特定配置解析时被意外过滤的问题。
 
-### 2.5 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
+### 2.6 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
 
 > **本版含破坏性变更**：协议指纹更新为 `fp-1`；`event_type` 收窄为封闭联合类型。
 
@@ -142,7 +163,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - HTTP 路由表映射数扩充至 48。
 
-### 2.6 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
+### 2.7 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
 
 #### 新增
 
@@ -153,7 +174,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - 补充软件包 `package.json` 中的 `engines.node >= 22` 与代码仓库元数据。
 
-### 2.7 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
+### 2.8 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
 
 #### 新增
 
@@ -163,7 +184,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - 修复 `0.1.0` 缺少平台依赖导致可执行文件定位失败的问题。
 
-### 2.8 `0.1.0` — 2026-09-09T09:09:04Z
+### 2.9 `0.1.0` — 2026-09-09T09:09:04Z
 
 #### 新增
 
@@ -179,9 +200,9 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-**当前没有「已落地但未发布」的条目**：`0.1.0-beta.8` 的内容已按发布事实转入本文 §2。下一批改动落地后在此登记，发布时再转正。
+**当前没有「已落地但未发布」的条目**：`0.1.0-beta.9` 的内容已按发布事实转入本文 §2。下一批改动落地后在此登记，发布时再转正。
 
-当前稳定发布版本为 `0.1.0-beta.8`（对应线协议 `fp-12`）。未收录于本页的版本特性不应假定为已生效。
+当前稳定发布版本为 `0.1.0-beta.9`（对应线协议 `fp-13`）。未收录于本页的版本特性不应假定为已生效。
 
 ## 5. 另见
 
