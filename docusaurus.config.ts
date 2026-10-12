@@ -114,6 +114,12 @@ const config: Config = {
 
   onBrokenLinks: "throw",
   onBrokenAnchors: "throw",
+  // EdgeOne Makers 只对「目录/带尾斜杠」的路径直接服务 index.html；无尾斜杠的深路径
+  //（如 /zh-CN/docs/typescript-sdk）会以 403 + 404 文案拒绝（2026-10-12 文档重排部署后实测，
+  // 此前同一 URL 曾 200，属平台行为变化）。Docusaurus 默认 trailingSlash 为 undefined →
+  // 产物与站内链接都不带斜杠，正好踩中。显式设 true：产物全部落为 <path>/index.html、
+  // 站内链接与 canonical 全部带尾斜杠，与平台行为对齐（验证见 deploy-trigger §7）。
+  trailingSlash: true,
   // 文档正文的站内链是绝对路径（`/zh-CN/docs/x`），由 docs 插件校验；
   // Markdown 里的相对 `.md` 链接（上游同步过来的文件用不到）在这里只警告。
   markdown: {
