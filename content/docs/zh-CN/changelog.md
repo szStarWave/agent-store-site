@@ -1,14 +1,14 @@
 # 变更日志
 
-本文档按版本时间线记录 `@flowy-agent-store/*` 各正式发布版本的更新内容，并作为**破坏性变更的权威公告面**。
+本文按版本时间线记录 `@flowy-agent-store/*` 各正式发布版本的更新内容，并作为**破坏性变更的权威公告面**。
 
 发布记录元数据与具体升级迁移指引详见 [升级与迁移指引](/zh-CN/docs/upgrade)。
 
 ## 1. 本页范围
 
 - **收录范围**：严格收录已发布至 npm 的软件包，包括 `@flowy-agent-store/protocol`、`client`、`sdk` 以及各平台运行时依赖包 `@flowy-agent-store/runtime-*`。
-- **未发布特性界定**：工作区开发中但未正式发布的增量改动，归集于 [升级与迁移指引](/zh-CN/docs/upgrade) §8 及本文 §4。
-- **发布事实原则**：本页仅记录已发生的版本事实，不预告未经发布的交付预期。
+- **未发布特性界定**：开发中但未正式发布的增量改动归集于 [升级与迁移指引](/zh-CN/docs/upgrade) §8 及本文 §4。
+- **发布事实原则**：仅记录已发生的版本事实，不预告未经发布的交付预期。
 - **兼容性原则**：预发布阶段的破坏性变更随下一预发布版本发布，具体规范详见 [升级与迁移指引](/zh-CN/docs/upgrade) §1。
 
 ## 2. 已发布版本（事实）
@@ -57,21 +57,21 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 #### 破坏性
 
-- **协议契约指纹更新**：`fp-13` $\to$ **`fp-14`**。新增两个 **WebSocket-only** 方法 `import/assets`（列一个不可变快照的插件级资产清单）与 `import/asset`（base64 单文件字节，与 `skill/file` 同形）。协议方法总数由 80 扩充至 **82**，HTTP 路由映射数保持 **55**（两个新方法都不带 HTTP 绑定）。握手仍是严格相等校验：旧客户端连新宿主（或反之）会被直接拒绝，SDK 与宿主必须一起升级。握手能力位新增 `snapshot_assets`。
+- **协议契约指纹更新**：`fp-13` $\to$ **`fp-14`**。新增两个 **WebSocket-only** 方法 `import/assets`（列出不可变快照的插件级资产清单）与 `import/asset`（获取单文件 base64 字节流，与 `skill/file` 同形）。协议方法总数由 80 扩充至 **82**，HTTP 路由映射数保持 **55**（两个新方法均不带 HTTP 绑定）。握手执行严格相等校验：客户端与宿主版本不一致时将被直接拒绝，SDK 与宿主必须同步升级。握手能力位新增 `snapshot_assets`。
 
 #### 新增
 
-- **专家 / 专家团导出补齐插件级资产**：`ExpertPack` 升到 `pack_format 2`，新增 `assets`（插件级 `avatars/`、`bin/`、`scripts/` 的按引用清单：`path` / `kind: "avatar" | "script"` / `size` / sha256 `digest`，按 `path` 排序）与 `avatar`（包级头像的快照相对路径，仅当该文件确实列在 `assets` 里）。`materializePack` 把资产按快照相对路径落盘，`ExportResult` 新增 `writtenAssets` —— 导出目录从此是**完整的插件根**：团自带脚本按 `PLUGIN_ROOT/bin/init_task.py`（技能目录上方两级）与 `../../../avatars` 的寻址全部成立。资产是快照作用域的：成员 pack 的 `assets` 恒为空表，读顶层 pack。
-- **宿主运营者减项**：`[expert_export]` 新增 `scripts` 键（缺省 `true`，fail-open 教义不变）；`false` 时包的 `assets` 去掉 `kind: "script"` 条目（头像不受影响）。诚实边界：它修饰**包契约**而非字节面——`import/asset` 与 `import/get` 同权威，正如 `skill/files` 本就不受该表约束。
-- **悬空技能定为可接受现状（口径记录）**：成员 frontmatter 的 `skills:` 声明在源运行时（WorkBuddy/CodeBuddy）本就没有兑现机制，本仓与源对齐；导出对落空声明**如实上报**进 `danglingSkills`（不静默、不中断），官方团包级技能永不悬空。
+- **专家 / 专家团导出补齐插件级资产**：`ExpertPack` 升至 `pack_format 2`，新增 `assets`（插件级 `avatars/`、`bin/`、`scripts/` 的按引用清单：`path` / `kind: "avatar" | "script"` / `size` / sha256 `digest`，按 `path` 排序）与 `avatar`（包级头像在快照中的相对路径，仅当该文件存在于 `assets` 时提供）。`materializePack` 将资产按快照相对路径物化落盘，`ExportResult` 新增 `writtenAssets`。导出目录由此具备**完整的插件根目录结构**：团队私有脚本通过 `PLUGIN_ROOT/bin/init_task.py` 与 `../../../avatars` 进行的寻址均正常解析。资产受快照作用域限定：成员 pack 的 `assets` 始终为空列表，统一读取顶层 pack。
+- **宿主运营者能力裁剪**：`[expert_export]` 新增 `scripts` 配置项（缺省为 `true`，遵循 fail-open 原则）；设为 `false` 时导出的包 `assets` 将移除 `kind: "script"` 条目（头像不受影响）。该配置作用于**包级契约**：`import/asset` 与 `import/get` 维持同等权限，且 `skill/files` 不受该配置限制。
+- **未关联技能状态收录（规范声明）**：成员 frontmatter 中的 `skills:` 声明在源运行时（WorkBuddy / CodeBuddy）中无执行机制，本系统与源逻辑对齐；导出时未关联的声明将如实记录于 `danglingSkills`（不静默处理，不中断流程），官方团队包级技能保证完整可用。
 
 #### 修复
 
-- **连接器授权回调页不再说谎**：回调的 code 一到就回 "Authorization successful!"、而 token 交换在其后才跑——被网关限流（`slow_down`）的那次登录在用户眼里是成功的。现在浏览器在交换出结果后才收到页面：成功页 / "未完成" 页（含净化后的原因）；被拒的回调（CSRF、路径、缺参、无待处理登录）也各回一页面向用户的话。
-- **`connector/auth/status` 新增 `authorization_pending`**：浏览器授权流程进行中时如实上报（此前「正在等用户」与「从没发起」在协议面上是同一个答案）。优先于已存凭据、随流程结束消失。无字段/方法/事件变化，不触发指纹。
-- **从 WebUI 安装商店条目走 SDK 的 `store.install()`**：此前走裸动词 `store/install-entry`，绕过了「连接器注册出来是 disabled，就绪检查先 enable 再探针」那一步——商店页装出来的连接器停在「已禁用」。两个安装入口（商店页、市场管理）都已改走状态机。
-- **`store.findByConnector(connectorId)`**：按连接器的 `id` 或运行期 `name` 反查安装它的 `StoreItem`（例：条目 `fenbi-baokao-decision` 装出名为 `fenbi_mcp` 的 server，此前 `search()` 查不到）；`StoreOperationOutcome` 新增 `installedCount`。
-- **`MCP_OAUTH_CLIENT_NAME`**：动态客户端注册上报宿主自己的名字（env 优先，缺省 `Nomifun MCP Client`，空值视为未设），私有部署不必改二进制就能在服务商同意页显示自己的品牌；仅对本宿主自己注册的 client 生效，既有注册保留原名。
+- **优化连接器 OAuth 授权回调状态反馈**：此前回调在收到 code 时即返回 "Authorization successful!"，而 token 交换在此后异步执行，导致网关限流（`slow_down`）失败时前端误判为成功并提前关闭窗口。现调整为在完成 token 交换后才向浏览器返回结果页面（成功页，或含脱敏原因的“未完成”页）；对被拒绝的回调（CSRF 失败、路径不匹配、参数缺失、无待处理登录）亦分别返回明确提示页。
+- **`connector/auth/status` 新增 `authorization_pending` 状态**：浏览器授权流程进行中时如实上报该状态（此前在协议层无法区分“等待用户操作”与“从未发起”）。该状态优先级高于已存凭据，并在授权流程结束时自动清除。无字段、方法与事件变更，不触发协议指纹递增。
+- **Web UI 安装商店条目对齐 `store.install()`**：此前直接调用裸动词 `store/install-entry`，绕过了“连接器注册后默认处于 disabled，就绪检查需先 enable 再发起探针”的处理流程，导致商店页安装的连接器停留在已禁用状态。现两个安装入口（商店页、市场管理）均统一接入该状态机。
+- **`store.findByConnector(connectorId)` 反查支持**：支持按连接器的 `id` 或运行时 `name` 反查安装该连接器的 `StoreItem`（例如：条目 `fenbi-baokao-decision` 安装的 server 名为 `fenbi_mcp`，此前 `search()` 无法反查）；`StoreOperationOutcome` 新增 `installedCount` 字段。
+- **`MCP_OAUTH_CLIENT_NAME` 动态客户端标识**：动态客户端注册时上报宿主名称（环境变量优先，默认 `Nomifun MCP Client`，空值视为未设置），支持私有化部署在无需修改二进制的情况下在服务商授权页展示自定义品牌；仅对当前宿主自主注册的 client 生效，既有注册保持原名。
 
 ### 2.2 `0.1.0-beta.9` — 2026-10-10T04:34:35Z
 
@@ -79,18 +79,18 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 #### 破坏性
 
-- **协议契约指纹更新**：`fp-12` $\to$ **`fp-13`**。新增两个同面方法 `market/settings`（读市场源策略）与 `market/settings-set`（写穿 `config.toml`）。协议方法总数由 78 扩充至 **80**，HTTP 路由映射数由 53 扩充至 **55**。本次**没有** TypeScript 签名变化，调用方代码不受影响。
+- **协议契约指纹更新**：`fp-12` $\to$ **`fp-13`**。新增两个同面方法 `market/settings`（读取市场源策略）与 `market/settings-set`（持久化写入 `config.toml`）。协议方法总数由 78 扩充至 **80**，HTTP 路由映射数由 53 扩充至 **55**。本次无 TypeScript 方法签名破坏性变更，调用方代码保持兼容。
 
 #### 新增
 
-- **市场源下载策略可配置**：`[default_marketplaces.<id>]` 新增 per-source `download_on_start`（缺省 `true`，保持「写进配置即启动下载」的旧语义；置 `false` 时只写注册行，归档留给显式刷新）；`AGENT_STORE_MARKET_DOWNLOAD=eager|lazy|none` 在进程级覆盖整机行为（`none` 连注册都不做）；`AGENT_STORE_CONFIG=<path>` 让 SDK 使用者把宿主指向自己的配置文件——这也是 per-source 字段对 SDK 使用者可用的前提。
-- **市场策略可在运行期读写**：新增 `market/settings` 与 `market/settings-set`（HTTP `GET` / `POST /api/app-server/market-settings`）。真源是 `~/.agent-store/config.toml`：写面只改指名键并**回读文件**作答，因此保存即生效、无需重启；未知条目类型、超范围周期、空补丁与白名单外字段一律拒绝且文件不动。TS 客户端配套 `getMarketSettings()` / `setMarketSettings()`，SDK 的 `SpawnOptions` 新增 `marketDownload` / `configPath`。
-- **受控自动升级**：市场级 `auto_update` 的语义从「只刷新索引」扩为「刷新索引 + 自动升级从该市场安装的条目」，默认白名单 `["agent","team","skill"]`；**连接器绝不隐式包含**（其升级会走 `upsert_server`，配置一变就把 server 置为停用，无人值守等于静默掉线）。用户手动停用的条目、带 `blocked_reason` 的条目、只导入未安装的条目一律不碰；`entry_auto_update_kinds = []` 即回到旧的「只刷索引」行为。调度器从「启动时定死周期」改为 60 秒判定到期，周期因此可热改；读数 `last_sweep { at, refreshed, upgraded, failed[] }` 随 `market/settings` 返回（纯内存，不写盘）。
-- **设置页市场策略卡片**：WebUI 的「设置 → 市场源」新增宿主级策略卡片（扫掠周期、可升级条目类型多选、连接器排除警告、上次扫掠读数与失败明细），中英双语齐备。
+- **市场源下载策略支持按源配置**：`[default_marketplaces.<id>]` 新增 per-source `download_on_start` 字段（默认 `true`，保持启动时即下载的语义；设为 `false` 时仅注册记录，归档留待显式刷新）；支持通过环境变量 `AGENT_STORE_MARKET_DOWNLOAD=eager|lazy|none` 覆盖全局行为（`none` 时不执行注册）；通过 `AGENT_STORE_CONFIG=<path>` 支持将宿主指向自定义配置文件（使 SDK 调用者可使用 per-source 配置）。
+- **市场策略支持运行期读写**：新增 `market/settings` 与 `market/settings-set` 接口（HTTP `GET` / `POST /api/app-server/market-settings`），单一真源为 `~/.agent-store/config.toml`。写操作仅更新指定键并在回读文件确认后响应，保存即生效无需重启；自动校验并拒绝未知条目类型、超范围周期、空补丁与白名单外字段。TS 客户端配套提供 `getMarketSettings()` 与 `setMarketSettings()`，SDK `SpawnOptions` 新增 `marketDownload` 与 `configPath`。
+- **受控自动升级**：市场级 `auto_update` 语义从“仅刷新索引”扩展为“刷新索引并自动升级从该市场安装的条目”，默认白名单为 `["agent","team","skill"]`；**连接器绝不隐式自动升级**（避免配置变更后触发 `upsert_server` 导致服务静默停用）。手动停用、带 `blocked_reason` 以及仅导入未安装的条目一律跳过；设为 `entry_auto_update_kinds = []` 即可恢复为仅刷新索引行为。调度器改为 60 秒轮询到期判定，支持运行时热更新周期；`market/settings` 响应中附带纯内存维护的 `last_sweep { at, refreshed, upgraded, failed[] }` 状态。
+- **设置页市场策略卡片**：Web UI「设置 $\to$ 市场源」新增宿主级策略卡片（包含扫掠周期、可升级条目类型多选、连接器排除提示、上次扫掠读数与失败明细），双语支持齐备。
 
 #### 修复
 
-- **`exportTeam()` 现在会导出团队自身的包级技能**：团队 `ExpertPack` 的顶层 `skills` 此前被硬编码为空数组，而成员技能只从成员 Agent 的 frontmatter 读取；官方市场里「技能只在包级声明、成员一个都不写」的团队（例如 `stock-partner-team`：包级 3 个技能、7 名成员零声明）导出后一个技能都没有。现在改为读取该团队**自身快照已安装**的技能组件，与成员声明一并由 `materializePack` 去重落盘到 `skills/<name>/...`。协议与类型**无形态变化**（用法见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §4.4）。
+- **`exportTeam()` 导出团队自身包级技能**：修复团队 `ExpertPack` 顶层 `skills` 此前硬编码为空数组的缺陷（此前仅读取成员 Agent frontmatter 声明，导致包级声明但成员未声明的团队导出后丢失技能）。现调整为读取该团队快照已安装的技能组件，并与成员声明合并去重后物化至 `skills/<name>/...`。协议与类型无形态变更（详见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §4.4）。
 
 ### 2.3 `0.1.0-beta.8` — 2026-09-28T10:23:47Z
 
@@ -99,19 +99,19 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 #### 破坏性
 
 - **协议契约指纹更新**：`fp-8` $\to$ **`fp-12`**。本次跨越四个指纹（`fp-9` 至 `fp-12`）：连接器凭据读面、凭据表单文案归位、`connector/register` 与 `store/update-entry`。协议方法总数由 73 扩充至 **78**，HTTP 路由映射数由 48 扩充至 **53**。
-- **TS 客户端签名变更**：`StoreClient.updateHint()` 的返回值由 `"uninstall_reinstall"` 改为 `"update"`，以该返回值分支的调用方需同步；`StoreOperationOutcome` 新增 `errors` 与 `warnings` 两个字段（加法，旧调用方无感）。
+- **TS 客户端签名变更**：`StoreClient.updateHint()` 返回值由 `"uninstall_reinstall"` 更新为 `"update"`，依赖该返回值的调用方需同步调整；`StoreOperationOutcome` 新增 `errors` 与 `warnings` 字段（保持向后兼容）。
 
 #### 新增
 
-- **连接器用户凭据体系**：连接器元数据增加 `credential` 配置块与 `token-schema.json` 声明支持；新增 `connector/credential/{get,set,clear}` 凭据管理接口（值单向写入，回包只含键名与缺项）与 `connector/register` 私有 MCP 服务注册（模板即声明：`transport` 里的 `${secret:NAME}` 就是那张凭据表单）；凭据按调用者（principal）键控，宿主级旧键归安装所有者。
-- **商店条目原地安全更新**：新增 `store/update-entry` 协议动词，提供原子升级语义——先装新版本、装成功才释放旧版本，失败保留旧版并把新快照回滚；专家预设原地升级并保留预设 ID，连接器复用同一 `mcp_servers` 行，技能按快照各自成目录且解析取最新。客户端配套 `store.update()`。
-- **SDK 资源物化助手**：`@flowy-agent-store/sdk` 提供 `exportAgent`、`exportTeam` 与 `materializePack`，把资产定义与引用技能规范化物化到本地目录（`members/<id>/persona.md` 与去重后的 `skills/<name>/...`）。
+- **连接器用户凭据体系**：连接器元数据增加 `credential` 配置块与 `token-schema.json` 声明支持；新增 `connector/credential/{get,set,clear}` 凭据管理接口（值单向写入，回包仅含键名与缺项）与 `connector/register` 私有 MCP 服务注册（以模板方式声明：`transport` 中的 `${secret:NAME}` 即作为凭据项）；凭据按调用方（Principal）隔离，历史宿主级密钥归属于安装所有者。
+- **商店条目原地安全更新**：新增 `store/update-entry` 协议动词，提供原子升级语义——新版本安装验证成功后方释放旧版本；升级失败时保留旧版本并回滚新快照。专家预设原地升级并保留预设 ID，连接器复用同一 `mcp_servers` 记录，技能按快照各自隔离目录且解析时取最新版本。客户端配套提供 `store.update()`。
+- **SDK 资源物化助手**：`@flowy-agent-store/sdk` 提供 `exportAgent`、`exportTeam` 与 `materializePack`，将资产定义与引用技能规范化物化至本地目录（`members/<id>/persona.md` 与去重后的 `skills/<name>/...`）。
 
 #### 修复
 
-- **技能与连接器条目的版本此前被钉在占位版本 `1.0.0`**：目录侧读市场索引、导入侧不读，后果是「有新版本」恒为真、内容一改就撞不可变快照的 digest 冲突。现在条目版本随导入请求落库（并补齐技能市场索引的读取）。
-- **安装态写入未按快照限定**：组件 ID 跨快照相同，释放旧版本会连带清掉新版本的安装记录；`install/uninstall` 等三处写入已按 `(snapshot_id, component_id)` 收窄。
-- **连接器传输配置里的空 `values` 会被写进存储**：下一次保存即被判为「配置变更」，从而停用该 server 并清空已探测工具；现仅在非空时写入。
+- **修复技能与连接器条目版本固化问题**：此前因导入侧未读取市场索引导致版本被固定在占位符 `1.0.0`，进而引发重复提示更新及快照 digest 冲突。现条目版本随导入请求持久化落库。
+- **安装状态限定快照作用域**：避免跨快照组件 ID 冲突导致释放旧版本时误清理新版本的安装记录，写入操作收窄为 `(snapshot_id, component_id)` 联合键。
+- **过滤连接器配置中的空 `values`**：避免空配置写入后被误判为配置变更导致连接器服务异常停用。
 
 ### 2.4 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
 

@@ -51,7 +51,7 @@ The single status displayed in the UI represents an aggregated view. The ingesti
 
 ## Connectors
 
-Connectors (MCP Servers) are managed by the local host, which owns network connections and credentials to invoke tools on behalf of callers. Interfaces and permissions are strictly bifurcated into two planes:
+Connectors (MCP Servers) are managed by the local host, which owns network connections and credentials to invoke tools on behalf of callers. Access controls are strictly bifurcated into two planes:
 
 | Face | Methods | Needs host authorization? |
 | --- | --- | --- |

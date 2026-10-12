@@ -128,6 +128,7 @@ The `AppServerClient` instance exposes top-level lifecycle and catalog managemen
 | `connect()` | None | `Promise<InitializeResult>` | `initialize` → `initialized` |
 | `close()` | None | `void` | Resets client state and closes transport |
 | `onNotification(listener)` | Downstream callback | Unsubscribe closure `() => void` | Listens to server broadcasts |
+| `readImportAsset(snapshotId, path)` | Export snapshot ID and relative path | `Promise<Uint8Array>` | `import/assets` |
 | `listStore()` | None | `Promise<StoreList>` | `store/list` |
 | `installStoreEntry(marketplaceId, entryName)` | Marketplace ID and entry name | `Promise<StoreInstallResult>` | `store/install-entry` |
 | `listMarketplaces()` | None | `Promise<MarketplaceSummary[]>` | `market/list` |
@@ -140,153 +141,164 @@ The `AppServerClient` instance exposes top-level lifecycle and catalog managemen
 #### `agents` — Expert catalog and export
 
 ```ts
-// 1. Query all installed and available agent expert summaries
-client.agents.list(): Promise<AgentSummary[]>;
-
-// 2. Retrieve detailed configuration view for an expert (including skill and connector bindings)
-client.agents.get(agentId: string): Promise<AgentDetail>;
-
-// 3. Export complete expert definition pack (including persona instructions and manifests)
-client.agents.export(agentId: string): Promise<ExpertPack>;
+export interface AgentsSubclient {
+  /** Query all installed and available agent expert summaries */
+  list(): Promise<AgentSummary[]>;
+  /** Retrieve detailed configuration view for an expert (including skill and connector bindings) */
+  get(agentId: string): Promise<AgentDetail>;
+  /** Export complete expert definition pack (including persona instructions and manifests) */
+  export(agentId: string): Promise<ExpertPack>;
+}
 ```
 
 #### `teams` — Expert team catalog and orchestration
 
 ```ts
-// 1. Query configured expert teams
-client.teams.list(): Promise<TeamSummary[]>;
-
-// 2. Retrieve topology configuration for a team (member roles and delegation rules)
-client.teams.get(teamId: string): Promise<TeamDetail>;
-
-// 3. Export complete team definition package (supports optional semver validation)
-client.teams.export(teamId: string, teamVersion?: string): Promise<ExpertPack>;
+export interface TeamsSubclient {
+  /** Query configured expert teams */
+  list(): Promise<TeamSummary[]>;
+  /** Retrieve topology configuration for a team (member roles and delegation rules) */
+  get(teamId: string): Promise<TeamDetail>;
+  /** Export complete team definition package (supports optional semver validation) */
+  export(teamId: string, teamVersion?: string): Promise<ExpertPack>;
+}
 ```
 
 #### `skills` — Skill discovery and file inspection
 
 ```ts
-// 1. List local atomic skill summaries
-client.skills.list(): Promise<SkillSummary[]>;
-
-// 2. Retrieve detailed skill definition
-client.skills.get(skillId: string): Promise<SkillDetail>;
-
-// 3. List static file inventory within a skill directory
-client.skills.files(skillId: string): Promise<SkillFileList>;
-
-// 4. Read binary file bytes from skill package
-client.skills.readFile(skillId: string, path: string): Promise<Uint8Array>;
+export interface SkillsSubclient {
+  /** List local atomic skill summaries */
+  list(): Promise<SkillSummary[]>;
+  /** Retrieve detailed skill definition */
+  get(skillId: string): Promise<SkillDetail>;
+  /** List static file inventory within a skill directory (requires skill_files capability) */
+  files(skillId: string): Promise<SkillFileList>;
+  /** Read binary file bytes from skill package (requires skill_files capability) */
+  readFile(skillId: string, path: string): Promise<Uint8Array>;
+}
 ```
 
 #### `connectors` — Connector management, registration, and tool proxying
 
 ```ts
-// 1. Discovery and status inspection
-client.connectors.list(): Promise<ConnectorSummary[]>;
-client.connectors.get(connectorId: string): Promise<ConnectorDetail>;
-client.connectors.status(connectorId: string): Promise<ConnectorStatusView>;
-client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;
+export interface ConnectorsSubclient {
+  // 1. Discovery and status inspection
+  list(): Promise<ConnectorSummary[]>;
+  get(connectorId: string): Promise<ConnectorDetail>;
+  status(connectorId: string): Promise<ConnectorStatusView>;
+  test(connectorId: string): Promise<ConnectorProbeResult>;
 
-// 2. OAuth authorization workflow
-client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>;
-client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>;
-client.connectors.waitForAuth(connectorId: string, options?: { timeoutMs?: number }): Promise<WaitForAuthOutcome>;
-client.connectors.logout(connectorId: string): Promise<void>;
+  // 2. OAuth authorization workflow
+  authStatus(connectorId: string): Promise<OAuthStatusView>;
+  authStart(connectorId: string): Promise<OAuthStartResult>;
+  waitForAuth(connectorId: string, options?: { timeoutMs?: number }): Promise<WaitForAuthOutcome>;
+  logout(connectorId: string): Promise<void>;
 
-// 3. Tool dynamic proxy invocation
-client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>;
+  // 3. Tool dynamic proxy invocation
+  call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>;
 
-// 4. Dynamic connector registration and credential management
-client.connectors.register(registration: ConnectorRegistration): Promise<ConnectorDetail>;
-client.connectors.credentials(connectorId: string): Promise<ConnectorCredential>;
-client.connectors.setCredentials(connectorId: string, values: Record<string, string>): Promise<ConnectorCredential>;
-client.connectors.clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;
+  // 4. Dynamic connector registration and credential management
+  register(registration: ConnectorRegistration): Promise<ConnectorDetail>;
+  credentials(connectorId: string): Promise<ConnectorCredential>;
+  setCredentials(connectorId: string, values: Record<string, string>): Promise<ConnectorCredential>;
+  clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;
+}
 ```
 
 #### `store` — Marketplace comprehensive lifecycle
 
 ```ts
-// 1. Unified catalog discovery
-client.store.list(): Promise<StoreItem[]>;
-client.store.search(query: string, filter?: { kind?: StoreItemKind }): Promise<StoreItem[]>;
-client.store.installed(): Promise<StoreItem[]>;
+export interface StoreSubclient {
+  // 1. Unified catalog discovery
+  list(): Promise<StoreItem[]>;
+  search(query: string, filter?: { kind?: StoreItemKind }): Promise<StoreItem[]>;
+  installed(): Promise<StoreItem[]>;
 
-// 2. State-machine installation and update tracking
-client.store.install(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
-client.store.update(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
-client.store.checkUpdates(): Promise<StoreItem[]>;
-client.store.updateHint(item: StoreItem): "none" | "update" | "unknown";
+  // 2. State-machine installation and update tracking
+  install(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
+  update(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
+  checkUpdates(): Promise<StoreItem[]>;
+  updateHint(item: StoreItem): "none" | "update" | "unknown";
 
-// 3. Toggle activation and complete uninstallation
-client.store.setEnabled(item: StoreItem, enabled: boolean): Promise<StoreOperationOutcome>;
-client.store.uninstall(item: StoreItem): Promise<StoreOperationOutcome>;
+  // 3. Toggle activation and complete uninstallation
+  setEnabled(item: StoreItem, enabled: boolean): Promise<StoreOperationOutcome>;
+  uninstall(item: StoreItem): Promise<StoreOperationOutcome>;
+}
 ```
 
 #### `conversations` — Conversation creation, model options, and interaction
 
 ```ts
-// 1. Conversation lifecycle
-client.conversations.create(input: ConversationCreateInput): Promise<ConversationView>;
-client.conversations.get(conversationId: string): Promise<ConversationView>;
-client.conversations.list(limit?: number): Promise<ConversationView[]>;
-client.conversations.update(conversationId: string, input: ConversationUpdateInput): Promise<ConversationView>;
-client.conversations.delete(conversationId: string): Promise<{ conversation_id: string; deleted: boolean }>;
+export interface ConversationsSubclient {
+  // 1. Conversation lifecycle
+  create(input: ConversationCreateInput): Promise<ConversationView>;
+  get(conversationId: string): Promise<ConversationView>;
+  list(limit?: number): Promise<ConversationView[]>;
+  update(conversationId: string, input: ConversationUpdateInput): Promise<ConversationView>;
+  delete(conversationId: string): Promise<{ conversation_id: string; deleted: boolean }>;
 
-// 2. Turn execution and messaging
-client.conversations.messages(query: ConversationMessagesQuery): Promise<ConversationMessagesPage>;
-client.conversations.send(
-  conversationId: string,
-  content: string,
-  idempotencyKey: string,
-  options?: ConversationSendOptions,
-): Promise<ConversationSendReceipt>;
-client.conversations.cancel(conversationId: string): Promise<ConversationView>;
+  // 2. Turn execution and messaging
+  messages(query: ConversationMessagesQuery): Promise<ConversationMessagesPage>;
+  send(
+    conversationId: string,
+    content: string,
+    idempotencyKey: string,
+    options?: ConversationSendOptions,
+  ): Promise<ConversationSendReceipt>;
+  cancel(conversationId: string): Promise<ConversationView>;
 
-// 3. Streaming subscriptions and model metadata
-client.conversations.follow(conversationId: string): Promise<ConversationSubscription>;
-client.conversations.subscribe(conversationId: string, onEvent: (event: ConversationEvent) => void): () => void;
-client.conversations.modelOptions(): Promise<ConversationModelOptions>;
+  // 3. Streaming subscriptions and model metadata
+  follow(conversationId: string): Promise<ConversationSubscription>;
+  subscribe(conversationId: string, onEvent: (event: ConversationEvent) => void): () => void;
+  modelOptions(): Promise<ConversationModelOptions>;
+}
 ```
 
 #### `runs` — Standalone task execution, plans, and approvals
 
 ```ts
-// 1. Trigger batch tasks
-client.runs.agent(input: AgentRunInput): Promise<RunReceipt>;
-client.runs.team(input: TeamRunInput): Promise<TeamRunReceipt>;
+export interface RunsSubclient {
+  // 1. Trigger batch tasks
+  agent(input: AgentRunInput): Promise<RunReceipt>;
+  team(input: TeamRunInput): Promise<TeamRunReceipt>;
 
-// 2. Execution monitoring and plans
-client.runs.get(runId: string): Promise<RunView>;
-client.runs.plan(runId: string): Promise<RunPlan>;
-client.runs.result(runId: string): Promise<RunResult>;
-client.runs.events(query: RunEventsQuery): Promise<RunEvent[]>;
+  // 2. Execution monitoring and plans
+  get(runId: string): Promise<RunView>;
+  plan(runId: string): Promise<RunPlan>;
+  result(runId: string): Promise<RunResult>;
+  events(query: RunEventsQuery): Promise<RunEvent[]>;
 
-// 3. Task intervention, approvals, and streaming
-client.runs.cancel(input: CancelRunInput): Promise<RunView>;
-client.runs.steer(input: SteerRunInput): Promise<RunView>;
-client.runs.answerDecision(input: AnswerDecisionInput): Promise<RunView>;
-client.runs.follow(runId: string): Promise<EventSubscription>;
+  // 3. Task intervention, approvals, and streaming
+  cancel(input: CancelRunInput): Promise<RunView>;
+  steer(input: SteerRunInput): Promise<RunView>;
+  answerDecision(input: AnswerDecisionInput): Promise<RunView>;
+  follow(runId: string): Promise<EventSubscription>;
+}
 ```
 
 #### `workspaces` — Local workspace registration and management
 
 ```ts
-// 1. Query registered workspaces
-client.workspaces.list(): Promise<WorkspaceView[]>;
+export interface WorkspacesSubclient {
+  // 1. Query registered workspaces
+  list(): Promise<WorkspaceView[]>;
 
-// 2. Register and canonicalize path as a secure workspace
-client.workspaces.create(path: string): Promise<WorkspaceView>;
+  // 2. Register and canonicalize path as a secure workspace
+  create(path: string): Promise<WorkspaceView>;
 
-// 3. Revoke workspace (soft delete reference without wiping disk content)
-client.workspaces.revoke(workspaceId: string): Promise<WorkspaceRevokeResult>;
+  // 3. Revoke workspace (soft delete reference without wiping disk content)
+  revoke(workspaceId: string): Promise<WorkspaceRevokeResult>;
+}
 ```
 
 #### `models` — Available model metadata discovery
 
 ```ts
-// Query all configured models available for invocation along with token pricing parameters
-client.models.list(): Promise<ModelSummary[]>;
+export interface ModelsSubclient {
+  // Query all configured models available for invocation along with token pricing parameters
+  list(): Promise<ModelSummary[]>;
+}
 ```
 
 ---
@@ -411,30 +423,29 @@ Materialized assets adhere to the following standard directory tree layout:
 
 #### Two sources of a team's skills
 
-A team (`kind === "team"`) draws its skills from **two sources**. The server deliberately does **not** merge them; `materializePack` unions them and deduplicates by `id` (`id === name`):
+An expert team (`kind === "team"`) has **two distinct definition sources** for skills. The server maintains them separately, and the client unions and deduplicates them by ID (`id === name`) during `materializePack`:
 
-| Source | Pack field | What it is once installed | Typical case |
+| Source | Pack field | Materialized destination | Typical scenario |
 | --- | --- | --- | --- |
-| The team's own package-level skills | `pack.skills` | Skills declared in the package's `plugin.json` under `skills`, materialized into the host's managed skills root at install time | **Most official teams declare skills only here** |
-| Member declarations | `pack.team.members[].skills` | The `skills:` list in each member's Markdown frontmatter | Frequently an empty array |
+| Package-level skills | `pack.skills` | Skills declared in the package manifest `plugin.json`, materialized into the host managed skills root at install time | **Most official teams declare skills exclusively here** |
+| Member-level declarations | `pack.team.members[].skills` | Skill dependency lists in member Markdown frontmatter | Typically an empty array |
 
-Reading only one side loses skills: the official market package `stock-partner-team` declares three skills at the package level and none on any of its seven members — walking the members alone yields zero skills. So **call `exportTeam` / `materializePack` instead of iterating members yourself**. The server also never spreads package-level skills across members, because that would invent a binding the runtime does not have.
+Traversing member declarations alone will result in missing skills: the official market package `stock-partner-team` declares three skills at the package level while none of its seven members declare explicit skills. Call `exportTeam` or `materializePack` to materialize the combined set rather than manually iterating members; the server does not implicitly propagate package-level skills to members to ensure runtime bindings remain authentic.
 
 #### Exporting a team's skills in one call
 
 ```ts
 import { exportTeam } from "@flowy-agent-store/sdk";
 
-// teamId comes from teams.list(): it is the component id (shaped like wb-<package>-team), not the package name.
-// The team must also be installed: one missing or disabled member fails the whole export and names that member
-// (all-or-nothing, never a partial directory).
+// teamId comes from teams.list(): corresponds to the component ID (shaped like wb-<package>-team), not the package name.
+// The team must be installed and active: missing or disabled members cause immediate failure naming the exact member.
 const team = (await client.teams.list()).find((entry) => entry.name === "stock-partner-team")!;
 const result = await exportTeam(client, team.id, "./dist/stock-partner-team");
 
 console.log(result.writtenSkills); // ["westock-data", "westock-tool", "md-to-html"]
-console.log(result.danglingSkills); // [{ id, error }]: declared but unresolvable on this host
-console.log(result.dir); // the directory that was written
-console.log(result.pack); // the live ExpertPack itself, usable without touching disk
+console.log(result.danglingSkills); // [{ id, error }]: declared but unresolvable skill references on this host
+console.log(result.dir); // target export directory
+console.log(result.pack); // original live ExpertPack, usable without disk I/O
 ```
 
 ```text
@@ -457,14 +468,14 @@ The directories beside `skills/` — `avatars/`, `bin/`, `scripts/` — are part
 - `pack.avatar`: the package avatar as a snapshot-relative path (e.g. `avatars/team.png`), present **only when that exact file is listed in `assets`**.
 - `ExportResult.writtenAssets`: the snapshot-relative paths actually written.
 
-Two honest boundaries: assets are **snapshot-scoped** — a member pack's `assets` is always empty; read the top-level pack. And `kind: "script"` is a **class label, not a permission** — the host itself never executes plugin-level scripts, so what a consumer does with the bytes is its own decision; an operator can subtract the class from the pack with `[expert_export] scripts = false` in `config.toml`. When the host's `snapshot_assets` capability is false, `assets` is always empty (that is how "not wired" differs from "ships none").
+Two architectural scope constraints: assets are **snapshot-scoped** — a member pack's `assets` is always empty; read the top-level pack. And `kind: "script"` is a **classification label rather than an execution permission** — the host does not directly execute plugin-level scripts; execution is mediated by the consumer, and operators can omit this class from exported packs via `[expert_export] scripts = false` in `config.toml`. When the host's `snapshot_assets` capability bit is false, `assets` remains an empty table (distinguishing unintegrated capability from absence of assets).
 
 #### Skill bytes only, without writing a directory
 
 Beyond `exportTeam`, the public primitives are `skills.files(id)` and `skills.readFile(id, path)`. Both sit behind the host's `skill_files` capability bit:
 
 ```ts
-// Without the skill read face wired up, skill/files rejects everything and every skill looks dangling
+// When the host does not expose skill_files, requests are rejected and skills are flagged as dangling
 if (!client.initializeInfo?.capabilities.skill_files) throw new Error("host does not expose skill_files");
 
 const pack = await client.teams.export(team.id); // definition only, nothing written yet
@@ -489,11 +500,11 @@ for (const ref of refs) {
 
 #### Prerequisites and pitfalls
 
-1. **`teamId` is neither a package name nor any expert package**: it must be the component id `teams.list()` returns (`wb-<package>-team`), and the package must really be a team (its manifest carries `teamInfo`). Use `exportAgent` for an expert package; the two channels are not interchangeable.
-2. **The team must be installed first**: `exportTeam` requires every member to be installed and enabled, otherwise it answers `agent_not_installed` / `agent_disabled` and names the member. That is deliberate all-or-nothing behaviour; it never produces a partial team directory.
-3. **`danglingSkills` has two causes**: the skill genuinely is not installed here, or the host has no `skill_files` capability bit wired up (in which case **every** skill dangles). Only an empty list means the directory carries complete skills and can be moved to another machine.
-4. **Re-exporting into the same directory does not clean up stale files**: materialization only does `mkdir -p` followed by writes, never deletes. Use a fresh directory per version, or empty the target first, otherwise skills removed upstream linger.
-5. **Skill bytes are never inlined into the pack**: `pack.skills` holds `{name, id}` references only, and the bytes always come from `skill/files` / `skill/file`. To relocate a team, take the `skills/` directory with you.
+1. **Identifier format**: `teamId` must be the component ID returned by `teams.list()` (such as `wb-<package>-team`), not the package name. For single expert agents, use `exportAgent`; the two entities use distinct interfaces.
+2. **Complete prerequisites**: `exportTeam` requires all members to be installed and enabled; missing or disabled members return `agent_not_installed` or `agent_disabled` specifying the exact member to prevent incomplete exports.
+3. **Dangling reference causes**: `danglingSkills` occurs when a skill is not installed locally or the host lacks the `skill_files` capability bit. An empty list confirms full offline readiness.
+4. **Incremental write behavior**: Materialization writes incrementally without deleting existing files in the target directory. When upgrading versions, export to a new directory or clean the target folder first.
+5. **Decoupled binary transfer**: `pack.skills` contains metadata references only; binaries are retrieved on demand via `skill/files` and `skill/file`. To relocate to another host, copy the entire materialized `skills/` directory.
 
 ---
 
@@ -556,7 +567,7 @@ Live conversation event streams deliver 9 discriminated union types:
 | `turn.status` | Execution turn state transition | `turn.status` |
 | `context.usage` | Context token usage and billing statistics | `context.usage` |
 
-### 6.2 sequence sequence number semantics
+### 6.2 sequence number semantics
 
 - Every downstream event carries a connection-local strictly increasing integer `sequence`;
 - When the client detects `currentSequence > lastSeenSequence + 1`, a network gap is identified, triggering catch-up logic;

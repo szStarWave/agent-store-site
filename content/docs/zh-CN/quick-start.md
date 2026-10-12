@@ -6,10 +6,10 @@ Flowy Agent Store 是一款**本地优先（Local-First）**的 Agent 运行时�
 
 ## 1. 系统要求与环境准备
 
-在开始安装前，请确认您的系统满足基本运行条件：
+运行环境要求：
 
 - **操作系统**：Windows 10/11 (x64 / ARM64 转译)、macOS 12+ (Apple Silicon / Intel)、主流 Linux 发行版（Ubuntu 20.04+、Debian 11+、Fedora 36+ 等）；
-- **网络访问**：首次启动或同步市场资源时需能访问互联网（用于拉取 ModelScope / GitHub 市场清单）；
+- **网络访问**：首次启动或同步市场资源时需访问互联网（拉取 ModelScope / GitHub 市场清单）；
 - **大模型 API 访问**：至少准备一个可用的大模型 API 凭据或本地模型服务。
 
 系统原生支持主流云端大模型服务商与本地推理后端：
@@ -26,7 +26,7 @@ Flowy Agent Store 是一款**本地优先（Local-First）**的 Agent 运行时�
 
 ## 2. 下载与一键安装
 
-系统支持一键脚本、npm 全局安装或手动下载二进制包三种方式：
+系统支持一键脚本、npm 全局安装与手动下载三种方式：
 
 ```bash
 # 方式 A：Windows PowerShell 一键脚本安装（自动完成安装并将 flowy-agent-store 写入 PATH）
@@ -39,13 +39,13 @@ npm install -g @flowy-agent-store/runtime-win32-x64
 # 访问 https://github.com/szStarWave/agent-store-site/releases 下载对应平台的最新归档
 ```
 
-安装完成后，打开新的终端会话执行 `flowy-agent-store --version` 即可确认版本。
+安装完成后，打开新终端运行 `flowy-agent-store --version` 验证安装。
 
 ---
 
 ## 3. 启动本地服务与工作台
 
-直接执行主程序，系统将自动拉起本地 App Server 并打开系统默认浏览器进入工作台：
+运行主程序将启动本地 App Server，并自动在默认浏览器中打开工作台：
 
 ```bash
 # 默认启动：监听 127.0.0.1:8787 并自动唤起浏览器工作台
@@ -58,22 +58,22 @@ flowy-agent-store --port 8788
 flowy-agent-store --data-dir /data/agent-store --no-open
 ```
 
-服务就绪后，进程将向控制台输出包含协议指纹与服务信息的就绪通知：
+服务就绪后，进程向控制台输出包含协议指纹与服务信息的就绪通知：
 
 ```json
 {"agent_store":"listening","host":"127.0.0.1","port":8787,"url":"http://127.0.0.1:8787/","protocol_version":"2026.03.v1","version":"0.8.2","auth":"disabled-local"}
 ```
 
-工作台界面将在浏览器中打开 `http://127.0.0.1:8787/`。所有会话数据、工具配置及模型密钥均安全持久化于本地设备。
+工作台地址为 `http://127.0.0.1:8787/`。所有会话数据、工具配置及模型密钥均安全持久化于本地。
 
 ---
 
 ## 4. 环境初始化与模型配置
 
-首次使用前需配置大模型 API 供应商。您可以通过以下三种方式之一完成配置：
+首次使用需配置模型 API 凭据，支持以下三种方式：
 
 - **方式一（命令行交互向导）**：在终端运行 `flowy-agent-store init`，根据交互式提示选择模型供应商并输入 API 密钥，向导将自动生成配置文件。
-- **方式二（工作台图形化设置）**：在打开的 Web UI 中，点击右上角 **设置** $\to$ **模型供应商**，添加并填入您的 API 密钥与端点地址。
+- **方式二（工作台图形化设置）**：在 Web UI 中点击右上角 **设置** $\to$ **模型供应商**，添加并填入 API 密钥与端点地址。
 - **方式三（直接编辑配置文件）**：直接创建或修改配置文件 `~/.agent-store/config.toml`：
 
 ```toml
@@ -100,11 +100,11 @@ default_model = "deepseek-chat"
 
 ## 5. 发现与激活首个 Agent 资产
 
-Flowy Agent Store 内置连接官方 ModelScope 资源市场，覆盖专家（Agent）、原子技能（Skill）与系统连接器（Connector）：
+Flowy Agent Store 内置官方 ModelScope 资源市场，覆盖专家（Agent）、技能（Skill）与系统连接器（Connector）：
 
 1. **进入市场**：在工作台顶部导航栏点击 **市场**；
 2. **检索目标组件**：在搜索栏中输入功能关键词（例如 `代码审查`、`网页抓取` 或 `GitHub`）；
-3. **一键安装**：在资源卡片上点击 **安装**。系统将执行静态路径与安全性审计，计算 SHA-256 全树摘要，并固化为本地不可变快照（`PluginSnapshot`）；
+3. **一键安装**：点击卡片上的 **安装**。系统执行路径与安全审计、计算 SHA-256 全树摘要，并固化为本地不可变快照（`PluginSnapshot`）；
 4. **即刻可用**：安装完成后无需重启服务，该资产已自动注册至本地资源目录（Catalog），随时可在会话中调用。
 
 如需了解自研插件与私有 MCP Server 接入规范，请参阅 [插件与市场](/zh-CN/docs/plugins-market)。
@@ -113,7 +113,7 @@ Flowy Agent Store 内置连接官方 ModelScope 资源市场，覆盖专家（Ag
 
 ## 6. 发起首次会话运行（First Run）
 
-资产就绪后，即可开启 Agent 交互与推理编排：
+资产就绪后即可开启 Agent 交互与推理编排：
 
 1. **新建会话**：在工作台侧边栏点击 **新建会话**；
 2. **绑定专家角色**：在会话顶部选择刚刚安装的专家（或选用默认通用助手）；
@@ -123,7 +123,7 @@ Flowy Agent Store 内置连接官方 ModelScope 资源市场，覆盖专家（Ag
    - 工具与连接器调用经过权限栅栏校验后，在受控沙箱内异步执行；
    - 最终执行产物（生成的 Markdown 文档、图表代码或补丁文件）在右侧产物面板中结构化呈现。
 
-除了 Web UI 外，开发者亦可通过 TypeScript SDK 以代码化方式驱动全量执行：
+开发者亦可通过 TypeScript SDK 以代码化方式驱动全量执行：
 
 ```typescript
 import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
@@ -177,7 +177,7 @@ await client.conversations.send(
 
 ## 8. 下一步
 
-随着您对系统的深入探索，推荐继续阅读以下进阶指引：
+进阶阅读指引：
 
 - [命令行用法](/zh-CN/docs/cli) —— 掌握服务启动参数、守护进程配置与认证网关。
 - [架构设计与系统规范](/zh-CN/docs/architecture) —— 深入了解 Rust 执行引擎、App Server 协议与事件溯源机制。

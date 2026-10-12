@@ -6,7 +6,7 @@ Flowy Agent Store is a **local-first** agent runtime and visual workbench. It pa
 
 ## 1. System Requirements & Prerequisites
 
-Before installing, ensure your environment meets the following basic requirements:
+Prerequisites:
 
 - **Operating System**: Windows 10/11 (x64 / ARM64 via emulation), macOS 12+ (Apple Silicon / Intel), or mainstream Linux distributions (Ubuntu 20.04+, Debian 11+, Fedora 36+, etc.);
 - **Network Access**: Internet connectivity is required during initial launch and marketplace synchronization (for downloading ModelScope / GitHub marketplace manifests);
@@ -26,7 +26,7 @@ The system natively supports major cloud LLM providers and local inference engin
 
 ## 2. Download & Installation
 
-The system can be installed via an automated script, global npm package, or direct binary download:
+The system supports one-liner script, global npm package, or manual download:
 
 ```bash
 # Method A: Windows PowerShell one-liner script (requires no admin privileges, sets PATH automatically)
@@ -45,7 +45,7 @@ After installation completes, open a new terminal session and run `flowy-agent-s
 
 ## 3. Starting the Local Service & Workbench
 
-Execute the binary to launch the local App Server and automatically open the visual workbench in your default browser:
+Run the executable to launch the local App Server and open the workbench in your default browser:
 
 ```bash
 # Default mode: binds to 127.0.0.1:8787 and launches the browser workbench
@@ -64,16 +64,16 @@ Once ready, the process prints a machine-readable JSON notification to stdout co
 {"agent_store":"listening","host":"127.0.0.1","port":8787,"url":"http://127.0.0.1:8787/","protocol_version":"2026.03.v1","version":"0.8.2","auth":"disabled-local"}
 ```
 
-The workbench UI opens in your browser at `http://127.0.0.1:8787/`. All conversation histories, tool definitions, and API keys remain safely persisted on your local disk.
+The workbench UI opens at `http://127.0.0.1:8787/`. All conversation histories, tool definitions, and API keys remain safely persisted locally.
 
 ---
 
 ## 4. Environment Initialization & Model Setup
 
-Before your first run, configure an LLM provider using any of the following three workflows:
+Configure an LLM provider before your first run using any of the following three workflows:
 
 - **Method 1 (Interactive CLI Wizard)**: Run `flowy-agent-store init` in your terminal and follow the interactive prompts to pick a provider and enter your API key.
-- **Method 2 (Visual Settings in Web UI)**: In the workbench, click **Settings** in the top right $\to$ **Model Providers**, then enter your endpoint URL and API key.
+- **Method 2 (Visual Settings in Web UI)**: In the workbench, click **Settings** $\to$ **Model Providers**, then enter your endpoint URL and API key.
 - **Method 3 (Direct Configuration File)**: Create or edit `~/.agent-store/config.toml` directly:
 
 ```toml
@@ -104,7 +104,7 @@ Flowy Agent Store connects natively to official ModelScope marketplace channels,
 
 1. **Open Marketplace**: Click **Market** in the top navigation bar;
 2. **Search Components**: Enter search keywords in the search bar (e.g. `Code Review`, `Web Scraper`, or `GitHub`);
-3. **One-Click Install**: Click **Install** on any resource card. The system performs static security checks, computes the SHA-256 full tree digest, and locks the asset into an immutable snapshot (`PluginSnapshot`);
+3. **One-Click Install**: Click **Install** on any resource card. The system validates security paths, computes the SHA-256 full tree digest, and locks the asset into an immutable snapshot (`PluginSnapshot`);
 4. **Immediate Availability**: No process restart is needed. The component registers into the local Catalog and is ready for execution.
 
 To learn how to register custom plugins or private MCP servers, see [Plugins & Marketplace](/en-US/docs/plugins-market).

@@ -128,6 +128,7 @@ await client.connect();
 | `connect()` | 无 | `Promise<InitializeResult>` | `initialize` → `initialized` |
 | `close()` | 无 | `void` | 客户端本地状态重置与连接释放 |
 | `onNotification(listener)` | 下行消息回调函数 | 退订闭包函数 `() => void` | 监听服务端广播通知 |
+| `readImportAsset(snapshotId, path)` | 导出快照 ID 与相对路径 | `Promise<Uint8Array>` | `import/assets` |
 | `listStore()` | 无 | `Promise<StoreList>` | `store/list` |
 | `installStoreEntry(marketplaceId, entryName)` | 市场 ID 与条目名称 | `Promise<StoreInstallResult>` | `store/install-entry` |
 | `listMarketplaces()` | 无 | `Promise<MarketplaceSummary[]>` | `market/list` |
@@ -140,153 +141,164 @@ await client.connect();
 #### `agents` — 专家目录与导出
 
 ```ts
-// 1. 查询全部已安装及可用的专家概要
-client.agents.list(): Promise<AgentSummary[]>;
-
-// 2. 查询指定专家的详细配置视图（包含绑定的技能与连接器依赖）
-client.agents.get(agentId: string): Promise<AgentDetail>;
-
-// 3. 导出专家完整定义包（包含 Persona 指令及配置契约）
-client.agents.export(agentId: string): Promise<ExpertPack>;
+export interface AgentsSubclient {
+  /** 查询全部已安装及可用的专家概要 */
+  list(): Promise<AgentSummary[]>;
+  /** 查询指定专家的详细配置视图（包含绑定的技能与连接器依赖） */
+  get(agentId: string): Promise<AgentDetail>;
+  /** 导出专家完整定义包（包含 Persona 指令及配置契约） */
+  export(agentId: string): Promise<ExpertPack>;
+}
 ```
 
 #### `teams` — 专家团队目录与协同
 
 ```ts
-// 1. 查询已配置的专家团队列表
-client.teams.list(): Promise<TeamSummary[]>;
-
-// 2. 查询指定团队的拓扑定义（成员角色与协作规则）
-client.teams.get(teamId: string): Promise<TeamDetail>;
-
-// 3. 导出团队全量定义包（支持传入可选的语义化版本进行校验）
-client.teams.export(teamId: string, teamVersion?: string): Promise<ExpertPack>;
+export interface TeamsSubclient {
+  /** 查询已配置的专家团队列表 */
+  list(): Promise<TeamSummary[]>;
+  /** 查询指定团队的拓扑定义（成员角色与协作规则） */
+  get(teamId: string): Promise<TeamDetail>;
+  /** 导出团队全量定义包（支持传入可选的语义化版本进行校验） */
+  export(teamId: string, teamVersion?: string): Promise<ExpertPack>;
+}
 ```
 
 #### `skills` — 技能检索与内部文件读取
 
 ```ts
-// 1. 列出本地所有原子技能摘要
-client.skills.list(): Promise<SkillSummary[]>;
-
-// 2. 获取技能详细定义
-client.skills.get(skillId: string): Promise<SkillDetail>;
-
-// 3. 列出指定技能目录下的所有静态资源清单
-client.skills.files(skillId: string): Promise<SkillFileList>;
-
-// 4. 读取技能包内的指定文件字节数组
-client.skills.readFile(skillId: string, path: string): Promise<Uint8Array>;
+export interface SkillsSubclient {
+  /** 列出本地所有原子技能摘要 */
+  list(): Promise<SkillSummary[]>;
+  /** 获取技能详细定义 */
+  get(skillId: string): Promise<SkillDetail>;
+  /** 列出指定技能目录下的所有静态资源清单（需宿主具备 skill_files 能力位） */
+  files(skillId: string): Promise<SkillFileList>;
+  /** 读取技能包内的指定文件字节数组（需宿主具备 skill_files 能力位） */
+  readFile(skillId: string, path: string): Promise<Uint8Array>;
+}
 ```
 
 #### `connectors` — 连接器管理、动态注册与工具代理
 
 ```ts
-// 1. 目录与状态查询
-client.connectors.list(): Promise<ConnectorSummary[]>;
-client.connectors.get(connectorId: string): Promise<ConnectorDetail>;
-client.connectors.status(connectorId: string): Promise<ConnectorStatusView>;
-client.connectors.test(connectorId: string): Promise<ConnectorProbeResult>;
+export interface ConnectorsSubclient {
+  // 1. 目录与状态查询
+  list(): Promise<ConnectorSummary[]>;
+  get(connectorId: string): Promise<ConnectorDetail>;
+  status(connectorId: string): Promise<ConnectorStatusView>;
+  test(connectorId: string): Promise<ConnectorProbeResult>;
 
-// 2. OAuth 授权流程
-client.connectors.authStatus(connectorId: string): Promise<OAuthStatusView>;
-client.connectors.authStart(connectorId: string): Promise<OAuthStartResult>;
-client.connectors.waitForAuth(connectorId: string, options?: { timeoutMs?: number }): Promise<WaitForAuthOutcome>;
-client.connectors.logout(connectorId: string): Promise<void>;
+  // 2. OAuth 授权流程
+  authStatus(connectorId: string): Promise<OAuthStatusView>;
+  authStart(connectorId: string): Promise<OAuthStartResult>;
+  waitForAuth(connectorId: string, options?: { timeoutMs?: number }): Promise<WaitForAuthOutcome>;
+  logout(connectorId: string): Promise<void>;
 
-// 3. 工具动态代理调用
-client.connectors.call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>;
+  // 3. 工具动态代理调用
+  call(connectorId: string, tool: string, args?: unknown): Promise<ConnectorCallResult>;
 
-// 4. 动态连接器注册与凭据表单管理
-client.connectors.register(registration: ConnectorRegistration): Promise<ConnectorDetail>;
-client.connectors.credentials(connectorId: string): Promise<ConnectorCredential>;
-client.connectors.setCredentials(connectorId: string, values: Record<string, string>): Promise<ConnectorCredential>;
-client.connectors.clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;
+  // 4. 动态连接器注册与凭据表单管理
+  register(registration: ConnectorRegistration): Promise<ConnectorDetail>;
+  credentials(connectorId: string): Promise<ConnectorCredential>;
+  setCredentials(connectorId: string, values: Record<string, string>): Promise<ConnectorCredential>;
+  clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;
+}
 ```
 
 #### `store` — 资源市场综合生命周期
 
 ```ts
-// 1. 统一目录检索
-client.store.list(): Promise<StoreItem[]>;
-client.store.search(query: string, filter?: { kind?: StoreItemKind }): Promise<StoreItem[]>;
-client.store.installed(): Promise<StoreItem[]>;
+export interface StoreSubclient {
+  // 1. 统一目录检索
+  list(): Promise<StoreItem[]>;
+  search(query: string, filter?: { kind?: StoreItemKind }): Promise<StoreItem[]>;
+  installed(): Promise<StoreItem[]>;
 
-// 2. 状态机安装与版本管理
-client.store.install(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
-client.store.update(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
-client.store.checkUpdates(): Promise<StoreItem[]>;
-client.store.updateHint(item: StoreItem): "none" | "update" | "unknown";
+  // 2. 状态机安装与版本管理
+  install(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
+  update(item: StoreItem, options?: { waitForReady?: boolean; timeoutMs?: number }): Promise<StoreOperationOutcome>;
+  checkUpdates(): Promise<StoreItem[]>;
+  updateHint(item: StoreItem): "none" | "update" | "unknown";
 
-// 3. 启用状态切换与完全卸载
-client.store.setEnabled(item: StoreItem, enabled: boolean): Promise<StoreOperationOutcome>;
-client.store.uninstall(item: StoreItem): Promise<StoreOperationOutcome>;
+  // 3. 启用状态切换与完全卸载
+  setEnabled(item: StoreItem, enabled: boolean): Promise<StoreOperationOutcome>;
+  uninstall(item: StoreItem): Promise<StoreOperationOutcome>;
+}
 ```
 
 #### `conversations` — 会话创建、模型配置与交互
 
 ```ts
-// 1. 会话生命周期
-client.conversations.create(input: ConversationCreateInput): Promise<ConversationView>;
-client.conversations.get(conversationId: string): Promise<ConversationView>;
-client.conversations.list(limit?: number): Promise<ConversationView[]>;
-client.conversations.update(conversationId: string, input: ConversationUpdateInput): Promise<ConversationView>;
-client.conversations.delete(conversationId: string): Promise<{ conversation_id: string; deleted: boolean }>;
+export interface ConversationsSubclient {
+  // 1. 会话生命周期
+  create(input: ConversationCreateInput): Promise<ConversationView>;
+  get(conversationId: string): Promise<ConversationView>;
+  list(limit?: number): Promise<ConversationView[]>;
+  update(conversationId: string, input: ConversationUpdateInput): Promise<ConversationView>;
+  delete(conversationId: string): Promise<{ conversation_id: string; deleted: boolean }>;
 
-// 2. 消息流与交互发送
-client.conversations.messages(query: ConversationMessagesQuery): Promise<ConversationMessagesPage>;
-client.conversations.send(
-  conversationId: string,
-  content: string,
-  idempotencyKey: string,
-  options?: ConversationSendOptions,
-): Promise<ConversationSendReceipt>;
-client.conversations.cancel(conversationId: string): Promise<ConversationView>;
+  // 2. 消息流与交互发送
+  messages(query: ConversationMessagesQuery): Promise<ConversationMessagesPage>;
+  send(
+    conversationId: string,
+    content: string,
+    idempotencyKey: string,
+    options?: ConversationSendOptions,
+  ): Promise<ConversationSendReceipt>;
+  cancel(conversationId: string): Promise<ConversationView>;
 
-// 3. 流式订阅与模型元数据
-client.conversations.follow(conversationId: string): Promise<ConversationSubscription>;
-client.conversations.subscribe(conversationId: string, onEvent: (event: ConversationEvent) => void): () => void;
-client.conversations.modelOptions(): Promise<ConversationModelOptions>;
+  // 3. 流式订阅与模型元数据
+  follow(conversationId: string): Promise<ConversationSubscription>;
+  subscribe(conversationId: string, onEvent: (event: ConversationEvent) => void): () => void;
+  modelOptions(): Promise<ConversationModelOptions>;
+}
 ```
 
 #### `runs` — 独立任务批处理、计划与审批
 
 ```ts
-// 1. 触发任务执行
-client.runs.agent(input: AgentRunInput): Promise<RunReceipt>;
-client.runs.team(input: TeamRunInput): Promise<TeamRunReceipt>;
+export interface RunsSubclient {
+  // 1. 触发任务执行
+  agent(input: AgentRunInput): Promise<RunReceipt>;
+  team(input: TeamRunInput): Promise<TeamRunReceipt>;
 
-// 2. 状态监控与执行计划
-client.runs.get(runId: string): Promise<RunView>;
-client.runs.plan(runId: string): Promise<RunPlan>;
-client.runs.result(runId: string): Promise<RunResult>;
-client.runs.events(query: RunEventsQuery): Promise<RunEvent[]>;
+  // 2. 状态监控与执行计划
+  get(runId: string): Promise<RunView>;
+  plan(runId: string): Promise<RunPlan>;
+  result(runId: string): Promise<RunResult>;
+  events(query: RunEventsQuery): Promise<RunEvent[]>;
 
-// 3. 任务干预、审批提交与流式追踪
-client.runs.cancel(input: CancelRunInput): Promise<RunView>;
-client.runs.steer(input: SteerRunInput): Promise<RunView>;
-client.runs.answerDecision(input: AnswerDecisionInput): Promise<RunView>;
-client.runs.follow(runId: string): Promise<EventSubscription>;
+  // 3. 任务干预、审批提交与流式追踪
+  cancel(input: CancelRunInput): Promise<RunView>;
+  steer(input: SteerRunInput): Promise<RunView>;
+  answerDecision(input: AnswerDecisionInput): Promise<RunView>;
+  follow(runId: string): Promise<EventSubscription>;
+}
 ```
 
 #### `workspaces` — 本地工作区注册与权限管理
 
 ```ts
-// 1. 查询当前已登记的工作区列表
-client.workspaces.list(): Promise<WorkspaceView[]>;
+export interface WorkspacesSubclient {
+  // 1. 查询当前已登记的工作区列表
+  list(): Promise<WorkspaceView[]>;
 
-// 2. 注册并规范化物理路径为安全工作区
-client.workspaces.create(path: string): Promise<WorkspaceView>;
+  // 2. 注册并规范化物理路径为安全工作区
+  create(path: string): Promise<WorkspaceView>;
 
-// 3. 注销工作区（软删除引用，不物理清空磁盘文件）
-client.workspaces.revoke(workspaceId: string): Promise<WorkspaceRevokeResult>;
+  // 3. 注销工作区（软删除引用，不物理清空磁盘文件）
+  revoke(workspaceId: string): Promise<WorkspaceRevokeResult>;
+}
 ```
 
 #### `models` — 可用模型元数据检索
 
 ```ts
-// 查询当前宿主环境内已配置且可供调用的模型列表及费率参数
-client.models.list(): Promise<ModelSummary[]>;
+export interface ModelsSubclient {
+  // 查询当前宿主环境内已配置且可供调用的模型列表及费率参数
+  list(): Promise<ModelSummary[]>;
+}
 ```
 
 ---
@@ -411,29 +423,29 @@ await materializePack(client, pack, "./dist/expert-manual");
 
 #### 团队技能的两个来源
 
-一个团队（`kind === "team"`）的技能有**两个来源**，它们在服务端**不会**被合并，由 `materializePack` 取并集后按 `id` 去重（`id === name`）：
+专家团队（`kind === "team"`）的技能存在**两个定义来源**。服务端保持二者独立存储，由客户端在调用 `materializePack` 时执行并集去重（`id === name`）：
 
-| 来源 | 包内字段 | 安装后是什么 | 常见情况 |
+| 来源 | 包内字段 | 安装后映射位置 | 常见场景 |
 | --- | --- | --- | --- |
-| 团队自身的包级技能 | `pack.skills` | 包的 `plugin.json` 中 `skills` 声明的技能，安装时被物化到宿主的托管技能根目录 | **官方团队大多只在这里声明** |
-| 成员的声明 | `pack.team.members[].skills` | 成员 Markdown frontmatter 里的 `skills:` 列表 | 经常是空数组 |
+| 团队自身的包级技能 | `pack.skills` | 包描述文件 `plugin.json` 中声明的技能，安装时物化至宿主托管的技能根目录 | **官方团队大多仅在此处声明** |
+| 团队成员的独立声明 | `pack.team.members[].skills` | 各成员 Markdown frontmatter 里的 `skills:` 依赖列表 | 通常为空数组 |
 
-只读其中一侧会漏东西：官方市场包 `stock-partner-team` 在包级声明 3 个技能，7 名成员一个都不写——只看成员就会导出 0 个技能。因此**请直接用 `exportTeam` / `materializePack`，不要自己遍历成员**；服务端也刻意不把包级技能摊给每个成员，因为那等于发明一份运行期并不存在的绑定。
+若仅遍历成员声明将导致技能遗漏：以官方市场包 `stock-partner-team` 为例，其包级声明了 3 个技能，而 7 名成员未显式声明技能。因此推荐直接调用 `exportTeam` 或 `materializePack` 统一物化，避免手动遍历成员；服务端未将包级技能隐式下发至各成员，以保持运行时绑定的真实性。
 
 #### 一行导出团队的技能
 
 ```ts
 import { exportTeam } from "@flowy-agent-store/sdk";
 
-// teamId 取自 teams.list()：那是组件 id（形如 wb-<包名>-team），不是包名。
-// 且该团队必须已安装：成员缺一个或被停用，整个导出都会失败并指名到成员（要么全给，要么明确失败）。
+// teamId 取自 teams.list()：对应组件 ID（形如 wb-<包名>-team），而非包名。
+// 该团队必须处于已安装且就绪状态；若成员缺失或被禁用，导出将快速失败并定位到具体成员。
 const team = (await client.teams.list()).find((entry) => entry.name === "stock-partner-team")!;
 const result = await exportTeam(client, team.id, "./dist/stock-partner-team");
 
 console.log(result.writtenSkills); // ["westock-data", "westock-tool", "md-to-html"]
-console.log(result.danglingSkills); // [{ id, error }]：声明了但本机取不到的技能
-console.log(result.dir); // 落盘目录
-console.log(result.pack); // 线上 ExpertPack 原件，不落盘也能用
+console.log(result.danglingSkills); // [{ id, error }]：声明但本机不可解析的技能引用
+console.log(result.dir); // 落盘目标目录
+console.log(result.pack); // 线上 ExpertPack 原件，支持无磁盘 I/O 消费
 ```
 
 ```text
@@ -456,14 +468,14 @@ console.log(result.pack); // 线上 ExpertPack 原件，不落盘也能用
 - `pack.avatar`：包级头像的快照相对路径（如 `avatars/team.png`），且**只会在该文件确实列在 `assets` 里时出现**。
 - `ExportResult.writtenAssets`：实际落盘的快照相对路径列表。
 
-两个诚实的边界：资产是**快照作用域**的——成员 pack 的 `assets` 恒为空表，读顶层 pack；`kind: "script"` 是**类别标注而非许可**——宿主自己从不执行插件级脚本，怎么用是消费方的决定，运营者可用 `config.toml` 的 `[expert_export] scripts = false` 把这一类从包里减掉。宿主能力位 `snapshot_assets` 为 false 时，`assets` 恒为空表（区分「没接」与「没有」）。
+两项核心作用域约束：资产具有**快照作用域**——成员 pack 的 `assets` 恒为空表，统一读取顶层 pack；`kind: "script"` 为**类别标注而非执行许可**——宿主自身不直接执行插件级脚本，具体调用由消费方调度，运营者可通过 `config.toml` 中的 `[expert_export] scripts = false` 显式剔除该类资产。宿主能力位 `snapshot_assets` 为 false 时，`assets` 恒为空表（明确区分「未接入」与「无资产」）。
 
 #### 只要技能字节，不落盘
 
 `exportTeam` 之外的公开原语是 `skills.files(id)` 与 `skills.readFile(id, path)`；两者都受宿主能力位 `skill_files` 门禁：
 
 ```ts
-// 宿主没接技能读面时，skill/files 一律被拒，所有技能都会变成「悬空」
+// 当宿主未提供 skill_files 能力位时，相关调用将被拒绝，所有技能标记为悬空引用
 if (!client.initializeInfo?.capabilities.skill_files) throw new Error("宿主未提供 skill_files");
 
 const pack = await client.teams.export(team.id); // 只要定义，先不落盘
@@ -481,18 +493,18 @@ for (const ref of refs) {
       console.log(ref.name, file.path, bytes.length);
     }
   } catch (error) {
-    console.warn("悬空技能（本机没装或能力位未接线）:", ref.name, String(error));
+    console.warn("悬空技能（本机未安装或能力位未启用）:", ref.name, String(error));
   }
 }
 ```
 
 #### 前置条件与注意事项
 
-1. **`teamId` 不是包名，也不是任意专家包**：它必须是 `teams.list()` 返回的组件 id（`wb-<包名>-team`），且该包确实是团队（清单里有 `teamInfo`）。专家包请用 `exportAgent`，两条通道不通用。
-2. **必须先安装**：`exportTeam` 要求全部成员已安装且启用，否则返回 `agent_not_installed` / `agent_disabled` 并指名成员；这是刻意的「要么全给、要么明确失败」，不会产出残缺的团队目录。
-3. **`danglingSkills` 有两种成因**：本机确实没装该技能，或宿主没接 `skill_files` 能力位（那时是**全部**技能悬空）。只有它为空，才说明这个目录自带完整技能，可以离机使用。
-4. **重复导出到同一目录不会清理旧文件**：物化只做 `mkdir -p` 后写入，不删除任何既有文件。换版本时请用新目录，或先把目标目录清空，否则上一版已移除的技能会残留。
-5. **技能字节永不内联在包里**：`pack.skills` 只有 `{name, id}` 引用，字节始终经 `skill/files` / `skill/file` 取回。要搬迁到另一台机器，必须把 `skills/` 目录一起带走。
+1. **标识符规范**：`teamId` 必须是 `teams.list()` 返回的组件 ID（形如 `wb-<包名>-team`），而非原始包名。单专家条目请调用 `exportAgent`，两类实体接口不通用。
+2. **完整依赖前置**：`exportTeam` 要求团队所有成员均处于已安装且启用状态；若存在成员缺失或禁用，将返回 `agent_not_installed` 或 `agent_disabled` 错误并定位到具体成员，避免导出残缺的团队包。
+3. **悬空引用判定**：`danglingSkills` 产生于本地未安装该技能，或宿主未开启 `skill_files` 能力位。该列表为空时，方可确保离线完整可用。
+4. **增量写入特性**：物化导出采用增量写入，不会清理目标目录中既有的无关文件。版本升级重新导出时，建议指定新目录或预先清空目标路径。
+5. **按需流式拉取**：`pack.skills` 仅包含元数据引用，具体二进制由 SDK 通过 `skill/files` 与 `skill/file` 流式拉取。跨环境迁移时需完整携带物化后的 `skills/` 目录。
 
 ---
 

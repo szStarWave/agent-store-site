@@ -63,7 +63,7 @@ Unspecified installation targets resolve against `latest`; ambiguous version ran
 
 ```bash
 bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2 (latest)
-bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.7
+bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.10
 bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → resolves 0.1.0-beta.2
 npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → resolves 0.1.0
 ```
