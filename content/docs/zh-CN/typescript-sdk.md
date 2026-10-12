@@ -43,7 +43,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出符号 | 类型定义与用途 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-13"`）。建连握手时执行全等校验，跨版本不兼容 |
+| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-14"`）。建连握手时执行全等校验，跨版本不兼容 |
 | `InitializeRequest` / `InitializeResult` | 协议初始化握手载荷（交换协议版本、客户端标识及服务端能力集） |
 | `ClientInfo` / `ClientCapabilities` | 客户端身份声明（名称、版本）与能力声明（`events`、`approvals`、`team_runtime`） |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | 统一资源商店目录结构与安装回执模型 |
@@ -440,11 +440,23 @@ console.log(result.pack); // 线上 ExpertPack 原件，不落盘也能用
 ./dist/stock-partner-team/
 ├── expert-pack.json                  # 线上 pack 逐字节（含 pack_format 与 provenance）
 ├── members/<成员 id>/persona.md       # 团队成员人设；团队本身没有顶层 persona.md
-└── skills/                           # 两个来源并集去重后的技能文件
-    ├── westock-data/{SKILL.md, package.json, references/...}
-    ├── westock-tool/{SKILL.md, package.json, references/...}
-    └── md-to-html/{SKILL.md, shell.html, scripts/...}
+├── skills/                           # 两个来源并集去重后的技能文件
+│   ├── westock-data/{SKILL.md, package.json, references/...}
+│   ├── westock-tool/{SKILL.md, package.json, references/...}
+│   └── md-to-html/{SKILL.md, shell.html, scripts/...}
+├── avatars/team.png                  # 插件级资产（fp-14 / pack_format 2 起随包导出）
+└── bin/init_task.py                  # 包自带脚本；宿主自身从不执行，字节按 0644 交付
 ```
+
+#### 插件级资产（`fp-14` / `pack_format 2` 起随包导出）
+
+技能目录之外、与 `skills/` 平级的 `avatars/`、`bin/`、`scripts/` 也属于包的交付物——很多团队的自带脚本就假设插件根持有它们（如 `md-to-html` 的 `render.py` 按 `PLUGIN_ROOT/bin/init_task.py` 寻址）。`fp-14` 起 `ExpertPack` 携带：
+
+- `pack.assets`：按引用的资产清单（`path` / `kind: "avatar" | "script"` / `size` / sha256 `digest`），按 `path` 排序。字节不在包里，用 `client.readImportAsset(pack.provenance.snapshot_id, path)` 拉取；`materializePack` 已替你做完全部落盘。
+- `pack.avatar`：包级头像的快照相对路径（如 `avatars/team.png`），且**只会在该文件确实列在 `assets` 里时出现**。
+- `ExportResult.writtenAssets`：实际落盘的快照相对路径列表。
+
+两个诚实的边界：资产是**快照作用域**的——成员 pack 的 `assets` 恒为空表，读顶层 pack；`kind: "script"` 是**类别标注而非许可**——宿主自己从不执行插件级脚本，怎么用是消费方的决定，运营者可用 `config.toml` 的 `[expert_export] scripts = false` 把这一类从包里减掉。宿主能力位 `snapshot_assets` 为 false 时，`assets` 恒为空表（区分「没接」与「没有」）。
 
 #### 只要技能字节，不落盘
 
@@ -498,7 +510,7 @@ const routes = httpRouteTable();
 console.log(`已映射 HTTP 接口总数: ${Object.keys(routes).length}`);
 ```
 
-- 公共 HTTP 接口覆盖 **55 / 80** 个协议方法；
+- 公共 HTTP 接口覆盖 **55 / 82** 个协议方法；
 - 需保持持续双向通信的实时流式推送方法（如 `follow`）以及宿主本地特权接口不在 HTTP 中开放。
 
 ### 5.2 审批决策 CAS 乐观并发控制

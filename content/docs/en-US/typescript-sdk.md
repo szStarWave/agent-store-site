@@ -43,7 +43,7 @@ The protocol package serves as the definitive source of truth for wire interacti
 
 | Export symbol | Contract definition and usage |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-13"`). Enforces strict equality during handshakes |
+| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-14"`). Enforces strict equality during handshakes |
 | `InitializeRequest` / `InitializeResult` | Protocol handshake payloads exchanging protocol versions, client identities, and host capabilities |
 | `ClientInfo` / `ClientCapabilities` | Client identity declarations (name, version) and feature subscriptions (`events`, `approvals`, `team_runtime`) |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | Unified catalog structures and installation receipt models |
@@ -441,11 +441,23 @@ console.log(result.pack); // the live ExpertPack itself, usable without touching
 ./dist/stock-partner-team/
 ├── expert-pack.json                  # the live pack, byte for byte (with pack_format and provenance)
 ├── members/<member id>/persona.md     # member personas; a team has no top-level persona.md
-└── skills/                           # the union of both sources, deduplicated
-    ├── westock-data/{SKILL.md, package.json, references/...}
-    ├── westock-tool/{SKILL.md, package.json, references/...}
-    └── md-to-html/{SKILL.md, shell.html, scripts/...}
+├── skills/                           # the union of both sources, deduplicated
+│   ├── westock-data/{SKILL.md, package.json, references/...}
+│   ├── westock-tool/{SKILL.md, package.json, references/...}
+│   └── md-to-html/{SKILL.md, shell.html, scripts/...}
+├── avatars/team.png                  # plugin-level asset (exported since fp-14 / pack_format 2)
+└── bin/init_task.py                  # package script; the host itself never executes it, bytes land 0644
 ```
+
+#### Plugin-level assets (exported since `fp-14` / `pack_format 2`)
+
+The directories beside `skills/` — `avatars/`, `bin/`, `scripts/` — are part of what a package ships, and many teams' own scripts assume the plugin root holds them (`md-to-html`'s `render.py` resolves `PLUGIN_ROOT/bin/init_task.py`). Since `fp-14` the `ExpertPack` carries:
+
+- `pack.assets`: an asset list **by reference** (`path` / `kind: "avatar" | "script"` / `size` / sha256 `digest`), sorted by `path`. The bytes are not in the pack — fetch one with `client.readImportAsset(pack.provenance.snapshot_id, path)`; `materializePack` already does all of the writing for you.
+- `pack.avatar`: the package avatar as a snapshot-relative path (e.g. `avatars/team.png`), present **only when that exact file is listed in `assets`**.
+- `ExportResult.writtenAssets`: the snapshot-relative paths actually written.
+
+Two honest boundaries: assets are **snapshot-scoped** — a member pack's `assets` is always empty; read the top-level pack. And `kind: "script"` is a **class label, not a permission** — the host itself never executes plugin-level scripts, so what a consumer does with the bytes is its own decision; an operator can subtract the class from the pack with `[expert_export] scripts = false` in `config.toml`. When the host's `snapshot_assets` capability is false, `assets` is always empty (that is how "not wired" differs from "ships none").
 
 #### Skill bytes only, without writing a directory
 
@@ -499,7 +511,7 @@ const routes = httpRouteTable();
 console.log(`Mapped HTTP endpoints: ${Object.keys(routes).length}`);
 ```
 
-- Public HTTP endpoints map **55 / 80** protocol methods;
+- Public HTTP endpoints map **55 / 82** protocol methods;
 - Stateful real-time streaming methods (such as `follow`) and privileged local administrative operations are excluded from HTTP bindings.
 
 ### 5.2 Approval decision CAS optimistic concurrency control
