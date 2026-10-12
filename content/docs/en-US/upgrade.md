@@ -22,7 +22,8 @@ The following table documents published releases, distribution tags, and breakin
 
 | Version | Published (UTC) | Current dist-tag | Substantive changes from prior release |
 | --- | --- | --- | --- |
-| `0.1.0-beta.9` | 2026-10-10T04:34:35Z | `beta` | **Breaking**: Protocol fingerprint incremented to `fp-13` (strict equality check); adds `market/settings` / `market/settings-set` for reading and writing the market policy, bringing total methods to 80 and HTTP mapped routes to 55; adds per-source `download_on_start`, `AGENT_STORE_MARKET_DOWNLOAD` / `AGENT_STORE_CONFIG`, and bounded auto-upgrade; `exportTeam()` now exports a team's package-level skills (steps in §6.8) |
+| `0.1.0-beta.10` | 2026-10-12T07:30:00Z | `beta` | **Breaking**: Protocol fingerprint incremented to `fp-14` (strict equality check); adds the WebSocket-only `import/assets` / `import/asset`, method count grows to 82 (HTTP mapped routes stay 55); the expert pack moves to `pack_format 2` (plugin-level `avatars/ bin/ scripts/` ride along, `materializePack` writes `writtenAssets`); the connector authorization callback answers only after the token exchange, `auth/status` reports `authorization_pending`, WebUI installs go through `store.install()`, and `store.findByConnector()` / `MCP_OAUTH_CLIENT_NAME` are new (upgrade steps in §6.9) |
+| `0.1.0-beta.9` | 2026-10-10T04:34:35Z | — | **Breaking**: Protocol fingerprint incremented to `fp-13` (strict equality check); adds `market/settings` / `market/settings-set` for reading and writing the market policy, bringing total methods to 80 and HTTP mapped routes to 55; adds per-source `download_on_start`, `AGENT_STORE_MARKET_DOWNLOAD` / `AGENT_STORE_CONFIG`, and bounded auto-upgrade; `exportTeam()` now exports a team's package-level skills (steps in §6.8) |
 | `0.1.0-beta.8` | 2026-09-28T10:23:47Z | — | **Breaking**: Protocol fingerprint incremented to `fp-12` (strict equality check); adds `store/update-entry` for in-place store upgrades and the connector user credential system (`connector/credential/*`, `connector/register`), bringing total methods to 78 and HTTP mapped routes to 53; `updateHint()` narrows its return value (steps in §6.7) |
 | `0.1.0-beta.7` | 2026-09-20T10:33:48Z | — | **Breaking**: Protocol fingerprint incremented to `fp-8` (strict equality check); adds WebSocket APIs `agent/export` and `team/export`, bringing total methods to 73 (steps in §6.6) |
 | `0.1.0-beta.6` | 2026-09-18T11:08:21Z | — | **Breaking**: SDK API reshaping (`launchClient` renamed to `launchHarness`, `.client` nesting removed, `initializeResult` renamed to `handshake`), requiring code updates; wire remains `fp-7` (steps in §6.5) |
@@ -39,7 +40,7 @@ The following table documents published releases, distribution tags, and breakin
 | dist-tag | Points at today |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.9` |
+| `beta` | `0.1.0-beta.10` |
 
 ```bash
 npm view @flowy-agent-store/sdk versions dist-tags --json
@@ -47,8 +48,8 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.9", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.10", "latest": "0.1.0-beta.2" }
 }
 ```
 
@@ -202,6 +203,21 @@ bun run typecheck
 - **`exportTeam()` output changed** (no wire or type shape change): a team's `pack.skills` is no longer always empty — it now holds the skills that team declares at the package level and actually installed. If you previously walked `pack.team.members[].skills` yourself to collect a team's skills, that code can go away; read `result.writtenSkills` instead (usage in the [TypeScript SDK reference](/en-US/docs/typescript-sdk) §4.4);
 - If you want the host to stop downloading market sources at boot, use `download_on_start = false` or `AGENT_STORE_MARKET_DOWNLOAD=none`; the upgradable entry kinds and the sweep cadence can be changed while the host runs through `market/settings-set` (see the [configuration reference](/en-US/docs/configuration)).
 
+### 6.9 From 0.1.0-beta.9 to 0.1.0-beta.10
+
+```bash
+bun add @flowy-agent-store/sdk@0.1.0-beta.10
+bun add @flowy-agent-store/protocol@0.1.0-beta.10
+bun run typecheck
+```
+
+- The protocol fingerprint advances to `fp-14` and the handshake enforces strict equality: **host and client must be upgraded together** — one side alone cannot connect;
+- **No TypeScript signature breaks this time**: `ExpertPack.assets` / `ExpertPack.avatar`, `ExpertAssetRef`, `client.listImportAssets()` / `client.readImportAsset()`, `ExportResult.writtenAssets` and the `snapshot_assets` capability are all **additive**, so `bun run typecheck` should pass unchanged;
+- Adds two **WebSocket-only** methods, `import/assets` / `import/asset`, bringing total methods to 82 and HTTP mapped routes stay at 55;
+- **`exportTeam()` / `exportAgent()` write more into the target directory** (nothing is removed): the package-level `avatars/`, `bin/` and `scripts/` land at their snapshot-relative paths (`result.writtenAssets`) and the materialized directory becomes a complete plugin root — if your consumer assumed the directory holds only `expert-pack.json` / `persona.md` / `members/` / `skills/`, check that the new directories do not interfere;
+- **Executable content boundary**: `kind: "script"` is a class label, not a permission — the host itself never executes plugin-level scripts and the bytes land 0644; an operator who does not want the pack to declare the class adds `[expert_export] scripts = false` to `config.toml` (avatars unaffected);
+- After the host upgrade, the connector authorization page shows success/failure only once the token exchange has a verdict, `connector/auth/status` reports `authorization_pending` while a flow runs, and installing a connector from the Web UI now matches the SDK (usable immediately).
+
 ## 7. Verifying Installed Versions
 
 ```bash
@@ -217,14 +233,16 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. Artifact Diff Verification
 
-As of `0.1.0-beta.9`, repository contracts align with published packages:
+As of `0.1.0-beta.10`, repository contracts align with published packages:
 
-1. **Market source policy and bounded auto-upgrade — `fp-12` $\to$ `fp-13`**: adds `market/settings` / `market/settings-set` (`GET` / `POST /api/app-server/market-settings`), bringing wire methods to 80 and HTTP mapped routes to 55; per-source `download_on_start`, `AGENT_STORE_MARKET_DOWNLOAD`, `AGENT_STORE_CONFIG`; a market's `auto_update` grows from "refresh the index" to "refresh and auto-upgrade", with the default whitelist `["agent","team","skill"]` (connectors are never implicit).
-2. **`exportTeam()` now carries a team's package-level skills**: the team's top-level `skills` is filled from the skills its own snapshot installed and deduplicated with the member declarations; no wire or type shape change.
-3. **In-place store updates — `fp-11` $\to$ `fp-12`**: adds `store/update-entry` and the client's `store.update()`, bringing wire methods to 78 and HTTP mapped routes to 53.
-4. **Connector user credential system — `fp-8` $\to$ `fp-11`**: the `credential` block and `token-schema.json` declarations, `connector/credential/{get,set,clear}`, and `connector/register` (the template is the declaration); credentials are keyed per caller.
-5. **SDK pack materialization**: `exportAgent` / `exportTeam` / `materializePack`.
-6. **Two entry-version and install-state fixes**: skill and connector entry versions are no longer pinned at the `1.0.0` placeholder, and install-state writes narrow on `(snapshot_id, component_id)`.
+1. **Expert export carries plugin-level assets — `fp-13` $\to$ `fp-14`**: adds `import/assets` / `import/asset` (WebSocket-only), bringing wire methods to 82 (HTTP mapped routes stay 55); the `ExpertPack` moves to `pack_format 2` (`assets` / `avatar`), `materializePack` writes `writtenAssets`, and the exported directory is a complete plugin root; the `snapshot_assets` capability and the `[expert_export] scripts` subtraction are new.
+2. **Connector authorization visibility fixes**: the callback page answers only after the token exchange has a verdict; `auth/status` reports `authorization_pending`; WebUI installs go through `store.install()`; `store.findByConnector()` and `StoreOperationOutcome.installedCount` are new; `MCP_OAUTH_CLIENT_NAME`.
+3. **Market source policy and bounded auto-upgrade — `fp-12` $\to$ `fp-13`**: adds `market/settings` / `market/settings-set` (`GET` / `POST /api/app-server/market-settings`), bringing wire methods to 80 and HTTP mapped routes to 55; per-source `download_on_start`, `AGENT_STORE_MARKET_DOWNLOAD`, `AGENT_STORE_CONFIG`; a market's `auto_update` grows from "refresh the index" to "refresh and auto-upgrade", with the default whitelist `["agent","team","skill"]` (connectors are never implicit).
+4. **`exportTeam()` now carries a team's package-level skills**: the team's top-level `skills` is filled from the skills its own snapshot installed and deduplicated with the member declarations; no wire or type shape change.
+5. **In-place store updates — `fp-11` $\to$ `fp-12`**: adds `store/update-entry` and the client's `store.update()`, bringing wire methods to 78 and HTTP mapped routes to 53.
+6. **Connector user credential system — `fp-8` $\to$ `fp-11`**: the `credential` block and `token-schema.json` declarations, `connector/credential/{get,set,clear}`, and `connector/register` (the template is the declaration); credentials are keyed per caller.
+7. **SDK pack materialization**: `exportAgent` / `exportTeam` / `materializePack`.
+8. **Two entry-version and install-state fixes**: skill and connector entry versions are no longer pinned at the `1.0.0` placeholder, and install-state writes narrow on `(snapshot_id, component_id)`.
 
 ### 8.1 Migrating Marketplace Sources in Existing Configurations
 
