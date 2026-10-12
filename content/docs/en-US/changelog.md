@@ -21,8 +21,8 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.9", "latest": "0.1.0-beta.2" },
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.10", "latest": "0.1.0-beta.2" },
   "time": {
     "0.1.0": "2026-09-09T09:09:04.795Z",
     "0.1.0-beta.2": "2026-09-09T09:27:36.122Z",
@@ -32,14 +32,16 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
     "0.1.0-beta.6": "2026-09-18T11:08:21.813Z",
     "0.1.0-beta.7": "2026-09-20T10:33:48.685Z",
     "0.1.0-beta.8": "2026-09-28T10:23:47.656Z",
-    "0.1.0-beta.9": "2026-10-10T04:34:35.842Z"
+    "0.1.0-beta.9": "2026-10-10T04:34:35.842Z",
+    "0.1.0-beta.10": "2026-10-12T07:30:00.000Z"
   }
 }
 ```
 
 | Version | Published (UTC) | Change type | Current dist-tag |
 | --- | --- | --- | --- |
-| `0.1.0-beta.9` | 2026-10-10 | Breaking (strict protocol fingerprint `fp-12` → `fp-13`) | `beta` |
+| `0.1.0-beta.10` | 2026-10-12 | Breaking (strict protocol fingerprint `fp-13` → `fp-14`) | `beta` |
+| `0.1.0-beta.9` | 2026-10-10 | Breaking (strict protocol fingerprint `fp-12` → `fp-13`) | — |
 | `0.1.0-beta.8` | 2026-09-28 | Breaking (strict protocol fingerprint `fp-8` → `fp-12`) | — |
 | `0.1.0-beta.7` | 2026-09-20 | Breaking (strict protocol fingerprint `fp-7` → `fp-8`) | — |
 | `0.1.0-beta.6` | 2026-09-18 | Breaking (SDK entry rename + flattened return shape) | — |
@@ -49,7 +51,29 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 | `0.1.0-beta.2` | 2026-09-09 | Additive (non-breaking) | `latest` |
 | `0.1.0` | 2026-09-09 | Initial release | none |
 
-### 2.1 `0.1.0-beta.9` — 2026-10-10T04:34:35Z
+### 2.1 `0.1.0-beta.10` — 2026-10-12T07:30:00Z
+
+> **Breaking change**: The protocol fingerprint incremented from `fp-13` to `fp-14`; clients and runtimes must align versions (see [Upgrade and migration guide](/en-US/docs/upgrade) §6.9).
+
+#### Breaking
+
+- **Protocol Fingerprint Increment**: `fp-13` $\to$ **`fp-14`**. Adds two **WebSocket-only** methods: `import/assets` (lists a snapshot's plugin-level asset inventory) and `import/asset` (one file's bytes base64, same envelope as `skill/file`). Wire methods grow from 80 to **82**; HTTP mapped routes stay at **55** (neither new method has an HTTP binding). The handshake is still strict-equality: an old client against a new host (or the reverse) is refused outright, so the SDK and the host must upgrade together. The handshake capability set gains `snapshot_assets`.
+
+#### Added
+
+- **Expert export carries plugin-level assets**: `ExpertPack` moves to `pack_format 2` with `assets` (a by-reference list of the package-level `avatars/`, `bin/`, `scripts/` files: `path` / `kind: "avatar" | "script"` / `size` / sha256 `digest`, sorted by `path`) and `avatar` (the package avatar as a snapshot-relative path, present only when that file is actually listed in `assets`). `materializePack` writes the assets at their snapshot-relative paths and `ExportResult` gains `writtenAssets` — the exported directory is now a **complete plugin root**: a team whose own scripts resolve `PLUGIN_ROOT/bin/init_task.py` (two levels above its skill) and `../../../avatars` finds them. Assets are snapshot-scoped: a member pack's `assets` is always empty; read the top-level pack.
+- **Operator subtraction**: `[expert_export]` gains a `scripts` key (default `true`, the fail-open doctrine unchanged); `false` drops the `kind: "script"` entries from the pack's `assets` (avatars unaffected). Honest boundary: it shapes the **pack contract**, not the byte face — `import/asset` reads with the same authority as `import/get`, exactly as `skill/files` was never gated by this table.
+- **Dangling skills are accepted behaviour (decision record)**: a member's frontmatter `skills:` declaration never had a fulfillment mechanism in the source runtime (WorkBuddy/CodeBuddy); this project aligns with that, and reports unresolvable declarations honestly into `danglingSkills` (never silently, never aborting). Package-level skills of an official team never dangle.
+
+#### Fixed
+
+- **The connector authorization page no longer lies**: the callback answered "Authorization successful!" as soon as the code arrived, while the token exchange ran after it — a login throttled by a gateway (`slow_down`) looked finished in the window, so the user closed it and never retried. The browser now receives its page only once the exchange has a verdict: a success page, or a "not completed" page with the sanitized reason; refused callbacks (CSRF, path mismatch, missing code/state, no pending login) each get a user-facing page too.
+- **`connector/auth/status` reports `authorization_pending`**: while a browser flow is running the status says so (before, "waiting for the user" and "never started" were the same answer on the wire). It outranks the stored credential and disappears with the flow. No field/method/event change, so no fingerprint bump.
+- **Installing a store entry from the Web UI goes through the SDK's `store.install()`**: the buttons used the bare `store/install-entry` verb, bypassing the "a connector registers as disabled; readiness enables it and probes" step — a connector installed from the store page stayed disabled. Both install entries (store page, market management) now use the state machine.
+- **`store.findByConnector(connectorId)`**: finds the `StoreItem` that installed a given connector by its `id` or runtime `name` (the entry `fenbi-baokao-decision` installs a server called `fenbi_mcp`, which `search()` could not answer); `StoreOperationOutcome` gains `installedCount`.
+- **`MCP_OAUTH_CLIENT_NAME`**: dynamic client registration announces the host's own name (env wins, built-in default `Nomifun MCP Client`, empty counts as unset), so a private deployment shows its own branding on the provider's consent page without patching the binary; it applies to clients this host registers itself, and an existing registration keeps the name it was created with.
+
+### 2.2 `0.1.0-beta.9` — 2026-10-10T04:34:35Z
 
 > **Breaking change**: The protocol fingerprint incremented from `fp-12` to `fp-13`; clients and runtimes must align versions (see [Upgrade and migration guide](/en-US/docs/upgrade) §6.8).
 
@@ -68,7 +92,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - **`exportTeam()` now exports a team's own package-level skills**: a team `ExpertPack`'s top-level `skills` used to be hard-coded to an empty array while member skills came only from each member agent's frontmatter, so teams that declare their skills once at the package level — for example `stock-partner-team`, three package skills and zero declarations across seven members — exported with no skills at all. It now reads the skill components **that team's own snapshot installed**, and `materializePack` deduplicates them with the member declarations into `skills/<name>/...`. No wire or type shape change (see the [TypeScript SDK reference](/en-US/docs/typescript-sdk) §4.4).
 
-### 2.2 `0.1.0-beta.8` — 2026-09-28T10:23:47Z
+### 2.3 `0.1.0-beta.8` — 2026-09-28T10:23:47Z
 
 > **Breaking change**: The protocol fingerprint incremented from `fp-8` to `fp-12`; clients and runtimes must align versions (see [Upgrade and migration guide](/en-US/docs/upgrade) §6.7).
 
@@ -89,7 +113,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - **Install-state writes were not snapshot-scoped**: component ids are shared across snapshots, so releasing an old version also cleared the new version's install record; the three write paths now narrow on `(snapshot_id, component_id)`.
 - **An empty `values` map was written into the stored connector transport config**: the next save was read as a configuration change, disabling the server and clearing its probed tools; it is now written only when non-empty.
 
-### 2.3 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
+### 2.4 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
 
 > **Breaking change**: The protocol fingerprint incremented to `fp-8`; clients and runtimes must align versions (see [Upgrade and migration guide](/en-US/docs/upgrade) §6.6).
 
@@ -106,7 +130,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - **Model Output Limit Wiring**: Resolves issue where `max_output_size` and `protocol` in `[models.*]` were unpopulated during registration, using non-destructive writes to backfill missing limits.
 
-### 2.4 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
+### 2.5 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
 
 > **Breaking change**: SDK entry point renamed and interface shape flattened (see [Upgrade and migration guide](/en-US/docs/upgrade) §6.5).
 
@@ -117,7 +141,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - `initializeResult` renamed to **`handshake`**.
 - `close()` teardown expanded to manage unsubscription, socket closure, process termination, and temporary data directory deletion.
 
-### 2.5 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
+### 2.6 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
 
 > **Breaking change**: Protocol fingerprint incremented to `fp-7`, breaking compatibility with older runtimes.
 
@@ -142,7 +166,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - Resolves issue where `source_kind = "zip"` entries were filtered during configuration parsing.
 
-### 2.6 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
+### 2.7 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
 
 > **Breaking change**: Fingerprint updated to `fp-1`; `event_type` narrowed.
 
@@ -163,7 +187,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - HTTP route table mapping coverage expanded to 48.
 
-### 2.7 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
+### 2.8 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
 
 #### Added
 
@@ -174,7 +198,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - Adds `engines.node >= 22` and repository metadata in `package.json`.
 
-### 2.8 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
+### 2.9 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
 
 #### Added
 
@@ -184,7 +208,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - Resolves missing runtime dependencies in `0.1.0`.
 
-### 2.9 `0.1.0` — 2026-09-09T09:09:04Z
+### 2.10 `0.1.0` — 2026-09-09T09:09:04Z
 
 #### Added
 
@@ -200,7 +224,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. Unpublished changes and release cadence
 
-**There are currently no landed-but-unpublished entries**: the `0.1.0-beta.9` content moved into §2 above as published fact. The next batch is registered here and promoted to §2 on release.
+**There are currently no landed-but-unpublished entries**: the `0.1.0-beta.10` content moved into §2 above as published fact. The next batch is registered here and promoted to §2 on release.
 
 The current stable release is `0.1.0-beta.9` (wire protocol `fp-13`). Features not listed on this page should not be considered active.
 

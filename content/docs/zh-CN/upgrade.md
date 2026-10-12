@@ -22,7 +22,8 @@
 
 | 版本 | 发布时间（UTC） | 当前 dist-tag | 与上一版的实质差异 |
 | --- | --- | --- | --- |
-| `0.1.0-beta.9` | 2026-10-10T04:34:35Z | `beta` | **破坏性**：协议指纹递增至 `fp-13`（握手全等校验）；新增 `market/settings` / `market/settings-set` 市场策略读写，方法总数扩充至 80、HTTP 路由映射数扩充至 55；新增市场源 per-source `download_on_start`、`AGENT_STORE_MARKET_DOWNLOAD` / `AGENT_STORE_CONFIG` 与受控自动升级；`exportTeam()` 修复团队包级技能（升级步骤见 §6.8） |
+| `0.1.0-beta.10` | 2026-10-12T07:30:00Z | `beta` | **破坏性**：协议指纹递增至 `fp-14`（握手全等校验）；新增 WebSocket 专用接口 `import/assets` 与 `import/asset`，方法总数扩充至 82（HTTP 路由映射数保持 55）；专家包升至 `pack_format 2`（插件级资产 `avatars/ bin/ scripts/` 随包导出，`materializePack` 落盘 `writtenAssets`）；连接器授权回调页改为交换后才出结果、`auth/status` 新增 `authorization_pending`、WebUI 安装走 `store.install()`、新增 `store.findByConnector()` 与 `MCP_OAUTH_CLIENT_NAME`（升级步骤见 §6.9） |
+| `0.1.0-beta.9` | 2026-10-10T04:34:35Z | — | **破坏性**：协议指纹递增至 `fp-13`（握手全等校验）；新增 `market/settings` / `market/settings-set` 市场策略读写，方法总数扩充至 80、HTTP 路由映射数扩充至 55；新增市场源 per-source `download_on_start`、`AGENT_STORE_MARKET_DOWNLOAD` / `AGENT_STORE_CONFIG` 与受控自动升级；`exportTeam()` 修复团队包级技能（升级步骤见 §6.8） |
 | `0.1.0-beta.8` | 2026-09-28T10:23:47Z | — | **破坏性**：协议指纹递增至 `fp-12`（握手全等校验）；新增 `store/update-entry` 商店条目原地更新与连接器用户凭据体系（`connector/credential/*`、`connector/register`），方法总数扩充至 78、HTTP 路由映射数扩充至 53；`updateHint()` 返回值收窄（升级步骤见 §6.7） |
 | `0.1.0-beta.7` | 2026-09-20T10:33:48Z | — | **破坏性**：协议指纹递增至 `fp-8`（握手全等校验）；新增 WebSocket 专用接口 `agent/export` 与 `team/export`，方法总数扩充至 73；接口参数保持平稳（升级步骤见 §6.6） |
 | `0.1.0-beta.6` | 2026-09-18T11:08:21Z | — | **破坏性**：SDK 入口与结构重构（`launchClient` 重命名为 `launchHarness`，移除 `.client` 包装，`initializeResult` 调整为 `handshake`），需同步修改调用代码；线协议维持 `fp-7`（升级步骤见 §6.5） |
@@ -39,7 +40,7 @@
 | dist-tag | 当前指向 |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.9` |
+| `beta` | `0.1.0-beta.10` |
 
 ```bash
 npm view @flowy-agent-store/sdk versions dist-tags --json
@@ -47,8 +48,8 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.9", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.10", "latest": "0.1.0-beta.2" }
 }
 ```
 
@@ -202,6 +203,21 @@ bun run typecheck
 - **`exportTeam()` 的输出变了**（协议与类型形态未变）：团队的 `pack.skills` 不再恒为空，它现在是该团队包级声明且已安装的技能；若你此前自行遍历 `pack.team.members[].skills` 来收集团队技能，那段代码可以删掉，直接读 `result.writtenSkills`（用法见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §4.4）；
 - 若你希望宿主启动时不自动下载市场源，可用 `download_on_start = false` 或 `AGENT_STORE_MARKET_DOWNLOAD=none`；自动升级的条目类型与扫掠周期可在运行期经 `market/settings-set` 改写（配置写法见 [配置参考](/zh-CN/docs/configuration)）。
 
+### 6.9 从 0.1.0-beta.9 升到 0.1.0-beta.10
+
+```bash
+bun add @flowy-agent-store/sdk@0.1.0-beta.10
+bun add @flowy-agent-store/protocol@0.1.0-beta.10
+bun run typecheck
+```
+
+- **协议指纹由 `fp-13` 递增到 `fp-14`**，握手执行严格全等校验：**客户端与运行时必须同批升级**，只升一边会直接连不上；
+- **没有 TypeScript 签名破坏**：`ExpertPack.assets` / `ExpertPack.avatar`、`ExpertAssetRef`、`client.listImportAssets()` / `client.readImportAsset()`、`ExportResult.writtenAssets`、能力位 `snapshot_assets` 全部是**加法**，`bun run typecheck` 应当照旧通过；
+- 新增两个 **WebSocket-only** 方法 `import/assets` / `import/asset`，协议方法总数 82、HTTP 路由映射数保持 55；
+- **`exportTeam()` / `exportAgent()` 的输出目录变多了**（不删任何东西）：插件级 `avatars/`、`bin/`、`scripts/` 会按快照相对路径落盘（`result.writtenAssets`），物化目录成为完整的插件根——若你的消费逻辑此前假设目录里只有 `expert-pack.json` / `persona.md` / `members/` / `skills/`，需要确认新增目录不会干扰它；
+- **可执行内容的边界**：`kind: "script"` 是类别标注不是许可——宿主自己从不执行插件级脚本，字节按 0644 交付；不想让包声明这一类的运营者，在 `config.toml` 加 `[expert_export] scripts = false` 即可（头像不受影响）；
+- 宿主升级后，连接器授权回调页会在 token 交换出结果后才显示成功/失败，`connector/auth/status` 在流程进行中报告 `authorization_pending`；从 WebUI 安装连接器现在与 SDK 行为一致（装完即可用）。
+
 ## 7. 自查当前安装的版本
 
 ```bash
@@ -217,14 +233,16 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. 已发布产物的差异与自查方法
 
-截至 `0.1.0-beta.9`，工作区与线上发布产物保持一致：
+截至 `0.1.0-beta.10`，工作区与线上发布产物保持一致：
 
-1. **市场源策略与受控自动升级 —— `fp-12` $\to$ `fp-13`**：新增 `market/settings` / `market/settings-set`（`GET` / `POST /api/app-server/market-settings`），协议方法总数扩充至 80、HTTP 路由映射数扩充至 55；per-source `download_on_start`、`AGENT_STORE_MARKET_DOWNLOAD`、`AGENT_STORE_CONFIG`；市场级 `auto_update` 从「只刷索引」扩为「刷新 + 自动升级」，默认白名单 `["agent","team","skill"]`（连接器不隐式包含）。
-2. **`exportTeam()` 补齐团队包级技能**：团队的顶层 `skills` 由该团队自身快照已安装的技能填充，与成员声明一并去重落盘；协议与类型形态未变。
-3. **商店条目原地更新 —— `fp-11` $\to$ `fp-12`**：新增 `store/update-entry` 与客户端 `store.update()`，协议方法总数扩充至 78，HTTP 路由映射数扩充至 53。
-4. **连接器用户凭据体系 —— `fp-8` $\to$ `fp-11`**：`credential` 块与 `token-schema.json` 声明、`connector/credential/{get,set,clear}`、`connector/register`（模板即声明）；凭据按调用者键控。
-5. **SDK 资源物化助手**：`exportAgent` / `exportTeam` / `materializePack`。
-6. **条目版本与安装态的两处修复**：技能与连接器条目的版本不再被钉在占位版本 `1.0.0`；安装态写入按 `(snapshot_id, component_id)` 收窄。
+1. **专家导出补齐插件级资产 —— `fp-13` $\to$ `fp-14`**：新增 `import/assets` / `import/asset`（WebSocket-only），方法总数扩充至 82（HTTP 路由映射数保持 55）；`ExpertPack` 升至 `pack_format 2`（`assets` / `avatar`），`materializePack` 落盘 `writtenAssets`，导出目录成为完整插件根；能力位 `snapshot_assets`、减项 `[expert_export] scripts`。
+2. **连接器授权可见性修复**：回调页在 token 交换出结果后才出页面；`auth/status` 新增 `authorization_pending`；WebUI 安装走 `store.install()`；新增 `store.findByConnector()` 与 `StoreOperationOutcome.installedCount`；`MCP_OAUTH_CLIENT_NAME`。
+3. **市场源策略与受控自动升级 —— `fp-12` $\to$ `fp-13`**：新增 `market/settings` / `market/settings-set`（`GET` / `POST /api/app-server/market-settings`），协议方法总数扩充至 80、HTTP 路由映射数扩充至 55；per-source `download_on_start`、`AGENT_STORE_MARKET_DOWNLOAD`、`AGENT_STORE_CONFIG`；市场级 `auto_update` 从「只刷索引」扩为「刷新 + 自动升级」，默认白名单 `["agent","team","skill"]`（连接器不隐式包含）。
+4. **`exportTeam()` 补齐团队包级技能**：团队的顶层 `skills` 由该团队自身快照已安装的技能填充，与成员声明一并去重落盘；协议与类型形态未变。
+5. **商店条目原地更新 —— `fp-11` $\to$ `fp-12`**：新增 `store/update-entry` 与客户端 `store.update()`，协议方法总数扩充至 78，HTTP 路由映射数扩充至 53。
+6. **连接器用户凭据体系 —— `fp-8` $\to$ `fp-11`**：`credential` 块与 `token-schema.json` 声明、`connector/credential/{get,set,clear}`、`connector/register`（模板即声明）；凭据按调用者键控。
+7. **SDK 资源物化助手**：`exportAgent` / `exportTeam` / `materializePack`。
+8. **条目版本与安装态的两处修复**：技能与连接器条目的版本不再被钉在占位版本 `1.0.0`；安装态写入按 `(snapshot_id, component_id)` 收窄。
 
 ### 8.1 迁移已有配置里的市场源
 

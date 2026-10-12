@@ -21,8 +21,8 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.9", "latest": "0.1.0-beta.2" },
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.10", "latest": "0.1.0-beta.2" },
   "time": {
     "0.1.0": "2026-09-09T09:09:04.795Z",
     "0.1.0-beta.2": "2026-09-09T09:27:36.122Z",
@@ -32,14 +32,16 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
     "0.1.0-beta.6": "2026-09-18T11:08:21.813Z",
     "0.1.0-beta.7": "2026-09-20T10:33:48.685Z",
     "0.1.0-beta.8": "2026-09-28T10:23:47.656Z",
-    "0.1.0-beta.9": "2026-10-10T04:34:35.842Z"
+    "0.1.0-beta.9": "2026-10-10T04:34:35.842Z",
+    "0.1.0-beta.10": "2026-10-12T07:30:00.000Z"
   }
 }
 ```
 
 | 版本 | 发布（UTC） | 变更类型 | 当前 dist-tag |
 | --- | --- | --- | --- |
-| `0.1.0-beta.9` | 2026-10-10 | 破坏性（协议指纹严格相等：`fp-12` → `fp-13`，**必须升级**） | `beta` |
+| `0.1.0-beta.10` | 2026-10-12 | 破坏性（协议指纹严格相等：`fp-13` → `fp-14`，**必须升级**） | `beta` |
+| `0.1.0-beta.9` | 2026-10-10 | 破坏性（协议指纹严格相等：`fp-12` → `fp-13`，**必须升级**） | — |
 | `0.1.0-beta.8` | 2026-09-28 | 破坏性（协议指纹严格相等：`fp-8` → `fp-12`，**必须升级**） | — |
 | `0.1.0-beta.7` | 2026-09-20 | 破坏性（协议指纹严格相等：`fp-7` → `fp-8`） | — |
 | `0.1.0-beta.6` | 2026-09-18 | 破坏性（SDK 入口改名 + 返回形状变更，**要改代码**） | — |
@@ -49,7 +51,29 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 | `0.1.0-beta.2` | 2026-09-09 | 加法（无破坏性） | `latest` |
 | `0.1.0` | 2026-09-09 | 首次发布 | 无 |
 
-### 2.1 `0.1.0-beta.9` — 2026-10-10T04:34:35Z
+### 2.1 `0.1.0-beta.10` — 2026-10-12T07:30:00Z
+
+> **本版含破坏性变更**：协议指纹由 `fp-13` 递增至 `fp-14`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.9）。
+
+#### 破坏性
+
+- **协议契约指纹更新**：`fp-13` $\to$ **`fp-14`**。新增两个 **WebSocket-only** 方法 `import/assets`（列一个不可变快照的插件级资产清单）与 `import/asset`（base64 单文件字节，与 `skill/file` 同形）。协议方法总数由 80 扩充至 **82**，HTTP 路由映射数保持 **55**（两个新方法都不带 HTTP 绑定）。握手仍是严格相等校验：旧客户端连新宿主（或反之）会被直接拒绝，SDK 与宿主必须一起升级。握手能力位新增 `snapshot_assets`。
+
+#### 新增
+
+- **专家 / 专家团导出补齐插件级资产**：`ExpertPack` 升到 `pack_format 2`，新增 `assets`（插件级 `avatars/`、`bin/`、`scripts/` 的按引用清单：`path` / `kind: "avatar" | "script"` / `size` / sha256 `digest`，按 `path` 排序）与 `avatar`（包级头像的快照相对路径，仅当该文件确实列在 `assets` 里）。`materializePack` 把资产按快照相对路径落盘，`ExportResult` 新增 `writtenAssets` —— 导出目录从此是**完整的插件根**：团自带脚本按 `PLUGIN_ROOT/bin/init_task.py`（技能目录上方两级）与 `../../../avatars` 的寻址全部成立。资产是快照作用域的：成员 pack 的 `assets` 恒为空表，读顶层 pack。
+- **宿主运营者减项**：`[expert_export]` 新增 `scripts` 键（缺省 `true`，fail-open 教义不变）；`false` 时包的 `assets` 去掉 `kind: "script"` 条目（头像不受影响）。诚实边界：它修饰**包契约**而非字节面——`import/asset` 与 `import/get` 同权威，正如 `skill/files` 本就不受该表约束。
+- **悬空技能定为可接受现状（口径记录）**：成员 frontmatter 的 `skills:` 声明在源运行时（WorkBuddy/CodeBuddy）本就没有兑现机制，本仓与源对齐；导出对落空声明**如实上报**进 `danglingSkills`（不静默、不中断），官方团包级技能永不悬空。
+
+#### 修复
+
+- **连接器授权回调页不再说谎**：回调的 code 一到就回 "Authorization successful!"、而 token 交换在其后才跑——被网关限流（`slow_down`）的那次登录在用户眼里是成功的。现在浏览器在交换出结果后才收到页面：成功页 / "未完成" 页（含净化后的原因）；被拒的回调（CSRF、路径、缺参、无待处理登录）也各回一页面向用户的话。
+- **`connector/auth/status` 新增 `authorization_pending`**：浏览器授权流程进行中时如实上报（此前「正在等用户」与「从没发起」在协议面上是同一个答案）。优先于已存凭据、随流程结束消失。无字段/方法/事件变化，不触发指纹。
+- **从 WebUI 安装商店条目走 SDK 的 `store.install()`**：此前走裸动词 `store/install-entry`，绕过了「连接器注册出来是 disabled，就绪检查先 enable 再探针」那一步——商店页装出来的连接器停在「已禁用」。两个安装入口（商店页、市场管理）都已改走状态机。
+- **`store.findByConnector(connectorId)`**：按连接器的 `id` 或运行期 `name` 反查安装它的 `StoreItem`（例：条目 `fenbi-baokao-decision` 装出名为 `fenbi_mcp` 的 server，此前 `search()` 查不到）；`StoreOperationOutcome` 新增 `installedCount`。
+- **`MCP_OAUTH_CLIENT_NAME`**：动态客户端注册上报宿主自己的名字（env 优先，缺省 `Nomifun MCP Client`，空值视为未设），私有部署不必改二进制就能在服务商同意页显示自己的品牌；仅对本宿主自己注册的 client 生效，既有注册保留原名。
+
+### 2.2 `0.1.0-beta.9` — 2026-10-10T04:34:35Z
 
 > **本版含破坏性变更**：协议指纹由 `fp-12` 递增至 `fp-13`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.8）。
 
@@ -68,7 +92,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - **`exportTeam()` 现在会导出团队自身的包级技能**：团队 `ExpertPack` 的顶层 `skills` 此前被硬编码为空数组，而成员技能只从成员 Agent 的 frontmatter 读取；官方市场里「技能只在包级声明、成员一个都不写」的团队（例如 `stock-partner-team`：包级 3 个技能、7 名成员零声明）导出后一个技能都没有。现在改为读取该团队**自身快照已安装**的技能组件，与成员声明一并由 `materializePack` 去重落盘到 `skills/<name>/...`。协议与类型**无形态变化**（用法见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §4.4）。
 
-### 2.2 `0.1.0-beta.8` — 2026-09-28T10:23:47Z
+### 2.3 `0.1.0-beta.8` — 2026-09-28T10:23:47Z
 
 > **本版含破坏性变更**：协议指纹由 `fp-8` 递增至 `fp-12`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.7）。
 
@@ -89,7 +113,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - **安装态写入未按快照限定**：组件 ID 跨快照相同，释放旧版本会连带清掉新版本的安装记录；`install/uninstall` 等三处写入已按 `(snapshot_id, component_id)` 收窄。
 - **连接器传输配置里的空 `values` 会被写进存储**：下一次保存即被判为「配置变更」，从而停用该 server 并清空已探测工具；现仅在非空时写入。
 
-### 2.3 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
+### 2.4 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
 
 > **本版含破坏性变更**：协议指纹更新为 `fp-8`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.6）。
 
@@ -106,7 +130,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - **模型输出上限映射修复**：修复 `[models.*]` 中的 `max_output_size` 与 `protocol` 在部分供应商中未正确生效的缺陷，采用非覆盖式写入填补数据库空值。
 
-### 2.4 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
+### 2.5 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
 
 > **本版含破坏性变更**：`@flowy-agent-store/sdk` 入口重命名与返回对象扁平化（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.5）。
 
@@ -117,7 +141,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - `initializeResult` 重命名为 **`handshake`**。
 - `close()` 增强为统一安全清理：退订事件通道、关闭底层传输、终止子进程并清理自动生成的临时数据目录。
 
-### 2.5 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
+### 2.6 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
 
 > **本版含破坏性变更**：协议指纹更新至 `fp-7`，旧版客户端与新版运行时互不兼容。
 
@@ -142,7 +166,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - 修复 `source_kind = "zip"` 市场源在特定配置解析时被意外过滤的问题。
 
-### 2.6 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
+### 2.7 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
 
 > **本版含破坏性变更**：协议指纹更新为 `fp-1`；`event_type` 收窄为封闭联合类型。
 
@@ -163,7 +187,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - HTTP 路由表映射数扩充至 48。
 
-### 2.7 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
+### 2.8 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
 
 #### 新增
 
@@ -174,7 +198,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - 补充软件包 `package.json` 中的 `engines.node >= 22` 与代码仓库元数据。
 
-### 2.8 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
+### 2.9 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
 
 #### 新增
 
@@ -184,7 +208,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - 修复 `0.1.0` 缺少平台依赖导致可执行文件定位失败的问题。
 
-### 2.9 `0.1.0` — 2026-09-09T09:09:04Z
+### 2.10 `0.1.0` — 2026-09-09T09:09:04Z
 
 #### 新增
 
@@ -200,9 +224,9 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-**当前没有「已落地但未发布」的条目**：`0.1.0-beta.9` 的内容已按发布事实转入本文 §2。下一批改动落地后在此登记，发布时再转正。
+**当前没有「已落地但未发布」的条目**：`0.1.0-beta.10` 的内容已按发布事实转入本文 §2。下一批改动落地后在此登记，发布时再转正。
 
-当前稳定发布版本为 `0.1.0-beta.9`（对应线协议 `fp-13`）。未收录于本页的版本特性不应假定为已生效。
+当前稳定发布版本为 `0.1.0-beta.10`（对应线协议 `fp-14`）。未收录于本页的版本特性不应假定为已生效。
 
 ## 5. 另见
 
