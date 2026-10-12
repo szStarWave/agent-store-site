@@ -63,7 +63,7 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```bash
 bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2（latest）
-bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.7
+bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.10
 bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → 解析为 0.1.0-beta.2
 npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → 可能解析为 0.1.0
 ```
