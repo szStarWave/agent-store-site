@@ -564,6 +564,48 @@ console.log(`Custom materialized skills: ${customResult.writtenSkills.join(", ")
 
 A team's skills come from two sources — the package-level declarations plus the members' own declarations — and `exportTeam` unions them, deduplicating by id. Where `teamId` comes from, how to fetch skill bytes only, and the four prerequisites and pitfalls are in the [TypeScript SDK guide](/en-US/docs/typescript-sdk) §4.4.
 
+#### 6.2.1 Plugin-level assets (avatars / bin / scripts) in the export
+
+Since `fp-14` (`pack_format 2`), the exported directory also carries the package's **plugin-level assets** — the `avatars/`, `bin/` and `scripts/` directories beside `skills/`. Many teams' own scripts assume the plugin root holds them (`stock-partner-team`'s `render.py` resolves `PLUGIN_ROOT/bin/init_task.py`), and exports used to miss exactly that layer:
+
+```ts
+// Confirm the host wired the asset face first (without it, pack.assets is
+// always empty — that is how "not wired" differs from "ships none").
+if (!client.initializeInfo?.capabilities.snapshot_assets) {
+  console.warn("host has no snapshot_assets; the export will carry no plugin-level assets");
+}
+
+const result = await exportTeam(client, "wb-stock-partner-team-team", "./exported-team");
+
+// pack.assets: the by-reference inventory, sorted by path; kind separates
+// display assets from executable package scripts
+for (const asset of result.pack.assets) {
+  console.log(`${asset.kind.padEnd(6)} ${asset.digest.slice(0, 12)} ${asset.path}`);
+  // avatar  3f2a…  avatars/team.png
+  // script  9c10…  bin/init_task.py
+  // script  51bb…  scripts/check.sh
+}
+
+// The package avatar: a snapshot-relative path, guaranteed to be listed in assets
+console.log(`package avatar: ${result.pack.avatar}`);       // avatars/team.png
+console.log(`written assets: ${result.writtenAssets.join(", ")}`);
+// → avatars/asset-pack-worker.png, avatars/team.png, bin/init_task, bin/init_task.py, scripts/check.sh
+```
+
+The result is a **complete plugin root**, so the package's own relative addressing works:
+
+```text
+./exported-team/
+├── expert-pack.json
+├── members/<id>/persona.md
+├── skills/md-to-html/scripts/render.py     # its PLUGIN_ROOT = two levels above
+├── avatars/team.png                        # ← new: embed_avatars.py's default avatar dir
+├── bin/init_task.py                        # ← new: the INIT_TASK render.py calls
+└── scripts/check.sh                        # ← new
+```
+
+Three boundaries to know: assets are **snapshot-scoped** (a member pack's `assets` is always empty; read the top-level pack); `kind: "script"` is a **class label, not a permission** — the host itself never executes plugin-level scripts, the bytes land 0644, and what a consumer does with them is its own decision; and an operator can subtract the class from the pack with `[expert_export] scripts = false` in `config.toml` (avatars unaffected). To fetch bytes yourself instead of going through the SDK, use `client.readImportAsset(pack.provenance.snapshot_id, asset.path)`.
+
 ### 6.3 Host tool policy pruning and control
 
 Dynamic configuration of host tool policies via environment variables:

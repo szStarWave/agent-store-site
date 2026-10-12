@@ -564,6 +564,51 @@ console.log(`自定义物化技能: ${customResult.writtenSkills.join(", ")}`);
 
 团队的技能来自「包级声明 + 成员声明」两个来源，`exportTeam` 会自动取并集并按 id 去重；`teamId` 怎么取、只想要技能字节怎么写、以及四个前置条件与注意事项，见 [TypeScript SDK 指南](/zh-CN/docs/typescript-sdk) §4.4。
 
+#### 6.2.1 插件级资产（avatars / bin / scripts）随包导出
+
+`fp-14`（`pack_format 2`）起，导出目录里除了技能还有包自带的**插件级资产**——与 `skills/` 平级的
+`avatars/`、`bin/`、`scripts/`。很多团的自带脚本就按「插件根」假设它们（如 `stock-partner-team`
+的 `render.py` 按 `PLUGIN_ROOT/bin/init_task.py` 寻址），此前导出缺了这一层，脚本跑不起来：
+
+```ts
+// 先确认宿主接了资产面（没接时 pack.assets 恒为空表——区分「没接」与「包里没有」）
+if (!client.initializeInfo?.capabilities.snapshot_assets) {
+  console.warn("宿主未接 snapshot_assets，导出目录将不含插件级资产");
+}
+
+const result = await exportTeam(client, "wb-stock-partner-team-team", "./exported-team");
+
+// pack.assets：按引用的清单，按 path 排序，kind 区分显示资产与可执行脚本
+for (const asset of result.pack.assets) {
+  console.log(`${asset.kind.padEnd(6)} ${asset.digest.slice(0, 12)} ${asset.path}`);
+  // avatar  3f2a…  avatars/team.png
+  // script  9c10…  bin/init_task.py
+  // script  51bb…  scripts/check.sh
+}
+
+// 包级头像：快照相对路径，且保证已列在 assets 里（可直接交给 <img>/卡片）
+console.log(`包级头像: ${result.pack.avatar}`);            // avatars/team.png
+console.log(`已落盘资产: ${result.writtenAssets.join(", ")}`);
+// → avatars/asset-pack-worker.png, avatars/team.png, bin/init_task, bin/init_task.py, scripts/check.sh
+```
+
+落盘后的目录就是一个**完整的插件根**，包自带脚本的相对寻址全部成立：
+
+```text
+./exported-team/
+├── expert-pack.json
+├── members/<id>/persona.md
+├── skills/md-to-html/scripts/render.py     # 其内部 PLUGIN_ROOT = 目录上方两级
+├── avatars/team.png                        # ← 新增：embed_avatars.py 的默认头像目录
+├── bin/init_task.py                        # ← 新增：render.py 调的 INIT_TASK
+└── scripts/check.sh                        # ← 新增
+```
+
+三个边界要知道：**资产是快照作用域的**（成员 pack 的 `assets` 恒为空表，读顶层）；`kind: "script"`
+是**类别标注不是许可**——宿主自己从不执行插件级脚本，字节按 0644 交付，怎么用是消费方的决定；
+运营者可用 `config.toml` 的 `[expert_export] scripts = false` 把这一类从包里减掉（头像不受影响）。
+想绕过 SDK 自己拉字节时用 `client.readImportAsset(pack.provenance.snapshot_id, asset.path)`。
+
 ### 6.3 宿主工具域裁剪与策略控制
 
 通过环境变量动态重载宿主工具策略：
