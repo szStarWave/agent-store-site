@@ -474,15 +474,15 @@ console.log(result.pack); // 线上 ExpertPack 原件，支持无磁盘 I/O 消�
 
 #### 类别与标签（`fp-16` / `pack_format 3` 起随包导出）
 
-`fp-16` 起 `ExpertPack` 携带市场声明的展示元数据，供第三方 runtime 还原市场的组织结构：
+`fp-16` 起 `ExpertPack` 携带市场声明的展示元数据，供第三方 runtime 还原市场组织方式：
 
 - `pack.tags`：本地化标签数组（`{zh, en}` 可选对，按位配对）。
-- `pack.category_id`：裸分类引用（如 `04-DataAI`）——包**只带 id**，解析分类名需要消费方自己持有等价字典（本仓的字典在 `store.categories()`，跨宿主不通用）。
+- `pack.category_id`：裸分类引用（如 `04-DataAI`）——包**只携带 id**，解析分类名要求消费方持有等价字典（本仓字典由 `store.categories()` 提供，不跨宿主通用）。
 
-作用域与 `assets` **恰好相反**：分类是**逐包自己的**声明，因此顶层包带团队行的值、**每个成员包带该成员自己的值**（`pack.team.members[].tags` / `.category_id`）；未声明则字段缺席，不会是空串或 `null` 占位。读写两个面同源：
+作用域与 `assets` **相反**：分类为**逐包声明**，顶层包携带团队行的值，**每个成员包携带该成员自己的值**（`pack.team.members[].tags` / `.category_id`）；未声明即字段缺席，不会补空串或 `null` 占位。目录面与导出面同源：
 
 ```ts
-// 1. 目录面：已安装的专家 / 团队 / 技能都能直接读到标签
+// 1. 目录面：已安装的专家 / 团队 / 技能均可直接读取标签
 const teams = await client.teams.list();
 console.log(teams[0].tags, teams[0].category_id); // 团队：包级声明
 
@@ -496,7 +496,7 @@ for (const member of pack.team?.members ?? []) {
   console.log(member.id, member.tags, member.category_id);           // 成员各自的声明
 }
 
-// 3. 把裸 id 解析成双语名（需要本地字典；未命中就是未命中，宿主从不猜）
+// 3. 裸 id 解析为双语名（需本地字典；未命中即无名称，宿主不做推断）
 const { items: categories } = await client.store.categories();
 const nameOf = (id?: string | null) => categories.find((c) => c.id === id)?.name;
 console.log(nameOf(pack.category_id));                               // { zh: "数据智能", en: "Data & AI" }
