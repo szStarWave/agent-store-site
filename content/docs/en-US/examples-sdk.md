@@ -192,7 +192,41 @@ for (const entry of outdated) {
 // await client.store.uninstall(searchResults[0]);         // Completely purges files from disk
 ```
 
-### 4.2 Connector tool probes and dynamic invocation
+### 4.2 Category filtering and localized tag rendering (since fp-15)
+
+The category dictionaries and tag metadata shipped by the market sources are now exposed over the wire: `store/categories` returns each enabled market's category dictionary plus its market-level tag vocabulary; every item carries `category_id` (raw reference) and the host-resolved `category` (omitted when the id misses the dictionary). Localized text is an optional `{zh, en}` pair — pick the field for the current language:
+
+```ts
+// 1. Fetch the category dictionary and tag vocabulary (filter-bar material;
+//    empty items = the market declares no dictionary, not an error)
+const { items: categories, marketplace_tags } = await client.store.categories();
+const activeCategory = categories.find((c) => c.id === "04-DataAI");
+console.log(`Category: ${activeCategory?.name.en} / ${activeCategory?.name.zh}`);
+console.log("Market tags:", marketplace_tags?.map((t) => t.en ?? t.zh));
+
+// 2. Filter items by category (the host joins the dictionary; one client-side filter)
+const catalog = await client.store.list();
+const dataAiExperts = catalog.filter((item) => item.category?.id === "04-DataAI");
+
+// 3. Render item tag chips (skill/connector entries take tags from the market
+//    index row; legacy names are merged in, deduplicated)
+for (const item of dataAiExperts) {
+  const tags = (item.tags ?? []).map((tag) => tag.en ?? tag.zh ?? "");
+  console.log(`${item.name} [${item.category?.name.en ?? item.category_id ?? "Uncategorized"}]: ${tags.join(" · ")}`);
+}
+
+// 4. Search naturally matches tags and category names (haystack includes tags and category.name)
+const hits = await client.store.search("Collaboration");
+```
+
+| Field | Meaning | Absence means |
+| --- | --- | --- |
+| `item.category_id` | Raw category reference from the source manifest (e.g. `04-DataAI`) | The item's source declares no category |
+| `item.category` | Full host-joined category (with localized `name`) | The dictionary misses the id — **the host never guesses**; only the raw id travels |
+| `item.tags` | Localized tag array (`{zh, en}` position-paired) | Empty array or omitted = no tags |
+| `marketplace_tags` | Market-level tag vocabulary (returned with `store/categories`) | No enabled market declares a vocabulary |
+
+### 4.3 Connector tool probes and dynamic invocation
 
 ```ts
 // 1. Probe connector connectivity and discover tool signatures
@@ -220,7 +254,7 @@ if (invocation.is_error) {
 }
 ```
 
-### 4.3 Connector credential forms and private service registration
+### 4.4 Connector credential forms and private service registration
 
 ```ts
 // 1. Inspect required credential schema
@@ -250,7 +284,7 @@ await client.connectors.register({
 // await client.connectors.clearCredentials("weather-service", ["WEATHER_API_KEY"]);
 ```
 
-### 4.4 End-to-end connector OAuth authorization flow
+### 4.5 End-to-end connector OAuth authorization flow
 
 ```ts
 const connectorId = "github";
@@ -283,7 +317,7 @@ console.log(`Connector status: ${health.status}`);
 // await client.connectors.logout(connectorId);
 ```
 
-### 4.5 Dynamic marketplace source management
+### 4.6 Dynamic marketplace source management
 
 ```ts
 // 1. List configured marketplace sources
@@ -388,6 +422,31 @@ if (client.initializeInfo?.capabilities.snapshot_assets) {
 ├── bin/init_task.py
 └── scripts/check.sh
 ```
+
+#### 5.2.2 Categories and tags ride along (since pack_format 3)
+
+Since `fp-16` (`pack_format 3`) the pack's display metadata ships with the definition. Mind the scope: it is the **opposite of `assets`** — a category is each package's own declaration, so member packs carry their own values:
+
+```ts
+const result = await exportTeam(client, "wb-stock-partner-team-team", "./exported-team");
+
+// The top-level pack is the team row's own declaration
+console.log(`format: ${result.pack.pack_format}`);           // 3
+console.log(`team tags: ${JSON.stringify(result.pack.tags)}`);
+console.log(`team category: ${result.pack.category_id}`);    // raw id, e.g. "04-DataAI"
+
+// Each member pack carries its own (an undeclared member is absent, not a fake empty array)
+for (const member of result.pack.team?.members ?? []) {
+  console.log(`${member.name}: ${member.category_id ?? "(uncategorized)"}`);
+}
+
+// Resolve the raw id to a localized name: the host gives the id, your local dictionary gives the name
+const { items: categories } = await client.store.categories();
+const categoryName = (id?: string | null) => categories.find((c) => c.id === id)?.name.en ?? "Uncategorized";
+console.log(`resolved: ${categoryName(result.pack.category_id)}`);
+```
+
+The installed catalogs read the same facts: `client.teams.list()` carries the package-level `tags` / `category_id`, and `client.skills.list()` carries `tags` taken from the market index row at import time — a later market edit only lands through a `store.update()`.
 
 ### 5.3 Workspace management and reading internal skill files
 
