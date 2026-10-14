@@ -194,35 +194,37 @@ for (const entry of outdated) {
 
 ### 4.2 分类筛选与双语标签渲染（fp-15 起）
 
-市场源自带的分类字典与标签元数据现已透出到协议面：`store/categories` 返回各启用市场的分类字典与市场级标签全集；每个条目携带 `category_id`（裸引用）与宿主解析好的 `category`（未命中字典时省略）。本地化文本为 `{zh, en}` 可选对，按当前语言取值即可：
+分类字典与标签元数据现由 `store/categories` 透出协议面：返回各启用市场的分类字典与市场级标签全集。每个条目携带 `category_id`（源 manifest 的裸引用）与宿主已解析的 `category`（字典未命中该 id 时省略）。本地化文本为 `{zh, en}` 可选对，按当前语言取对应字段：
 
 ```ts
-// 1. 拉取分类字典与标签全集（筛选栏素材；items 为空 = 市场未声明字典，不是错误）
+// 1. 拉取分类字典与标签全集（筛选栏素材；items 为空表示市场未声明字典，非错误）
 const { items: categories, marketplace_tags } = await client.store.categories();
 const activeCategory = categories.find((c) => c.id === "04-DataAI");
 console.log(`分类: ${activeCategory?.name.zh} / ${activeCategory?.name.en}`);
 console.log("市场级标签:", marketplace_tags?.map((t) => t.zh ?? t.en));
 
-// 2. 按分类筛选条目（宿主已 join 字典，客户端一行 filter 即可）
+// 2. 按分类筛选条目（宿主已 join 字典，客户端直接按 item.category.id 过滤）
 const catalog = await client.store.list();
 const dataAiExperts = catalog.filter((item) => item.category?.id === "04-DataAI");
 
-// 3. 渲染条目标签角标（skill/connector 条目来自市场索引行，legacy 旧名已并入去重）
+// 3. 渲染条目标签角标（skill / connector 条目的标签取自市场索引行，legacy 旧名已合并去重）
 for (const item of dataAiExperts) {
   const tags = (item.tags ?? []).map((tag) => tag.zh ?? tag.en ?? "");
   console.log(`${item.name} [${item.category?.name.zh ?? item.category_id ?? "未分类"}]: ${tags.join(" · ")}`);
 }
 
-// 4. 搜索自然命中标签与分类名（haystack 已包含 tags 与 category.name）
+// 4. 搜索覆盖标签与分类名（haystack 含 tags 与 category.name）
 const hits = await client.store.search("办公协同");
 ```
 
 | 字段 | 语义 | 缺席含义 |
 | --- | --- | --- |
-| `item.category_id` | 源 manifest 的裸分类引用（如 `04-DataAI`） | 该条目源上未声明分类 |
-| `item.category` | 宿主 join 字典后的完整分类（含双语 `name`） | 字典缺失该 id——**宿主不猜**，此时只有裸 id |
+| `item.category_id` | 源 manifest 的裸分类引用（如 `04-DataAI`） | 该条目在源 manifest 中未声明分类 |
+| `item.category` | 宿主 join 字典后的完整分类（含双语 `name`） | 字典未命中该 id（宿主不做推断），此时仅有裸 id |
 | `item.tags` | 本地化标签数组（`{zh, en}` 按位配对） | 空数组或省略 = 无标签 |
 | `marketplace_tags` | 市场级标签全集（与 `store/categories` 一同返回） | 无启用市场声明标签全集 |
+
+> **字典从哪来**：优先用**市场自己声明**的分类字典（市场根上的 `manifest.json`）；一个市场都没声明时，宿主回填内置词表（与 WorkBuddy 目录索引同一套 15 个分类 id），因此该端点通常不为空。两者不合并——市场声明优先，避免同一个 id 出现两个名字。分类 id 与条目 `plugin.json` 的 `categoryId` 是同一套词汇。
 
 ### 4.3 连接器工具探针测试与动态调用
 
@@ -423,28 +425,29 @@ if (client.initializeInfo?.capabilities.snapshot_assets) {
 
 #### 5.2.2 类别与标签随包导出（pack_format 3 起）
 
-`fp-16`（`pack_format 3`）起包的展示元数据随定义一起交付。注意作用域与 `assets` **相反**：分类是逐包自己的声明，成员包各带自己的值：
+`fp-16`（`pack_format 3`）起包的展示元数据随定义一同交付。作用域与 `assets` **相反**：分类为逐包声明，成员包各带自己的值：
 
 ```ts
 const result = await exportTeam(client, "wb-stock-partner-team-team", "./exported-team");
 
-// 顶层包 = 团队行自己的声明
+// 顶层包：团队行自己的声明
 console.log(`格式: ${result.pack.pack_format}`);            // 3
 console.log(`团队标签: ${JSON.stringify(result.pack.tags)}`);
 console.log(`团队分类: ${result.pack.category_id}`);         // 裸 id，如 "04-DataAI"
 
-// 成员包各带自己的（未声明的成员就是缺席，不是空数组伪造）
+// 成员包各带自己的值（未声明即字段缺席，不补空数组）
 for (const member of result.pack.team?.members ?? []) {
   console.log(`${member.name}: ${member.category_id ?? "(未分类)"}`);
 }
 
-// 把裸 id 解析成双语名：id 由宿主给，名字由你在本地字典里查
+// 裸 id 解析为双语名：id 来自宿主，名称需在本地字典中查得；查不到就显示裸 id（不猜）
 const { items: categories } = await client.store.categories();
-const categoryName = (id?: string | null) => categories.find((c) => c.id === id)?.name.zh ?? "未分类";
+const categoryName = (id?: string | null) =>
+  categories.find((c) => c.id === id)?.name.zh ?? id ?? "未分类";
 console.log(`解析后: ${categoryName(result.pack.category_id)}`);
 ```
 
-已安装资源的目录面同源：`client.teams.list()` 的 `tags` / `category_id` 是包级声明，`client.skills.list()` 的 `tags` 来自市场索引行（导入时固化，市场其后改标签需走一次 `store.update()` 才生效）。
+已安装资源的目录面与导出面同源：`client.teams.list()` 的 `tags` / `category_id` 为包级声明；`client.skills.list()` 的 `tags` 取自市场索引行，导入时固化，市场侧后续修改标签需经一次 `store.update()` 才生效。
 
 ### 5.3 工作区管理与技能内部文件读取
 

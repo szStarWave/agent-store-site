@@ -477,9 +477,9 @@ Two architectural scope constraints: assets are **snapshot-scoped** — a member
 Since `fp-16` an `ExpertPack` carries the market's display metadata, so a third-party runtime can restore the market's organization:
 
 - `pack.tags`: localized tags (`{zh, en}` optional pairs, position-paired).
-- `pack.category_id`: the raw category reference (e.g. `04-DataAI`). The pack carries **only the id**; resolving it to a display name needs an equivalent dictionary on the consumer's side (this host's is `store.categories()`, which does not travel).
+- `pack.category_id`: the raw category reference (e.g. `04-DataAI`). The pack carries **only the id**; resolving it to a display name requires an equivalent dictionary on the consumer's side (this host's dictionary comes from `store.categories()` and is not portable across hosts).
 
-The scope is the **exact opposite of `assets`**: a category is each package's own declaration, so the top-level pack carries the team row's values and **every member pack carries its own** (`pack.team.members[].tags` / `.category_id`). An undeclared value is an absent field, never an empty string or a `null` placeholder.
+The scope is the **opposite of `assets`**: a category is a per-package declaration, so the top-level pack carries the team row's values and **every member pack carries its own** (`pack.team.members[].tags` / `.category_id`). An undeclared value is an absent field; no empty string or `null` placeholder is substituted. The catalog face and the export face read the same facts:
 
 ```ts
 // 1. Catalog faces: installed experts / teams / skills expose their tags directly
@@ -496,7 +496,7 @@ for (const member of pack.team?.members ?? []) {
   console.log(member.id, member.tags, member.category_id);           // each member's own declaration
 }
 
-// 3. Resolve the raw id to a localized name (needs a local dictionary; a miss stays a miss)
+// 3. Resolve the raw id to a localized name (needs a local dictionary; a miss yields no name, never an inferred one)
 const { items: categories } = await client.store.categories();
 const nameOf = (id?: string | null) => categories.find((c) => c.id === id)?.name;
 console.log(nameOf(pack.category_id));                               // { zh: "数据智能", en: "Data & AI" }
