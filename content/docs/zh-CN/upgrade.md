@@ -22,7 +22,8 @@
 
 | 版本 | 发布时间（UTC） | 当前 dist-tag | 与上一版的实质差异 |
 | --- | --- | --- | --- |
-| `0.1.0-beta.10` | 2026-10-12T07:30:00Z | `beta` | **破坏性**：协议指纹递增至 `fp-14`（握手全等校验）；新增 WebSocket 专用接口 `import/assets` 与 `import/asset`，方法总数扩充至 82（HTTP 路由映射数保持 55）；专家包升至 `pack_format 2`（插件级资产 `avatars/ bin/ scripts/` 随包导出，`materializePack` 落盘 `writtenAssets`）；连接器授权回调页改为交换后才出结果、`auth/status` 新增 `authorization_pending`、WebUI 安装走 `store.install()`、新增 `store.findByConnector()` 与 `MCP_OAUTH_CLIENT_NAME`（升级步骤见 §6.9） |
+| `0.1.0-beta.11` | 2026-10-14T11:18:29Z | `beta` | **破坏性**：协议指纹递增至 `fp-16`（跨过 `fp-15`；握手全等校验）；新增 `store/categories` 市场分类字典与标签词表（`GET /api/app-server/store/categories`），方法总数扩充至 83（HTTP 路由映射数扩充至 56）；商店条目携带 `category_id` / 宿主解析的 `category`，专家与团队列表携带 `tags` / `category_id`、技能列表携带 `tags`，`ExpertPack` 升至 `pack_format 3`；`AgentDetail` 的 `tags` / `category_id` 上移到 `AgentSummary`（升级步骤见 §6.10） |
+| `0.1.0-beta.10` | 2026-10-12T07:31:25Z | — | **破坏性**：协议指纹递增至 `fp-14`（握手全等校验）；新增 WebSocket 专用接口 `import/assets` 与 `import/asset`，方法总数扩充至 82（HTTP 路由映射数保持 55）；专家包升至 `pack_format 2`（插件级资产 `avatars/ bin/ scripts/` 随包导出，`materializePack` 落盘 `writtenAssets`）；连接器授权回调页改为交换后才出结果、`auth/status` 新增 `authorization_pending`、WebUI 安装走 `store.install()`、新增 `store.findByConnector()` 与 `MCP_OAUTH_CLIENT_NAME`（升级步骤见 §6.9） |
 | `0.1.0-beta.9` | 2026-10-10T04:34:35Z | — | **破坏性**：协议指纹递增至 `fp-13`（握手全等校验）；新增 `market/settings` / `market/settings-set` 市场策略读写，方法总数扩充至 80、HTTP 路由映射数扩充至 55；新增市场源 per-source `download_on_start`、`AGENT_STORE_MARKET_DOWNLOAD` / `AGENT_STORE_CONFIG` 与受控自动升级；`exportTeam()` 修复团队包级技能（升级步骤见 §6.8） |
 | `0.1.0-beta.8` | 2026-09-28T10:23:47Z | — | **破坏性**：协议指纹递增至 `fp-12`（握手全等校验）；新增 `store/update-entry` 商店条目原地更新与连接器用户凭据体系（`connector/credential/*`、`connector/register`），方法总数扩充至 78、HTTP 路由映射数扩充至 53；`updateHint()` 返回值收窄（升级步骤见 §6.7） |
 | `0.1.0-beta.7` | 2026-09-20T10:33:48Z | — | **破坏性**：协议指纹递增至 `fp-8`（握手全等校验）；新增 WebSocket 专用接口 `agent/export` 与 `team/export`，方法总数扩充至 73；接口参数保持平稳（升级步骤见 §6.6） |
@@ -40,7 +41,7 @@
 | dist-tag | 当前指向 |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.10` |
+| `beta` | `0.1.0-beta.11` |
 
 ```bash
 npm view @flowy-agent-store/sdk versions dist-tags --json
@@ -48,8 +49,8 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.10", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0-beta.11", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.11", "latest": "0.1.0-beta.2" }
 }
 ```
 
@@ -63,7 +64,7 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```bash
 bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2（latest）
-bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.10
+bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.11
 bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → 解析为 0.1.0-beta.2
 npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → 可能解析为 0.1.0
 ```
@@ -218,6 +219,21 @@ bun run typecheck
 - **可执行内容的边界**：`kind: "script"` 是类别标注不是许可——宿主自己从不执行插件级脚本，字节按 0644 交付；不想让包声明这一类的运营者，在 `config.toml` 加 `[expert_export] scripts = false` 即可（头像不受影响）；
 - 宿主升级后，连接器授权回调页会在 token 交换出结果后才显示成功/失败，`connector/auth/status` 在流程进行中报告 `authorization_pending`；从 WebUI 安装连接器现在与 SDK 行为一致（装完即可用）。
 
+### 6.10 从 0.1.0-beta.10 升到 0.1.0-beta.11
+
+```bash
+bun add @flowy-agent-store/sdk@0.1.0-beta.11
+bun add @flowy-agent-store/protocol@0.1.0-beta.11
+bun run typecheck
+```
+
+- **协议指纹由 `fp-14` 递增到 `fp-16`**（一次发布跨过 `fp-15`），握手执行严格全等校验：**客户端与运行时必须同批升级**，只升一边会直接连不上；
+- **没有 TypeScript 签名破坏**：新字段全部是**可选**加法——`StoreItem.category_id` / `.category`、`AgentSummary.tags` / `.category_id`、`TeamSummary.tags` / `.category_id`、`SkillSummary.tags`、`ExpertPack.tags` / `.category_id`、`StoreCategories`、`client.listStoreCategories()` / `client.store.categories()`，`bun run typecheck` 应当照旧通过；
+- **有一处字段搬家**：`AgentDetail` 的 `tags` / `category_id` 上移到 `AgentSummary`（扁平 JSON 无法让同一个键在 summary 与 detail 各出现一次）。`AgentDetail` 继承 `AgentSummary`，读 `detail.tags` 的代码照旧可用；若你的代码里手写了 `AgentDetail` 对象字面量去喂断言或 mock，需要把这两个键挪到 summary 那一层；
+- 新增 `store/categories`（HTTP `GET /api/app-server/store/categories`），协议方法总数 83、HTTP 路由映射数 56；它返回所有**已启用**市场的分类字典与市场级标签词表（`marketplace_tags`，按位配对的双语数组），冷启动即完整；
+- **新字段的读取口径**：`category` 是宿主用字典解析出来的名字，**id 未命中字典时就缺席**（宿主不猜）；技能的 `tags` 来自市场索引行并在导入时固化，市场事后改标签需要升级该条目才生效；连接器条目**没有标签来源**，其标签恒为缺席。请把这几处都按「有就读、没有就退化成原始 id」写，`item.tags ?? []` 是安全默认；
+- **`pack_format 3` 的消费方**：导出包只携带**裸 `category_id`**，要显示名字必须自带等价字典（本宿主的字典经 `store.categories()` 提供，**不跨宿主通用**）；分类的作用域与 `assets` 相反——顶层包取自身声明、每个成员包取该成员自己的值（用法见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §4.4）。
+
 ## 7. 自查当前安装的版本
 
 ```bash
@@ -233,16 +249,17 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. 已发布产物的差异与自查方法
 
-截至 `0.1.0-beta.10`，工作区与线上发布产物保持一致：
+截至 `0.1.0-beta.11`，工作区与线上发布产物保持一致：
 
-1. **专家导出补齐插件级资产 —— `fp-13` $\to$ `fp-14`**：新增 `import/assets` / `import/asset`（WebSocket-only），方法总数扩充至 82（HTTP 路由映射数保持 55）；`ExpertPack` 升至 `pack_format 2`（`assets` / `avatar`），`materializePack` 落盘 `writtenAssets`，导出目录成为完整插件根；能力位 `snapshot_assets`、减项 `[expert_export] scripts`。
-2. **连接器授权可见性修复**：回调页在 token 交换出结果后才出页面；`auth/status` 新增 `authorization_pending`；WebUI 安装走 `store.install()`；新增 `store.findByConnector()` 与 `StoreOperationOutcome.installedCount`；`MCP_OAUTH_CLIENT_NAME`。
-3. **市场源策略与受控自动升级 —— `fp-12` $\to$ `fp-13`**：新增 `market/settings` / `market/settings-set`（`GET` / `POST /api/app-server/market-settings`），协议方法总数扩充至 80、HTTP 路由映射数扩充至 55；per-source `download_on_start`、`AGENT_STORE_MARKET_DOWNLOAD`、`AGENT_STORE_CONFIG`；市场级 `auto_update` 从「只刷索引」扩为「刷新 + 自动升级」，默认白名单 `["agent","team","skill"]`（连接器不隐式包含）。
-4. **`exportTeam()` 补齐团队包级技能**：团队的顶层 `skills` 由该团队自身快照已安装的技能填充，与成员声明一并去重落盘；协议与类型形态未变。
-5. **商店条目原地更新 —— `fp-11` $\to$ `fp-12`**：新增 `store/update-entry` 与客户端 `store.update()`，协议方法总数扩充至 78，HTTP 路由映射数扩充至 53。
-6. **连接器用户凭据体系 —— `fp-8` $\to$ `fp-11`**：`credential` 块与 `token-schema.json` 声明、`connector/credential/{get,set,clear}`、`connector/register`（模板即声明）；凭据按调用者键控。
-7. **SDK 资源物化助手**：`exportAgent` / `exportTeam` / `materializePack`。
-8. **条目版本与安装态的两处修复**：技能与连接器条目的版本不再被钉在占位版本 `1.0.0`；安装态写入按 `(snapshot_id, component_id)` 收窄。
+1. **市场分类与标签全链路透出 —— `fp-14` $\to$ `fp-16`**：新增 `store/categories`（`GET /api/app-server/store/categories`），协议方法总数扩充至 83、HTTP 路由映射数扩充至 56；商店条目携带 `category_id` 与宿主解析的 `category`，专家 / 团队列表携带 `tags` / `category_id`、技能列表携带 `tags`，`ExpertPack` 升至 `pack_format 3`；`AgentDetail` 的 `tags` / `category_id` 上移到 `AgentSummary`。
+2. **专家导出补齐插件级资产 —— `fp-13` $\to$ `fp-14`**：新增 `import/assets` / `import/asset`（WebSocket-only），方法总数扩充至 82（HTTP 路由映射数保持 55）；`ExpertPack` 升至 `pack_format 2`（`assets` / `avatar`），`materializePack` 落盘 `writtenAssets`，导出目录成为完整插件根；能力位 `snapshot_assets`、减项 `[expert_export] scripts`。
+3. **连接器授权可见性修复**：回调页在 token 交换出结果后才出页面；`auth/status` 新增 `authorization_pending`；WebUI 安装走 `store.install()`；新增 `store.findByConnector()` 与 `StoreOperationOutcome.installedCount`；`MCP_OAUTH_CLIENT_NAME`。
+4. **市场源策略与受控自动升级 —— `fp-12` $\to$ `fp-13`**：新增 `market/settings` / `market/settings-set`（`GET` / `POST /api/app-server/market-settings`），协议方法总数扩充至 80、HTTP 路由映射数扩充至 55；per-source `download_on_start`、`AGENT_STORE_MARKET_DOWNLOAD`、`AGENT_STORE_CONFIG`；市场级 `auto_update` 从「只刷索引」扩为「刷新 + 自动升级」，默认白名单 `["agent","team","skill"]`（连接器不隐式包含）。
+5. **`exportTeam()` 补齐团队包级技能**：团队的顶层 `skills` 由该团队自身快照已安装的技能填充，与成员声明一并去重落盘；协议与类型形态未变。
+6. **商店条目原地更新 —— `fp-11` $\to$ `fp-12`**：新增 `store/update-entry` 与客户端 `store.update()`，协议方法总数扩充至 78，HTTP 路由映射数扩充至 53。
+7. **连接器用户凭据体系 —— `fp-8` $\to$ `fp-11`**：`credential` 块与 `token-schema.json` 声明、`connector/credential/{get,set,clear}`、`connector/register`（模板即声明）；凭据按调用者键控。
+8. **SDK 资源物化助手**：`exportAgent` / `exportTeam` / `materializePack`。
+9. **条目版本与安装态的两处修复**：技能与连接器条目的版本不再被钉在占位版本 `1.0.0`；安装态写入按 `(snapshot_id, component_id)` 收窄。
 
 ### 8.1 迁移已有配置里的市场源
 
