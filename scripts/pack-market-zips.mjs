@@ -24,7 +24,7 @@
  */
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -74,6 +74,21 @@ export function caseCollisions(names) {
     else seen.set(key, name);
   }
   return collisions;
+}
+
+/**
+ * 把这次打好的条目并入**已记录**的那份台账，返回要写入的完整对象。
+ *
+ * 为什么需要：`content/market-hosts.json` 是**所有**市场的台账，而 `--only <market>`
+ * 只重打一个市场。此前它无条件用本次结果重建该文件，于是 `--only experts`（不带
+ * `--check`）会把另外两个市场的摘要从记录里抹掉——记录看起来像「它们从没打过」，
+ * 而它们的归档还在 ModelScope 上。全量运行时传 `existing = null` 即可（重建）
+ * 因为那时本次结果就是全部。
+ */
+export function mergeHosts(existing, host, packed) {
+  const markets = existing?.markets ? { ...existing.markets } : {};
+  for (const [market, entry] of Object.entries(packed)) markets[market] = entry;
+  return { host, markets };
 }
 
 function parseArgs(argv) {
@@ -180,7 +195,33 @@ async function main() {
   }
 
   // 不写时间戳：内容相同则文件相同（幂等）。改了什么问 git。
-  await writeFile(hostsFile, `${JSON.stringify(hosts, null, 2)}\n`, "utf8");
+  //
+  // `--only` 只重打一个市场，而这份台账是**所有**市场的：读入现有记录并合并，
+  // 否则另外两个市场的摘要会被抹掉（`mergeHosts` 的说明）。全量运行时本次结果就是
+  // 全部，所以直接重建——记录必须恰好描述「我们打的这三个市场」，不留陈旧条目。
+  let previous = null;
+  if (args.only && existsSync(hostsFile)) {
+    try {
+      previous = JSON.parse(await readFile(hostsFile, "utf8"));
+    } catch {
+      console.warn(
+        `[pack-market] ${path.relative(siteRoot, hostsFile)} 无法解析——按本次结果重建台账；` +
+          `另外两个市场的摘要需要一次全量 pack:market 才能恢复`,
+      );
+    }
+  }
+  const record = mergeHosts(previous, MARKET_HOST, hosts.markets);
+  await writeFile(hostsFile, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  const recorded = Object.keys(record.markets).length;
+  if (args.only && recorded > markets.length) {
+    console.log(
+      `[pack-market] --only ${args.only}：保留了另外 ${recorded - markets.length} 个市场的已记录摘要`,
+    );
+  } else if (args.only) {
+    console.warn(
+      `[pack-market] --only ${args.only}：台账现在只有 ${markets.length} 个市场——跑一次全量 pack:market 才能补齐`,
+    );
+  }
   console.log(
     `[pack-market] → dist-market/（${markets.length} 个归档）与 ${path.relative(siteRoot, hostsFile)}`,
   );

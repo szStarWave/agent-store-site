@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { inflateRawSync } from "node:zlib";
 
-import { caseCollisions } from "./pack-market-zips.mjs";
+import { caseCollisions, mergeHosts } from "./pack-market-zips.mjs";
 import { crc32, writeZipFile, writeZipFileSync } from "./lib/zip-lite.mjs";
 
 const EOCD_SIG = 0x06054b50;
@@ -199,5 +199,33 @@ describe("caseCollisions", () => {
       ["Icons/a.svg", "icons/A.svg"],
     ]);
     expect(caseCollisions(["a", "A"])).toEqual([["a", "A"]]);
+  });
+});
+
+describe("mergeHosts", () => {
+  const HOST = "https://example.test/markets";
+  const entry = (sha) => ({ url: `${HOST}/x.zip`, sha256: sha, bytes: 1, files: 1 });
+
+  test("keeps the other markets' recorded digests when packing only one", () => {
+    // `--only experts` 必须留下另外两个市场的摘要：它们的归档还在线，
+    // 记录里消失会让台账看起来像「从没打过」。
+    const existing = {
+      host: HOST,
+      markets: { experts: entry("old-experts"), skills: entry("skills"), connectors: entry("connectors") },
+    };
+    const merged = mergeHosts(existing, HOST, { experts: entry("new-experts") });
+    expect(Object.keys(merged.markets).sort()).toEqual(["connectors", "experts", "skills"]);
+    expect(merged.markets.experts.sha256).toBe("new-experts");
+    expect(merged.markets.skills.sha256).toBe("skills");
+    expect(existing.markets.experts.sha256).toBe("old-experts");
+  });
+
+  test("rebuilds from nothing for a full run, and tolerates a missing record", () => {
+    const full = mergeHosts(null, HOST, { experts: entry("e"), skills: entry("s"), connectors: entry("c") });
+    expect(full.host).toBe(HOST);
+    expect(Object.keys(full.markets).sort()).toEqual(["connectors", "experts", "skills"]);
+    // 一个只有 host 的旧记录 / 没有 markets 的记录都不能让合并炸掉。
+    expect(Object.keys(mergeHosts({ host: HOST }, HOST, { experts: entry("e") }).markets)).toEqual(["experts"]);
+    expect(Object.keys(mergeHosts({}, HOST, { experts: entry("e") }).markets)).toEqual(["experts"]);
   });
 });
