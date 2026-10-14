@@ -43,13 +43,15 @@ The protocol package serves as the definitive source of truth for wire interacti
 
 | Export symbol | Contract definition and usage |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-14"`). Enforces strict equality during handshakes |
+| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-16"`). Enforces strict equality during handshakes |
 | `InitializeRequest` / `InitializeResult` | Protocol handshake payloads exchanging protocol versions, client identities, and host capabilities |
 | `ClientInfo` / `ClientCapabilities` | Client identity declarations (name, version) and feature subscriptions (`events`, `approvals`, `team_runtime`) |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | Unified catalog structures and installation receipt models |
-| `AgentSummary` / `AgentDetail` | Agent expert catalog summaries and detailed configuration views |
-| `TeamSummary` / `TeamDetail` | Expert team summaries and multi-agent topologies |
-| `SkillSummary` / `SkillDetail` | Atomic skill metadata and permission flags |
+| `StoreCategory` / `StoreCategories` | Market category dictionaries and market-level tag vocabularies (the `store.categories()` shape) |
+| `AgentSummary` / `AgentDetail` | Agent expert catalog summaries and detailed configuration views (both carry `tags` / `category_id`) |
+| `TeamSummary` / `TeamDetail` | Expert team summaries and multi-agent topologies (package-level `tags` / `category_id`) |
+| `SkillSummary` / `SkillDetail` | Atomic skill metadata and permission flags (with `tags` from the market index row) |
+| `ExpertPack` / `ExpertPersona` / `ExpertAssetRef` | Expert export contract (`pack_format 3`: persona, skill and asset references, display metadata) |
 | `ConnectorSummary` / `ConnectorDetail` / `ConnectorStatusView` | Connector catalog views, runtime health statuses, and probe outcomes |
 | `ConnectorRegistration` / `ConnectorCredential` | Dynamic MCP connector registration inputs and credential form state models |
 | `ConversationView` / `ConversationMessage` / `ConversationEvent` | Conversation models, transcript message structures, and streaming delta events |
@@ -470,6 +472,36 @@ The directories beside `skills/` — `avatars/`, `bin/`, `scripts/` — are part
 
 Two architectural scope constraints: assets are **snapshot-scoped** — a member pack's `assets` is always empty; read the top-level pack. And `kind: "script"` is a **classification label rather than an execution permission** — the host does not directly execute plugin-level scripts; execution is mediated by the consumer, and operators can omit this class from exported packs via `[expert_export] scripts = false` in `config.toml`. When the host's `snapshot_assets` capability bit is false, `assets` remains an empty table (distinguishing unintegrated capability from absence of assets).
 
+#### Categories and tags (exported since `fp-16` / `pack_format 3`)
+
+Since `fp-16` an `ExpertPack` carries the market's display metadata, so a third-party runtime can restore the market's organization:
+
+- `pack.tags`: localized tags (`{zh, en}` optional pairs, position-paired).
+- `pack.category_id`: the raw category reference (e.g. `04-DataAI`). The pack carries **only the id**; resolving it to a display name requires an equivalent dictionary on the consumer's side (this host's dictionary comes from `store.categories()` and is not portable across hosts).
+
+The scope is the **opposite of `assets`**: a category is a per-package declaration, so the top-level pack carries the team row's values and **every member pack carries its own** (`pack.team.members[].tags` / `.category_id`). An undeclared value is an absent field; no empty string or `null` placeholder is substituted. The catalog face and the export face read the same facts:
+
+```ts
+// 1. Catalog faces: installed experts / teams / skills expose their tags directly
+const teams = await client.teams.list();
+console.log(teams[0].tags, teams[0].category_id); // team: package-level declaration
+
+const skills = await client.skills.list();
+console.log(skills[0].tags);                      // skill: from the market index row, fixed at import
+
+// 2. Export face: the top-level pack plus each member's own values
+const pack = await client.teams.export(teams[0].id);
+console.log(pack.pack_format, pack.tags, pack.category_id);          // 3, [...], "04-DataAI"
+for (const member of pack.team?.members ?? []) {
+  console.log(member.id, member.tags, member.category_id);           // each member's own declaration
+}
+
+// 3. Resolve the raw id to a localized name (needs a local dictionary; a miss yields no name, never an inferred one)
+const { items: categories } = await client.store.categories();
+const nameOf = (id?: string | null) => categories.find((c) => c.id === id)?.name;
+console.log(nameOf(pack.category_id));                               // { zh: "数据智能", en: "Data & AI" }
+```
+
 #### Skill bytes only, without writing a directory
 
 Beyond `exportTeam`, the public primitives are `skills.files(id)` and `skills.readFile(id, path)`. Both sit behind the host's `skill_files` capability bit:
@@ -522,7 +554,7 @@ const routes = httpRouteTable();
 console.log(`Mapped HTTP endpoints: ${Object.keys(routes).length}`);
 ```
 
-- Public HTTP endpoints map **55 / 82** protocol methods;
+- Public HTTP endpoints map **56 / 83** protocol methods;
 - Stateful real-time streaming methods (such as `follow`) and privileged local administrative operations are excluded from HTTP bindings.
 
 ### 5.2 Approval decision CAS optimistic concurrency control
