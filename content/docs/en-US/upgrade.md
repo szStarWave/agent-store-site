@@ -22,7 +22,8 @@ The following table documents published releases, distribution tags, and breakin
 
 | Version | Published (UTC) | Current dist-tag | Substantive changes from prior release |
 | --- | --- | --- | --- |
-| `0.1.0-beta.10` | 2026-10-12T07:30:00Z | `beta` | **Breaking**: Protocol fingerprint incremented to `fp-14` (strict equality check); adds the WebSocket-only `import/assets` / `import/asset`, method count grows to 82 (HTTP mapped routes stay 55); the expert pack moves to `pack_format 2` (plugin-level `avatars/ bin/ scripts/` ride along, `materializePack` writes `writtenAssets`); the connector authorization callback answers only after the token exchange, `auth/status` reports `authorization_pending`, WebUI installs go through `store.install()`, and `store.findByConnector()` / `MCP_OAUTH_CLIENT_NAME` are new (upgrade steps in §6.9) |
+| `0.1.0-beta.11` | 2026-10-14T11:18:29Z | `beta` | **Breaking**: Protocol fingerprint incremented to `fp-16` (spanning `fp-15`; strict equality check); adds `store/categories` for a market's category dictionary and tag vocabulary (`GET /api/app-server/store/categories`), bringing total methods to 83 and HTTP mapped routes to 56; store items carry `category_id` / the host-resolved `category`, expert and team listings carry `tags` / `category_id`, skill listings carry `tags`, and `ExpertPack` moves to `pack_format 3`; `AgentDetail`'s `tags` / `category_id` move up to `AgentSummary` (steps in §6.10) |
+| `0.1.0-beta.10` | 2026-10-12T07:31:25Z | — | **Breaking**: Protocol fingerprint incremented to `fp-14` (strict equality check); adds the WebSocket-only `import/assets` / `import/asset`, method count grows to 82 (HTTP mapped routes stay 55); the expert pack moves to `pack_format 2` (plugin-level `avatars/ bin/ scripts/` ride along, `materializePack` writes `writtenAssets`); the connector authorization callback answers only after the token exchange, `auth/status` reports `authorization_pending`, WebUI installs go through `store.install()`, and `store.findByConnector()` / `MCP_OAUTH_CLIENT_NAME` are new (upgrade steps in §6.9) |
 | `0.1.0-beta.9` | 2026-10-10T04:34:35Z | — | **Breaking**: Protocol fingerprint incremented to `fp-13` (strict equality check); adds `market/settings` / `market/settings-set` for reading and writing the market policy, bringing total methods to 80 and HTTP mapped routes to 55; adds per-source `download_on_start`, `AGENT_STORE_MARKET_DOWNLOAD` / `AGENT_STORE_CONFIG`, and bounded auto-upgrade; `exportTeam()` now exports a team's package-level skills (steps in §6.8) |
 | `0.1.0-beta.8` | 2026-09-28T10:23:47Z | — | **Breaking**: Protocol fingerprint incremented to `fp-12` (strict equality check); adds `store/update-entry` for in-place store upgrades and the connector user credential system (`connector/credential/*`, `connector/register`), bringing total methods to 78 and HTTP mapped routes to 53; `updateHint()` narrows its return value (steps in §6.7) |
 | `0.1.0-beta.7` | 2026-09-20T10:33:48Z | — | **Breaking**: Protocol fingerprint incremented to `fp-8` (strict equality check); adds WebSocket APIs `agent/export` and `team/export`, bringing total methods to 73 (steps in §6.6) |
@@ -40,7 +41,7 @@ The following table documents published releases, distribution tags, and breakin
 | dist-tag | Points at today |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.10` |
+| `beta` | `0.1.0-beta.11` |
 
 ```bash
 npm view @flowy-agent-store/sdk versions dist-tags --json
@@ -48,8 +49,8 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.10", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0-beta.11", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.11", "latest": "0.1.0-beta.2" }
 }
 ```
 
@@ -63,7 +64,7 @@ Unspecified installation targets resolve against `latest`; ambiguous version ran
 
 ```bash
 bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2 (latest)
-bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.10
+bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.11
 bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → resolves 0.1.0-beta.2
 npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → resolves 0.1.0
 ```
@@ -218,6 +219,21 @@ bun run typecheck
 - **Executable content boundary**: `kind: "script"` is a class label, not a permission — the host itself never executes plugin-level scripts and the bytes land 0644; an operator who does not want the pack to declare the class adds `[expert_export] scripts = false` to `config.toml` (avatars unaffected);
 - After the host upgrade, the connector authorization page shows success/failure only once the token exchange has a verdict, `connector/auth/status` reports `authorization_pending` while a flow runs, and installing a connector from the Web UI now matches the SDK (usable immediately).
 
+### 6.10 From 0.1.0-beta.10 to 0.1.0-beta.11
+
+```bash
+bun add @flowy-agent-store/sdk@0.1.0-beta.11
+bun add @flowy-agent-store/protocol@0.1.0-beta.11
+bun run typecheck
+```
+
+- The protocol fingerprint advances from `fp-14` to `fp-16` (one release spanning `fp-15`) and the handshake enforces strict equality: **host and client must be upgraded together** — one side alone cannot connect;
+- **No TypeScript signature breaks**: every new field is an **optional** addition — `StoreItem.category_id` / `.category`, `AgentSummary.tags` / `.category_id`, `TeamSummary.tags` / `.category_id`, `SkillSummary.tags`, `ExpertPack.tags` / `.category_id`, `StoreCategories`, and `client.listStoreCategories()` / `client.store.categories()` — so `bun run typecheck` should pass unchanged;
+- **One field relocation**: `AgentDetail`'s `tags` / `category_id` move up to `AgentSummary` (flattened JSON cannot carry the same key in both summary and detail). `AgentDetail` extends `AgentSummary`, so code reading `detail.tags` keeps working; if you hand-write `AgentDetail` object literals to feed assertions or mocks, move those two keys up into the summary level;
+- Adds `store/categories` (HTTP `GET /api/app-server/store/categories`), bringing total methods to 83 and HTTP mapped routes to 56; it returns every **enabled** market's category dictionary plus the market-level tag vocabulary (`marketplace_tags`, a position-paired localized array), complete even on a cold start;
+- **How to read the new fields**: `category` is the name the host resolved through the dictionary and is **absent when the id misses it** (the host never guesses); a skill's `tags` come from the market index row and are frozen at import time, so a later market edit to them requires upgrading that entry; connector entries **have no tag source**, so their tags are always absent. Write all of these as "read it when present, degrade to the raw id when not" — `item.tags ?? []` is the safe default;
+- **Consumers of `pack_format 3`**: an exported pack carries only the **bare `category_id`**, so displaying a name requires your own equivalent dictionary (this host's dictionary comes from `store.categories()` and does **not travel across hosts**); the category scope is the opposite of `assets` — the top-level pack takes its own declaration and each member pack takes that member's own values (usage in [TypeScript SDK reference](/en-US/docs/typescript-sdk) §4.4).
+
 ## 7. Verifying Installed Versions
 
 ```bash
@@ -233,16 +249,17 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. Artifact Diff Verification
 
-As of `0.1.0-beta.10`, repository contracts align with published packages:
+As of `0.1.0-beta.11`, repository contracts align with published packages:
 
-1. **Expert export carries plugin-level assets — `fp-13` $\to$ `fp-14`**: adds `import/assets` / `import/asset` (WebSocket-only), bringing wire methods to 82 (HTTP mapped routes stay 55); the `ExpertPack` moves to `pack_format 2` (`assets` / `avatar`), `materializePack` writes `writtenAssets`, and the exported directory is a complete plugin root; the `snapshot_assets` capability and the `[expert_export] scripts` subtraction are new.
-2. **Connector authorization visibility fixes**: the callback page answers only after the token exchange has a verdict; `auth/status` reports `authorization_pending`; WebUI installs go through `store.install()`; `store.findByConnector()` and `StoreOperationOutcome.installedCount` are new; `MCP_OAUTH_CLIENT_NAME`.
-3. **Market source policy and bounded auto-upgrade — `fp-12` $\to$ `fp-13`**: adds `market/settings` / `market/settings-set` (`GET` / `POST /api/app-server/market-settings`), bringing wire methods to 80 and HTTP mapped routes to 55; per-source `download_on_start`, `AGENT_STORE_MARKET_DOWNLOAD`, `AGENT_STORE_CONFIG`; a market's `auto_update` grows from "refresh the index" to "refresh and auto-upgrade", with the default whitelist `["agent","team","skill"]` (connectors are never implicit).
-4. **`exportTeam()` now carries a team's package-level skills**: the team's top-level `skills` is filled from the skills its own snapshot installed and deduplicated with the member declarations; no wire or type shape change.
-5. **In-place store updates — `fp-11` $\to$ `fp-12`**: adds `store/update-entry` and the client's `store.update()`, bringing wire methods to 78 and HTTP mapped routes to 53.
-6. **Connector user credential system — `fp-8` $\to$ `fp-11`**: the `credential` block and `token-schema.json` declarations, `connector/credential/{get,set,clear}`, and `connector/register` (the template is the declaration); credentials are keyed per caller.
-7. **SDK pack materialization**: `exportAgent` / `exportTeam` / `materializePack`.
-8. **Two entry-version and install-state fixes**: skill and connector entry versions are no longer pinned at the `1.0.0` placeholder, and install-state writes narrow on `(snapshot_id, component_id)`.
+1. **Market categories and tags end-to-end — `fp-14` $\to$ `fp-16`**: adds `store/categories` (`GET /api/app-server/store/categories`), bringing wire methods to 83 and HTTP mapped routes to 56; store items carry `category_id` and the host-resolved `category`, expert / team listings carry `tags` / `category_id`, skill listings carry `tags`, and `ExpertPack` moves to `pack_format 3`; `AgentDetail`'s `tags` / `category_id` move up to `AgentSummary`.
+2. **Expert export carries plugin-level assets — `fp-13` $\to$ `fp-14`**: adds `import/assets` / `import/asset` (WebSocket-only), bringing wire methods to 82 (HTTP mapped routes stay 55); the `ExpertPack` moves to `pack_format 2` (`assets` / `avatar`), `materializePack` writes `writtenAssets`, and the exported directory is a complete plugin root; the `snapshot_assets` capability and the `[expert_export] scripts` subtraction are new.
+3. **Connector authorization visibility fixes**: the callback page answers only after the token exchange has a verdict; `auth/status` reports `authorization_pending`; WebUI installs go through `store.install()`; `store.findByConnector()` and `StoreOperationOutcome.installedCount` are new; `MCP_OAUTH_CLIENT_NAME`.
+4. **Market source policy and bounded auto-upgrade — `fp-12` $\to$ `fp-13`**: adds `market/settings` / `market/settings-set` (`GET` / `POST /api/app-server/market-settings`), bringing wire methods to 80 and HTTP mapped routes to 55; per-source `download_on_start`, `AGENT_STORE_MARKET_DOWNLOAD`, `AGENT_STORE_CONFIG`; a market's `auto_update` grows from "refresh the index" to "refresh and auto-upgrade", with the default whitelist `["agent","team","skill"]` (connectors are never implicit).
+5. **`exportTeam()` now carries a team's package-level skills**: the team's top-level `skills` is filled from the skills its own snapshot installed and deduplicated with the member declarations; no wire or type shape change.
+6. **In-place store updates — `fp-11` $\to$ `fp-12`**: adds `store/update-entry` and the client's `store.update()`, bringing wire methods to 78 and HTTP mapped routes to 53.
+7. **Connector user credential system — `fp-8` $\to$ `fp-11`**: the `credential` block and `token-schema.json` declarations, `connector/credential/{get,set,clear}`, and `connector/register` (the template is the declaration); credentials are keyed per caller.
+8. **SDK pack materialization**: `exportAgent` / `exportTeam` / `materializePack`.
+9. **Two entry-version and install-state fixes**: skill and connector entry versions are no longer pinned at the `1.0.0` placeholder, and install-state writes narrow on `(snapshot_id, component_id)`.
 
 ### 8.1 Migrating Marketplace Sources in Existing Configurations
 
