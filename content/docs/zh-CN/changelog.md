@@ -21,8 +21,8 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.10", "latest": "0.1.0-beta.2" },
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0-beta.11", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.11", "latest": "0.1.0-beta.2" },
   "time": {
     "0.1.0": "2026-09-09T09:09:04.795Z",
     "0.1.0-beta.2": "2026-09-09T09:27:36.122Z",
@@ -33,14 +33,18 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
     "0.1.0-beta.7": "2026-09-20T10:33:48.685Z",
     "0.1.0-beta.8": "2026-09-28T10:23:47.656Z",
     "0.1.0-beta.9": "2026-10-10T04:34:35.842Z",
-    "0.1.0-beta.10": "2026-10-12T07:30:00.000Z"
+    "0.1.0-beta.10": "2026-10-12T07:31:25.974Z",
+    "0.1.0-beta.11": "2026-10-14T11:18:29.844Z"
   }
 }
 ```
 
+> **更正（2026-10-14）**：上一版发布时把 `0.1.0-beta.10` 的发布时间写成了整点值 `2026-10-12T07:30:00.000Z`，注册表实际输出为 `2026-10-12T07:31:25.974Z`。本块与 [升级与迁移指引](/zh-CN/docs/upgrade) §2 的对应表行、本文 §2.2 标题均已按注册表改正：发布日期 `2026-10-12` 这一事实不变，其余版本的 `time` 与注册表逐字一致；`versions` 数组按版本先后排列以便阅读，成员与注册表相同。
+
 | 版本 | 发布（UTC） | 变更类型 | 当前 dist-tag |
 | --- | --- | --- | --- |
-| `0.1.0-beta.10` | 2026-10-12 | 破坏性（协议指纹严格相等：`fp-13` → `fp-14`，**必须升级**） | `beta` |
+| `0.1.0-beta.11` | 2026-10-14 | 破坏性（协议指纹严格相等：`fp-14` → `fp-16`，**必须升级**） | `beta` |
+| `0.1.0-beta.10` | 2026-10-12 | 破坏性（协议指纹严格相等：`fp-13` → `fp-14`，**必须升级**） | — |
 | `0.1.0-beta.9` | 2026-10-10 | 破坏性（协议指纹严格相等：`fp-12` → `fp-13`，**必须升级**） | — |
 | `0.1.0-beta.8` | 2026-09-28 | 破坏性（协议指纹严格相等：`fp-8` → `fp-12`，**必须升级**） | — |
 | `0.1.0-beta.7` | 2026-09-20 | 破坏性（协议指纹严格相等：`fp-7` → `fp-8`） | — |
@@ -51,7 +55,28 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 | `0.1.0-beta.2` | 2026-09-09 | 加法（无破坏性） | `latest` |
 | `0.1.0` | 2026-09-09 | 首次发布 | 无 |
 
-### 2.1 `0.1.0-beta.10` — 2026-10-12T07:30:00Z
+### 2.1 `0.1.0-beta.11` — 2026-10-14T11:18:29Z
+
+> **本版含破坏性变更**：协议指纹由 `fp-14` 递增至 `fp-16`（一次发布跨过两级），客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.10）。
+
+#### 破坏性
+
+- **协议契约指纹更新**：`fp-14` $\to$ **`fp-16`**。`fp-15` 新增 `store/categories` 用于读取市场的分类字典与标签词表（HTTP `GET /api/app-server/store/categories`），协议方法总数由 82 扩充至 **83**、HTTP 路由映射数由 55 扩充至 **56**；`fp-16` 不增删任何方法，计数保持 83 / 56，只在既有响应里补字段（因此没有方法签名破坏）。握手仍执行严格相等校验：SDK 与宿主必须同批升级。
+- **`AgentDetail` 的两个字段上移到 `AgentSummary`**：`tags` 与 `category_id` 从专家详情面移到专家列表行。扁平化的 JSON 无法让同一个键同时出现在 summary 与 detail 里，所以读取口统一到 summary；`AgentDetail` 继承 `AgentSummary`，此前读 `detail.tags` 的调用方不受影响。
+
+#### 新增
+
+- **市场分类与标签透出（`fp-15`）**：新增 `store/categories` 协议方法与客户端 `store.categories()`（`AppServerClient` 面为 `listStoreCategories()`），返回所有**已启用**市场的分类字典（`items: StoreCategory[]`，含 `id` / 双语 `name` / 可选 `description`）与市场级标签词表 `marketplace_tags`（按位配对的双语数组）；`StoreItem` 新增 `category_id`（源 `plugin.json` 的裸引用，如 `04-DataAI`）与 `category`（宿主用字典解析出的双语名，**id 未命中字典时缺席，宿主不做推断**）；`AgentSummary` 携带本地化的 `tags` 与 `category_id`。字典的解析顺序为「市场自己声明的 `categories[]` 优先，未声明时用宿主内置的 15 类兜底表」；冷启动（此前未调用过 `store/list`）也返回完整的市场标签词表，且市场根集合按**当前启用**的市场整体替换。
+- **剩余展示面补齐（`fp-16`）**：`TeamSummary` 新增 `tags` / `category_id`，`SkillSummary` 新增 `tags`；`ExpertPack` 升至 `pack_format 3` 并携带 `tags` / `category_id`——顶层包取该包自身的声明，**每个成员包取该成员自己的值**（作用域与快照级的 `assets` 相反）。
+- **技能标签的来源固定为市场索引行**：技能不带 `plugin.json`，其标签在导入时取自市场索引行并随快照固化，之后按与图标相同的溯源链读回；市场事后修改标签，需升级该条目才生效——与技能内容本身的口径一致。
+
+#### 已知边界（如实登记）
+
+- **导出包只携带裸 `category_id`**：将其解析为名称需要一份等价字典。宿主通过 `store.categories()` 提供该字典，但它**不跨宿主通用**。
+- **技能没有分类**：技能市场只声明扁平标签，因此 `SkillSummary` 只有 `tags`，没有 `category_id`。
+- **连接器没有标签来源**：当前市场数据里不存在连接器标签字段，因此连接器条目的标签恒为缺席。
+
+### 2.2 `0.1.0-beta.10` — 2026-10-12T07:31:25Z
 
 > **本版含破坏性变更**：协议指纹由 `fp-13` 递增至 `fp-14`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.9）。
 
@@ -73,7 +98,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - **`store.findByConnector(connectorId)` 反查支持**：支持按连接器的 `id` 或运行时 `name` 反查安装该连接器的 `StoreItem`（例如：条目 `fenbi-baokao-decision` 安装的 server 名为 `fenbi_mcp`，此前 `search()` 无法反查）；`StoreOperationOutcome` 新增 `installedCount` 字段。
 - **`MCP_OAUTH_CLIENT_NAME` 动态客户端标识**：动态客户端注册时上报宿主名称（环境变量优先，默认 `Nomifun MCP Client`，空值视为未设置），支持私有化部署在无需修改二进制的情况下在服务商授权页展示自定义品牌；仅对当前宿主自主注册的 client 生效，既有注册保持原名。
 
-### 2.2 `0.1.0-beta.9` — 2026-10-10T04:34:35Z
+### 2.3 `0.1.0-beta.9` — 2026-10-10T04:34:35Z
 
 > **本版含破坏性变更**：协议指纹由 `fp-12` 递增至 `fp-13`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.8）。
 
@@ -92,7 +117,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - **`exportTeam()` 导出团队自身包级技能**：修复团队 `ExpertPack` 顶层 `skills` 此前硬编码为空数组的缺陷（此前仅读取成员 Agent frontmatter 声明，导致包级声明但成员未声明的团队导出后丢失技能）。现调整为读取该团队快照已安装的技能组件，并与成员声明合并去重后物化至 `skills/<name>/...`。协议与类型无形态变更（详见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §4.4）。
 
-### 2.3 `0.1.0-beta.8` — 2026-09-28T10:23:47Z
+### 2.4 `0.1.0-beta.8` — 2026-09-28T10:23:47Z
 
 > **本版含破坏性变更**：协议指纹由 `fp-8` 递增至 `fp-12`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.7）。
 
@@ -113,7 +138,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - **安装状态限定快照作用域**：避免跨快照组件 ID 冲突导致释放旧版本时误清理新版本的安装记录，写入操作收窄为 `(snapshot_id, component_id)` 联合键。
 - **过滤连接器配置中的空 `values`**：避免空配置写入后被误判为配置变更导致连接器服务异常停用。
 
-### 2.4 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
+### 2.5 `0.1.0-beta.7` — 2026-09-20T10:33:48Z
 
 > **本版含破坏性变更**：协议指纹更新为 `fp-8`，客户端与运行时需保持版本对齐（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.6）。
 
@@ -130,7 +155,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - **模型输出上限映射修复**：修复 `[models.*]` 中的 `max_output_size` 与 `protocol` 在部分供应商中未正确生效的缺陷，采用非覆盖式写入填补数据库空值。
 
-### 2.5 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
+### 2.6 `0.1.0-beta.6` — 2026-09-18T11:08:21Z
 
 > **本版含破坏性变更**：`@flowy-agent-store/sdk` 入口重命名与返回对象扁平化（迁移步骤见 [升级与迁移指引](/zh-CN/docs/upgrade) §6.5）。
 
@@ -141,7 +166,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 - `initializeResult` 重命名为 **`handshake`**。
 - `close()` 增强为统一安全清理：退订事件通道、关闭底层传输、终止子进程并清理自动生成的临时数据目录。
 
-### 2.6 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
+### 2.7 `0.1.0-beta.5` — 2026-09-17T11:41:10Z
 
 > **本版含破坏性变更**：协议指纹更新至 `fp-7`，旧版客户端与新版运行时互不兼容。
 
@@ -166,7 +191,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - 修复 `source_kind = "zip"` 市场源在特定配置解析时被意外过滤的问题。
 
-### 2.7 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
+### 2.8 `0.1.0-beta.4` — 2026-09-16T10:24:02Z
 
 > **本版含破坏性变更**：协议指纹更新为 `fp-1`；`event_type` 收窄为封闭联合类型。
 
@@ -187,7 +212,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - HTTP 路由表映射数扩充至 48。
 
-### 2.8 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
+### 2.9 `0.1.0-beta.3` — 2026-09-10T04:44:34Z
 
 #### 新增
 
@@ -198,7 +223,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - 补充软件包 `package.json` 中的 `engines.node >= 22` 与代码仓库元数据。
 
-### 2.9 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
+### 2.10 `0.1.0-beta.2` — 2026-09-09T09:27:36Z
 
 #### 新增
 
@@ -208,7 +233,7 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 - 修复 `0.1.0` 缺少平台依赖导致可执行文件定位失败的问题。
 
-### 2.10 `0.1.0` — 2026-09-09T09:09:04Z
+### 2.11 `0.1.0` — 2026-09-09T09:09:04Z
 
 #### 新增
 
@@ -224,9 +249,9 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-**当前没有「已落地但未发布」的条目**：`0.1.0-beta.10` 的内容已按发布事实转入本文 §2。下一批改动落地后在此登记，发布时再转正。
+**当前没有「已落地但未发布」的条目**：`0.1.0-beta.11` 的内容已按发布事实转入本文 §2。下一批改动落地后在此登记，发布时再转正。
 
-当前稳定发布版本为 `0.1.0-beta.10`（对应线协议 `fp-14`）。未收录于本页的版本特性不应假定为已生效。
+当前稳定发布版本为 `0.1.0-beta.11`（对应线协议 `fp-16`）。未收录于本页的版本特性不应假定为已生效。
 
 ## 5. 另见
 
