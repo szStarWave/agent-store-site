@@ -43,13 +43,15 @@ bun add @flowy-agent-store/protocol
 
 | 导出符号 | 类型定义与用途 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-14"`）。建连握手时执行全等校验，跨版本不兼容 |
+| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-16"`）。建连握手时执行全等校验，跨版本不兼容 |
 | `InitializeRequest` / `InitializeResult` | 协议初始化握手载荷（交换协议版本、客户端标识及服务端能力集） |
 | `ClientInfo` / `ClientCapabilities` | 客户端身份声明（名称、版本）与能力声明（`events`、`approvals`、`team_runtime`） |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | 统一资源商店目录结构与安装回执模型 |
-| `AgentSummary` / `AgentDetail` | Agent 专家目录概要与详细配置视图 |
-| `TeamSummary` / `TeamDetail` | 专家团队目录概要与多 Agent 拓扑配置 |
-| `SkillSummary` / `SkillDetail` | 原子技能元数据与权限标记 |
+| `StoreCategory` / `StoreCategories` | 市场分类字典与市场级标签全集（`store.categories()` 的返回形状） |
+| `AgentSummary` / `AgentDetail` | Agent 专家目录概要与详细配置视图（均带 `tags` / `category_id`） |
+| `TeamSummary` / `TeamDetail` | 专家团队目录概要与多 Agent 拓扑配置（带包级 `tags` / `category_id`） |
+| `SkillSummary` / `SkillDetail` | 原子技能元数据与权限标记（带市场索引行来源的 `tags`） |
+| `ExpertPack` / `ExpertPersona` / `ExpertAssetRef` | 专家导出契约（`pack_format 3`：persona、技能与资产引用、展示元数据） |
 | `ConnectorSummary` / `ConnectorDetail` / `ConnectorStatusView` | 连接器目录视图、运行时连通性与探测结果 |
 | `ConnectorRegistration` / `ConnectorCredential` | 动态 MCP 连接器注册配置与凭据表单状态 |
 | `ConversationView` / `ConversationMessage` / `ConversationEvent` | 会话视图、历史消息结构及流式增量事件模型 |
@@ -470,6 +472,36 @@ console.log(result.pack); // 线上 ExpertPack 原件，支持无磁盘 I/O 消�
 
 两项核心作用域约束：资产具有**快照作用域**——成员 pack 的 `assets` 恒为空表，统一读取顶层 pack；`kind: "script"` 为**类别标注而非执行许可**——宿主自身不直接执行插件级脚本，具体调用由消费方调度，运营者可通过 `config.toml` 中的 `[expert_export] scripts = false` 显式剔除该类资产。宿主能力位 `snapshot_assets` 为 false 时，`assets` 恒为空表（明确区分「未接入」与「无资产」）。
 
+#### 类别与标签（`fp-16` / `pack_format 3` 起随包导出）
+
+`fp-16` 起 `ExpertPack` 携带市场声明的展示元数据，供第三方 runtime 还原市场的组织结构：
+
+- `pack.tags`：本地化标签数组（`{zh, en}` 可选对，按位配对）。
+- `pack.category_id`：裸分类引用（如 `04-DataAI`）——包**只带 id**，解析分类名需要消费方自己持有等价字典（本仓的字典在 `store.categories()`，跨宿主不通用）。
+
+作用域与 `assets` **恰好相反**：分类是**逐包自己的**声明，因此顶层包带团队行的值、**每个成员包带该成员自己的值**（`pack.team.members[].tags` / `.category_id`）；未声明则字段缺席，不会是空串或 `null` 占位。读写两个面同源：
+
+```ts
+// 1. 目录面：已安装的专家 / 团队 / 技能都能直接读到标签
+const teams = await client.teams.list();
+console.log(teams[0].tags, teams[0].category_id); // 团队：包级声明
+
+const skills = await client.skills.list();
+console.log(skills[0].tags);                      // 技能：来自市场索引行，导入时固化
+
+// 2. 导出面：顶层包 + 每个成员包各带自己的值
+const pack = await client.teams.export(teams[0].id);
+console.log(pack.pack_format, pack.tags, pack.category_id);          // 3, [...], "04-DataAI"
+for (const member of pack.team?.members ?? []) {
+  console.log(member.id, member.tags, member.category_id);           // 成员各自的声明
+}
+
+// 3. 把裸 id 解析成双语名（需要本地字典；未命中就是未命中，宿主从不猜）
+const { items: categories } = await client.store.categories();
+const nameOf = (id?: string | null) => categories.find((c) => c.id === id)?.name;
+console.log(nameOf(pack.category_id));                               // { zh: "数据智能", en: "Data & AI" }
+```
+
 #### 只要技能字节，不落盘
 
 `exportTeam` 之外的公开原语是 `skills.files(id)` 与 `skills.readFile(id, path)`；两者都受宿主能力位 `skill_files` 门禁：
@@ -522,7 +554,7 @@ const routes = httpRouteTable();
 console.log(`已映射 HTTP 接口总数: ${Object.keys(routes).length}`);
 ```
 
-- 公共 HTTP 接口覆盖 **55 / 82** 个协议方法；
+- 公共 HTTP 接口覆盖 **56 / 83** 个协议方法；
 - 需保持持续双向通信的实时流式推送方法（如 `follow`）以及宿主本地特权接口不在 HTTP 中开放。
 
 ### 5.2 审批决策 CAS 乐观并发控制
