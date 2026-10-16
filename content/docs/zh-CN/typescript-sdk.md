@@ -43,7 +43,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出符号 | 类型定义与用途 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-16"`）。建连握手时执行全等校验，跨版本不兼容 |
+| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-17"`）。建连握手时执行全等校验，跨版本不兼容 |
 | `InitializeRequest` / `InitializeResult` | 协议初始化握手载荷（交换协议版本、客户端标识及服务端能力集） |
 | `ClientInfo` / `ClientCapabilities` | 客户端身份声明（名称、版本）与能力声明（`events`、`approvals`、`team_runtime`） |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | 统一资源商店目录结构与安装回执模型 |
@@ -207,6 +207,24 @@ export interface ConnectorsSubclient {
   clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;
 }
 ```
+
+##### 字段改名：`auth_mode` → `auth_transport`（`fp-17`）
+
+`fp-17` 起 `ConnectorSummary` 的 `auth_mode` 更名 **`auth_transport`**，取值仍是 `none` / `oauth`。旧字段**直接消失**，没有过渡双写：指纹在握手阶段做严格相等校验，任何一端停留在 `fp-16` 都会连不上，因此宿主与客户端必须同步升级。
+
+改名的原因是这个名字一直在说谎：该字段由 transport 推导，只描述形状——url 型连接器一律得到 `oauth`，即使它实际用 API key、或凭据由平台代持。**调用方要做什么，由另外两个来源回答**：
+
+- `credential.mode`：连接器真正需要的认证方式（市场声明：`token` / `oauth` / `none`）；
+- `status`：现在是否就差一次授权（`authorization_required` 才是行动信号）。
+
+```ts
+// `fp-17` 起：授权入口看声明与状态，不看形状
+if (summary.status === "authorization_required") {
+  await harness.connectors.authStart(summary.id);
+}
+```
+
+从 `fp-16` 升级时：把读 `summary.auth_mode` 的地方改成 `summary.auth_transport`（它只适合展示），把「是否显示授权按钮」的判断改成上面的 `status`。
 
 #### `store` — 资源市场综合生命周期
 

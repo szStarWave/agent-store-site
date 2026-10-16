@@ -43,7 +43,7 @@ The protocol package serves as the definitive source of truth for wire interacti
 
 | Export symbol | Contract definition and usage |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-16"`). Enforces strict equality during handshakes |
+| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-17"`). Enforces strict equality during handshakes |
 | `InitializeRequest` / `InitializeResult` | Protocol handshake payloads exchanging protocol versions, client identities, and host capabilities |
 | `ClientInfo` / `ClientCapabilities` | Client identity declarations (name, version) and feature subscriptions (`events`, `approvals`, `team_runtime`) |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | Unified catalog structures and installation receipt models |
@@ -207,6 +207,24 @@ export interface ConnectorsSubclient {
   clearCredentials(connectorId: string, keys?: string[]): Promise<ConnectorCredential>;
 }
 ```
+
+##### Field rename: `auth_mode` → `auth_transport` (since `fp-17`)
+
+Since `fp-17` the connector summary's `auth_mode` is renamed **`auth_transport`**, with the same `none` / `oauth` values. The old field is **gone**, with no transitional dual write: the fingerprint is compared for strict equality at handshake, so a client or host left on `fp-16` fails to connect — both sides must upgrade together.
+
+The rename is because the old name lied: the field is derived from the transport and describes shape only — every url-shaped connector answered `oauth`, even when it authenticates with an API key or when the platform holds the credentials. **What a caller must do is answered by two other fields**:
+
+- `credential.mode`: the authentication the connector actually needs (the marketplace declaration: `token` / `oauth` / `none`);
+- `status`: whether an authorization is genuinely outstanding (`authorization_required` is the actionable signal).
+
+```ts
+// Since `fp-17`: the auth affordance follows the declaration and the status, never the shape
+if (summary.status === "authorization_required") {
+  await harness.connectors.authStart(summary.id);
+}
+```
+
+Upgrading from `fp-16`: change `summary.auth_mode` to `summary.auth_transport` (display only), and decide whether to offer an authorization entry point from `status` instead.
 
 #### `store` — Marketplace comprehensive lifecycle
 
