@@ -258,6 +258,8 @@ if (invocation.is_error) {
 
 ### 4.4 Connector credential forms and private service registration
 
+> `credential/get|set`, `get` and `call` accept only the `mcp_server_id` (UUID), never the server name: resolve `.id` from `connectors.list()` by name, then pass it to all three. To keep the credential surface in focus, the snippets below omit that step.
+
 ```ts
 // 1. Inspect required credential schema
 const credForm = await client.connectors.credentials("weather-service");
@@ -335,6 +337,66 @@ await client.refreshMarketplace(added.marketplace_id);
 // 3. Remove marketplace source (cascade: true unregisters associated uncommitted snapshots)
 await client.removeMarketplace(added.marketplace_id, /* cascade */ true);
 ```
+
+### 4.7 Bring-your-own-token connectors: GitHub / Baidu Netdisk
+
+Marketplace entries use the same credential form as 4.4: when a market's `connectors.json` declares an entry as `auth_mode: "token"`, the installed connector provides its own credential form and needs no manual `register()` like 4.4's private service. The flow below uses allo's own `token-connectors` market (a zip archive hosted on ModelScope):
+
+```ts
+// 1. Register the market source (a zip archive; the archive root is the market root)
+const market = await client.addMarketplace({
+  name: "token-connectors",
+  source_kind: "zip",
+  source:
+    "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/token-connectors.zip",
+});
+
+// 2. Locate this market's entry: the same host may also carry the official
+//    connectors market, so the filter must match on marketplace_id
+const item = (await client.store.search("github-token")).find(
+  (hit) => hit.marketplace_id === market.marketplace_id,
+);
+if (!item) throw new Error("no github-token entry in the token-connectors market");
+
+// 3. Install. While no credential is stored, install waits for ready until it
+//    times out; the ready result can be ignored
+const installed = await client.store.install(item, { timeoutMs: 20_000 });
+console.log(installed.ok, installed.installedCount, installed.warnings);
+
+// 4. Resolve the mcp_server_id (UUID) from connectors.list() by name:
+//    credential/get|set, get and call accept the UUID only, never the server
+//    name (see 4.4)
+const row = (await client.connectors.list()).find((c) => c.name === "github-token");
+if (!row) throw new Error("the github-token connector is not installed");
+
+// 5. Read the credential surface: mode is token, missing lists the keys still
+//    absent (names only, never values)
+const form = await client.connectors.credentials(row.id);
+console.log(form.mode, form.missing); // → "token" ["GITHUB_PAT"]
+
+// 6. Store the credential: only keys declared by the entry are accepted;
+//    secrets go to the host credential store and are never returned in a response
+await client.connectors.setCredentials(row.id, { GITHUB_PAT: process.env.GITHUB_PAT! });
+
+// 7. Probe and call: the tool list is returned only after a credential is
+//    stored (get() returns an empty array before that); tool names are whatever
+//    the server returns
+const detail = await client.connectors.get(row.id);
+console.log(detail.tools.map((tool) => tool.name));
+const call = await client.connectors.call(row.id, detail.tools[0].name, {});
+if (call.is_error) console.warn(call.result);
+```
+
+Baidu Netdisk follows the same flow with a different entry name and credential key:
+
+| Entry | Remote service | Credential key | Where to get a credential |
+| --- | --- | --- | --- |
+| `github-token` | `https://api.githubcopilot.com/mcp/` | `GITHUB_PAT` | [github.com/settings/tokens](https://github.com/settings/tokens) |
+| `baidu-netdisk-token` | `https://mcp-pan.baidu.com/sse` | `BAIDU_NETDISK_ACCESS_TOKEN` | [pan.baidu.com/union/doc/Wm9sl0i0j](https://pan.baidu.com/union/doc/Wm9sl0i0j) |
+
+Both entries point at the **same remote service** as the official market's `github` / `baidu-netdisk`; only the authentication differs: the official entries are `server-side` (the platform holds the credential, so the UI shows no credential form) while these two are `token` (bring your own). Their ids and display names are deliberately distinct, so installing both markets on one host never yields same-named entries or a name-based overwrite.
+
+Calling before a credential is stored is fail-closed: the host returns `MCP_MISSING_CREDENTIAL` and sends no request to the remote service.
 
 ## 5. Advanced workflows and pack materialization
 

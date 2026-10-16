@@ -256,6 +256,8 @@ if (invocation.is_error) {
 
 ### 4.4 连接器用户凭据表单与私有服务注册
 
+> `credential/get|set`、`get`、`call` 均只接受 `mcp_server_id`（UUID），不接受服务名：先按 name 从 `connectors.list()` 取得 `.id`，再将其传给上述三个方法。为聚焦凭据面本身，下方片段省略该解析步骤。
+
 ```ts
 // 1. 查询连接器所需的凭据配置表单
 const credForm = await client.connectors.credentials("weather-service");
@@ -333,6 +335,59 @@ await client.refreshMarketplace(added.marketplace_id);
 // 3. 级联移除市场源（cascade: true 同步注销关联的未持久化快照）
 await client.removeMarketplace(added.marketplace_id, /* cascade */ true);
 ```
+
+### 4.7 自带 Token 的连接器：GitHub / 百度网盘
+
+市场条目同样适用 4.4 的凭据表单。市场 `connectors.json` 将条目声明为 `auth_mode: "token"` 时，安装后的连接器自带凭据表单，无需像 4.4 的私有服务那样手动调用 `register()`。以下以 allo 自有的 `token-connectors` 市场（zip 归档，托管于 ModelScope）为例，给出完整流程：
+
+```ts
+// 1. 注册市场源（zip 归档，归档根即市场根）
+const market = await client.addMarketplace({
+  name: "token-connectors",
+  source_kind: "zip",
+  source:
+    "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/token-connectors.zip",
+});
+
+// 2. 定位本市场条目：同一台宿主可能同时安装官方 connectors 市场，须按 marketplace_id 过滤
+const item = (await client.store.search("github-token")).find(
+  (hit) => hit.marketplace_id === market.marketplace_id,
+);
+if (!item) throw new Error("token-connectors 市场中不存在 github-token 条目");
+
+// 3. 安装。凭据未填时 install 会等待 ready 直至超时才返回，其 ready 结果可忽略
+const installed = await client.store.install(item, { timeoutMs: 20_000 });
+console.log(installed.ok, installed.installedCount, installed.warnings);
+
+// 4. 按 name 从 connectors.list() 解析出 mcp_server_id（UUID）：
+//    credential/get|set、get、call 只接受 UUID，不接受服务名（见 4.4）
+const row = (await client.connectors.list()).find((c) => c.name === "github-token");
+if (!row) throw new Error("github-token 连接器未安装");
+
+// 5. 读取凭据面：mode 为 token，missing 列出仍缺失的键（只返回键名，不返回值）
+const form = await client.connectors.credentials(row.id);
+console.log(form.mode, form.missing); // → "token" ["GITHUB_PAT"]
+
+// 6. 写入凭据：只接受条目声明过的键；secret 写入宿主凭据存储，响应不回显明文
+await client.connectors.setCredentials(row.id, { GITHUB_PAT: process.env.GITHUB_PAT! });
+
+// 7. 探活并调用：写入凭据后才返回工具表（未写入时 get() 返回空数组），工具名以服务端返回为准
+const detail = await client.connectors.get(row.id);
+console.log(detail.tools.map((tool) => tool.name));
+const call = await client.connectors.call(row.id, detail.tools[0].name, {});
+if (call.is_error) console.warn(call.result);
+```
+
+百度网盘复用同一流程，仅条目名与凭据键不同：
+
+| 条目 | 远端服务 | 凭据键 | 凭据获取入口 |
+| --- | --- | --- | --- |
+| `github-token` | `https://api.githubcopilot.com/mcp/` | `GITHUB_PAT` | [github.com/settings/tokens](https://github.com/settings/tokens) |
+| `baidu-netdisk-token` | `https://mcp-pan.baidu.com/sse` | `BAIDU_NETDISK_ACCESS_TOKEN` | [pan.baidu.com/union/doc/Wm9sl0i0j](https://pan.baidu.com/union/doc/Wm9sl0i0j) |
+
+这两个条目与官方市场的 `github` / `baidu-netdisk` 指向**同一个远端服务**，差异仅在认证方式：官方条目为 `server-side`（凭据由平台侧持有，界面不提供凭据表单），这两个条目为 `token`（用户自备）。二者的 id 与显示名互不相同，同一台宿主同时安装两个市场时不会产生同名条目，也不会发生按名覆盖。
+
+未填凭据即调用时为 fail-closed：宿主直接返回 `MCP_MISSING_CREDENTIAL`，不向远端发出任何请求。
 
 ## 5. 进阶编排与资产物化导出
 
