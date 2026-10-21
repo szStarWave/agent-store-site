@@ -223,7 +223,7 @@ For complex, multi-step objectives, Flowy Agent Store provides a **Planned DAG**
 - **Leader Planning Role Isolation**: The Leader focuses solely on goal decomposition and graph topology management. It maintains no independent chat history, and its planning prompt is synthesized dynamically, partitioned from member private instructions;
 - **Granular Concurrency & Step Retries**: Independent topological steps (such as Step 2 and Step 3 above) execute in parallel; isolated step failures invoke localized retry policies rather than failing the entire graph;
 - **Dynamic Re-planning**: If intermediate steps reveal missing data or conflicting assumptions, evaluation nodes trigger the Replan protocol, allowing the Leader to adjust downstream branches while preserving completed artifacts;
-- **Human-in-the-Loop Interventions**: Critical decision gates pause graph progression and transition to an awaiting-decision state, accepting external resolutions via [`client.runs.answer`](/en-US/docs/typescript-sdk).
+- **Human-in-the-Loop Interventions**: Critical decision gates pause graph progression and transition to an awaiting-decision state, accepting external resolutions via [`client.runs.answerDecision`](/en-US/docs/typescript-sdk) (wire protocol `run/answer`).
 
 | Architectural Dimension | Single Agent Session | Agent Team (V1) DAG Orchestration | Core Design Constraints |
 | --- | --- | --- | --- |

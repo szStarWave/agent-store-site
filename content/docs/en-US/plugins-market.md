@@ -175,7 +175,7 @@ await client.connect();
 // 2. Discover enabled connectors and verify socket connectivity
 const connectors = await client.connectors.list();
 const testResult = await client.connectors.test("conn_github_integration");
-console.log(`Connection test: ${testResult.ok ? "Success" : "Failed"}`);
+console.log(`Connection test: ${testResult.success ? "Success" : "Failed"}`);
 
 // 3. Create a conversation (connectors are also callable directly via client.connectors.call)
 const conv = await client.conversations.create({
@@ -184,7 +184,7 @@ const conv = await client.conversations.create({
 
 // 4. Dispatch inference prompt
 await client.conversations.send(
-  conv.id,
+  conv.conversation_id,
   "List the 3 most recent pull requests and generate a report in the right panel.",
   crypto.randomUUID(),
 );

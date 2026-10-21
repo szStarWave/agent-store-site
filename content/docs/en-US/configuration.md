@@ -301,7 +301,7 @@ The host supports overriding tool configurations dynamically via environment var
 AGENT_STORE_TOOLS='{"computer":false,"domains":{"knowledge":false}}' agent-store
 ```
 
-For complete integration examples, refer to the [TypeScript SDK cookbook](/en-US/docs/examples-sdk) §6.3.
+For complete integration examples, refer to the [TypeScript SDK cookbook](/en-US/docs/examples-sdk) §5.4.
 
 ## connector_proxy
 

@@ -249,7 +249,12 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. 未发布的变更与发布节奏
 
-**当前没有「已落地但未发布」的条目**：`0.1.0-beta.11` 的内容已按发布事实转入本文 §2。下一批改动落地后在此登记，发布时再转正。
+**已落地但未发布**（发布时按发布事实转入 §2）：
+
+| 批次 | 内容 | 线协议 | 指针 |
+| --- | --- | --- | --- |
+| 连接器认证字段改名 | `ConnectorSummary.auth_mode` → `auth_transport`；授权入口改由 `credential.mode` + `status` 决定，不再由 transport 形状推导 | `fp-16` → **`fp-17`** | [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §3.3 |
+| 目录检索与使用提示 | `store.search` 改为多词 AND + 三档相关性排序；新增 `store.searchWithHits` / `searchInstalled` / `listStatus`；技能与连接器条目的索引行 `examples_*` 进入 `StoreItem.quick_prompts` | 不改指纹（仍 `fp-17`，无方法增删） | [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §3.3、[实战示例](/zh-CN/docs/examples-sdk) §4.8 |
 
 当前稳定发布版本为 `0.1.0-beta.11`（对应线协议 `fp-16`）。未收录于本页的版本特性不应假定为已生效。
 

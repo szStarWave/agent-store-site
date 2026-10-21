@@ -127,6 +127,7 @@ Flowy Agent Store 内置官方 ModelScope 资源市场，覆盖专家（Agent）
 
 ```typescript
 import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
+import { decodeConversationEvent } from "@flowy-agent-store/protocol";
 
 // 连接本地 App Server 实例
 const client = new AppServerClient({
@@ -135,22 +136,24 @@ const client = new AppServerClient({
 });
 await client.connect();
 
-// 创建会话并绑定专家
+// 创建会话并绑定专家（未指定 expertId 时使用默认通用助手）
 const conv = await client.conversations.create({
   name: "快速体验会话",
-  agentId: "expert_general_assistant",
+  expertId: "expert_general_assistant",
 });
 
 // 订阅会话实时事件流
-client.conversations.subscribe(conv.id, (event) => {
-  if (event.kind === "text_delta") {
+const sub = await client.conversations.follow(conv.conversation_id);
+sub.onEvent((rawEvent) => {
+  const event = decodeConversationEvent(rawEvent);
+  if (event.kind === "message.delta") {
     process.stdout.write(event.delta);
   }
 });
 
 // 发起流式推理
 await client.conversations.send(
-  conv.id,
+  conv.conversation_id,
   "请用三句话介绍 Flowy Agent Store 的本地优先架构。",
   crypto.randomUUID(),
 );
