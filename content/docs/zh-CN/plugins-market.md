@@ -175,7 +175,7 @@ await client.connect();
 // 2. 检查已启用的连接器并测试物理连通性
 const connectors = await client.connectors.list();
 const testResult = await client.connectors.test("conn_github_integration");
-console.log(`连通性测试: ${testResult.ok ? "成功" : "失败"}`);
+console.log(`连通性测试: ${testResult.success ? "成功" : "失败"}`);
 
 // 3. 在会话中调度连接器（亦可通过 client.connectors.call 直接调用指定工具）
 const conv = await client.conversations.create({
@@ -184,7 +184,7 @@ const conv = await client.conversations.create({
 
 // 4. 发起交互推理
 await client.conversations.send(
-  conv.id,
+  conv.conversation_id,
   "请列出当前仓库最新的 3 个 Pull Request 并在右侧生成报告。",
   crypto.randomUUID(),
 );

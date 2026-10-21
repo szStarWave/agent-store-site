@@ -201,7 +201,7 @@ bun run typecheck
 - **协议指纹由 `fp-12` 递增到 `fp-13`**，握手执行严格全等校验：**客户端与运行时必须同批升级**，只升一边会直接连不上；
 - 本次**没有 TypeScript 签名破坏**：新增的 `getMarketSettings()` / `setMarketSettings()` 与 `SpawnOptions.marketDownload` / `configPath` 都是加法，`bun run typecheck` 应当照旧通过；
 - 新增两个 HTTP 映射方法 `market/settings` / `market/settings-set`（`GET` / `POST /api/app-server/market-settings`），协议方法总数 80、HTTP 路由映射数 55；
-- **`exportTeam()` 的输出变了**（协议与类型形态未变）：团队的 `pack.skills` 不再恒为空，它现在是该团队包级声明且已安装的技能；若你此前自行遍历 `pack.team.members[].skills` 来收集团队技能，那段代码可以删掉，直接读 `result.writtenSkills`（用法见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §4.4）；
+- **`exportTeam()` 的输出变了**（协议与类型形态未变）：团队的 `pack.skills` 不再恒为空，它现在是该团队包级声明且已安装的技能；若你此前自行遍历 `pack.team.members[].skills` 来收集团队技能，那段代码可以删掉，直接读 `result.writtenSkills`（用法见 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §5.2）；
 - 若你希望宿主启动时不自动下载市场源，可用 `download_on_start = false` 或 `AGENT_STORE_MARKET_DOWNLOAD=none`；自动升级的条目类型与扫掠周期可在运行期经 `market/settings-set` 改写（配置写法见 [配置参考](/zh-CN/docs/configuration)）。
 
 ### 6.9 从 0.1.0-beta.9 升到 0.1.0-beta.10
@@ -232,7 +232,7 @@ bun run typecheck
 - **有一处字段搬家**：`AgentDetail` 的 `tags` / `category_id` 上移到 `AgentSummary`（扁平 JSON 无法让同一个键在 summary 与 detail 各出现一次）。`AgentDetail` 继承 `AgentSummary`，读 `detail.tags` 的代码照旧可用；若你的代码里手写了 `AgentDetail` 对象字面量去喂断言或 mock，需要把这两个键挪到 summary 那一层；
 - 新增 `store/categories`（HTTP `GET /api/app-server/store/categories`），协议方法总数 83、HTTP 路由映射数 56；它返回所有**已启用**市场的分类字典与市场级标签词表（`marketplace_tags`，按位配对的双语数组），冷启动即完整；
 - **新字段的读取口径**：`category` 是宿主用字典解析出来的名字，**id 未命中字典时就缺席**（宿主不猜）；技能的 `tags` 来自市场索引行并在导入时固化，市场事后改标签需要升级该条目才生效；连接器条目**没有标签来源**，其标签恒为缺席。请把这几处都按「有就读、没有就退化成原始 id」写，`item.tags ?? []` 是安全默认；
-- **`pack_format 3` 的消费方**：导出包只携带**裸 `category_id`**，要显示名字必须自带等价字典（本宿主的字典经 `store.categories()` 提供，**不跨宿主通用**）；分类的作用域与 `assets` 相反——顶层包取自身声明、每个成员包取该成员自己的值（用法见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §4.4）。
+- **`pack_format 3` 的消费方**：导出包只携带**裸 `category_id`**，要显示名字必须自带等价字典（本宿主的字典经 `store.categories()` 提供，**不跨宿主通用**）；分类的作用域与 `assets` 相反——顶层包取自身声明、每个成员包取该成员自己的值（用法见 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §5.2）。
 
 ## 7. 自查当前安装的版本
 
