@@ -301,7 +301,7 @@ requirement = false
 AGENT_STORE_TOOLS='{"computer":false,"domains":{"knowledge":false}}' agent-store
 ```
 
-完整调用范例请参阅 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §6.3。
+完整调用范例请参阅 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §5.4。
 
 ## `connector_proxy`
 

@@ -223,7 +223,7 @@ Flowy Agent Store 采用**本地优先（Local-First）**、高度解耦且基�
 - **Leader 规划角色约束**：Leader 专注于全局目标拆解与执行图拓扑维护。Leader 不创建独立对话历史，其规划 Prompt 在执行前动态合成，与团队成员的私有指令物理隔离；
 - **步骤细粒度并发与重试**：无拓扑依赖的步骤（如上图 Step 2 与 Step 3）由调度引擎并发派发给对应专家处理；单步骤执行失败触发局部重试策略，避免整图回滚；
 - **动态重规划（Dynamic Re-planning）**：中间步骤如果暴露出信息缺失或逻辑矛盾，评估节点可触发 Replan 协议，由 Leader 在保留已完成步骤产物的前提下，动态调整后续待执行子图；
-- **人工干预闭环（Human-in-the-Loop）**：关键决策节点可暂停图流转，进入等待决策状态，通过 SDK 的 [`client.runs.answer`](/zh-CN/docs/typescript-sdk) 注入外部用户仲裁结果。
+- **人工干预闭环（Human-in-the-Loop）**：关键决策节点可暂停图流转，进入等待决策状态，通过 SDK 的 [`client.runs.answerDecision`](/zh-CN/docs/typescript-sdk)（底层协议 `run/answer`）注入外部用户仲裁结果。
 
 | 架构维度 | 单 Agent 会话模式 | Agent Team（V1）DAG 编排模式 | 核心设计约束 |
 | --- | --- | --- | --- |

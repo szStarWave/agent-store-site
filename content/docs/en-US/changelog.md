@@ -249,7 +249,12 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 
 ## 4. Unpublished changes and release cadence
 
-**There are currently no landed-but-unpublished entries**: the `0.1.0-beta.11` content moved into §2 above as published fact. The next batch is registered here and promoted to §2 on release.
+**Landed but unpublished** (moved into §2 as published fact on release):
+
+| Batch | Content | Wire protocol | Pointer |
+| --- | --- | --- | --- |
+| Connector auth field rename | `ConnectorSummary.auth_mode` → `auth_transport`; the authorization affordance now follows `credential.mode` + `status` instead of being derived from the transport's shape | `fp-16` → **`fp-17`** | [TypeScript SDK reference](/en-US/docs/typescript-sdk) §3.3 |
+| Catalogue search and prompt hints | `store.search` moves to multi-term AND with three relevance buckets; adds `store.searchWithHits` / `searchInstalled` / `listStatus`; the index row's `examples_*` for skill and connector entries reaches `StoreItem.quick_prompts` | No fingerprint change (still `fp-17`, no methods added or removed) | [TypeScript SDK reference](/en-US/docs/typescript-sdk) §3.3, [SDK cookbook](/en-US/docs/examples-sdk) §4.8 |
 
 The current stable release is `0.1.0-beta.11` (wire protocol `fp-16`). Features not listed on this page should not be considered active.
 
