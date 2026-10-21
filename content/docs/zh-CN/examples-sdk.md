@@ -54,7 +54,7 @@ const conversationId = chat.conversation_id;
 
 // 1. 订阅流式事件：实时接收模型思考过程与文本增量
 const subscription = await client.conversations.follow(conversationId);
-subscription.onEvent((rawEvent) => {
+const unsubscribe = subscription.onEvent((rawEvent) => {
   const event = decodeConversationEvent(rawEvent);
   if (event.kind === "message.thinking") {
     process.stderr.write(`[思考] ${event.thinking}\n`);
@@ -64,12 +64,18 @@ subscription.onEvent((rawEvent) => {
 });
 subscription.onError((error) => console.error("流式接收异常:", error));
 
-// 2. 发送对话消息
-await client.conversations.send(
-  conversationId,
-  "请评估单二进制架构的利弊并输出分析大纲",
-  crypto.randomUUID(),
-);
+try {
+  // 2. 发送对话消息
+  await client.conversations.send(
+    conversationId,
+    "请评估单二进制架构的利弊并输出分析大纲",
+    crypto.randomUUID(),
+  );
+} finally {
+  // 3. 生产级闭环：会话结束或组件卸载时及时注销回调并关闭订阅通道，释放 WebSocket 监听资源
+  // unsubscribe(); // 注销当前事件回调
+  // subscription.close(); // 彻底关闭底层流式通道
+}
 ```
 
 ### 2.2 动态挂载原子技能（单轮请求能力注入）
@@ -136,7 +142,7 @@ if (!architect) throw new Error("目标专家未安装");
 // 2. 创建绑定单专家的会话（未安装时抛出 agent_not_installed 错误）
 const expertChat = await client.conversations.create({
   name: "架构设计会话",
-  agentId: architect.id,
+  expertId: architect.id,
 });
 await client.conversations.send(expertChat.conversation_id, "规划微内核扩展架构", crypto.randomUUID());
 ```
@@ -149,7 +155,7 @@ await client.conversations.send(expertChat.conversation_id, "规划微内核扩�
 // 1. 检索已配置的专家团队
 const teams = await client.teams.list();
 const teamChat = await client.conversations.create({
-  teamId: teams[0].id, // teamId 与 agentId 严格互斥
+  teamId: teams[0].id, // teamId 与 expertId 严格互斥
 });
 
 // 2. 发起跨角色协作请求
@@ -262,7 +268,7 @@ if (invocation.is_error) {
 // 1. 查询连接器所需的凭据配置表单
 const credForm = await client.connectors.credentials("weather-service");
 
-if (credForm.status === "missing") {
+if (credForm.missing.length > 0) {
   console.warn(`缺失必需凭据: ${credForm.missing.join(", ")}`);
 
   // 2. 定向安全写入敏感凭据（单向加密落盘，网络回包中永不越界返回明文）
@@ -389,6 +395,72 @@ if (call.is_error) console.warn(call.result);
 
 未填凭据即调用时为 fail-closed：宿主直接返回 `MCP_MISSING_CREDENTIAL`，不向远端发出任何请求。
 
+> **协议版本演进说明（fp-17 起）**：条目 manifest 中的 `auth_mode` 在底层协议摘要中已统一映射为 `auth_transport`（`token` 映射为 `user_token`，`server-side` 映射为 `platform_proxy`），SDK 客户端与目录检索返回的数据模型保持平滑兼容。
+
+### 4.8 目录检索、高亮区间与使用提示
+
+`store.search` 支持多词匹配：查询字符串按空白切分为多个 term，条目在任意可搜字段中组合命中全部 term 即判定匹配（不要求位于同一字段）。`store.searchWithHits` 额外返回命中的字段名、匹配语种以及字符级高亮区间；`store.searchInstalled` 限定仅检索已安装条目；`store.listStatus` 则用于探测后台内置市场的异步就绪态。检索语义与取数契约的完整定义见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §3.3。
+
+下例演示目录检索与高亮渲染的标准交互链路：
+1. **冷启动与就绪探测**：一次性拉取目录并校验 `marketsPending` 完整性状态位；
+2. **高频零 I/O 检索**：通过复用内存 `items` 消除频繁磁盘投影，并基于 `ranges` 逆向切片安全渲染 `<mark>` 标签；
+3. **已安装范围过滤与提示词（`quick_prompts`）读取**。
+
+```ts
+import { launchHarness } from "@flowy-agent-store/sdk";
+
+// 运行环境：Node.js ≥ 22 / Bun；需宿主二进制（AGENT_STORE_BIN 或 @flowy-agent-store/runtime-* 包）
+const harness = await launchHarness({
+  bin: process.env["AGENT_STORE_BIN"],
+  client: { name: "catalog-search-demo", version: "1.0.0" },
+  marketDownload: "lazy",
+});
+
+try {
+  // 1. 取一次目录并读完整性标志：marketsPending 为 true 表示内置市场仍在异步注册
+  const { items, marketsPending } = await harness.store.listStatus();
+  if (marketsPending) {
+    console.warn("市场仍在注册，目录可能不全：此时的空结果不代表条目不存在");
+  }
+
+  // 2. 输入时零 I/O：items 由调用方持有，后续检索直接在内存中过滤，不再触发 store/list
+  const matches = await harness.store.searchWithHits("百度 网盘", { items, kind: "connector" });
+  for (const { item, hits, offLanguage } of matches) {
+    const nameHit = hits.find((hit) => hit.field === "name");
+    // offLanguage 为 true 表示命中的是另一语种文案，当前界面展示文本中不含该词
+    // reduceRight 从后向前逆向替换，确保前序区间的字符偏移量保持有效
+    const rendered =
+      nameHit && !offLanguage
+        ? nameHit.ranges.reduceRight(
+            (text, [start, end]) => `${text.slice(0, start)}<mark>${text.slice(start, end)}</mark>${text.slice(end)}`,
+            item.name,
+          )
+        : item.name;
+    console.log(rendered);
+  }
+
+  // 3. 限定已安装范围检索（复用同一份 items，不再向宿主拉取目录）
+  const installed = await harness.store.searchInstalled("网盘", { items });
+  console.log("已安装命中:", installed.map((item) => item.entry_name).join(", "));
+
+  // 4. 使用提示：技能/连接器取自市场索引行 examples_*，专家/专家团取自 plugin.json quickPrompts
+  for (const item of items.slice(0, 3)) {
+    const hint = item.quick_prompts?.[0];
+    console.log(`${item.name}: ${hint ? (hint.zh ?? hint.en) : "（市场未声明提示词，不渲染该行）"}`);
+  }
+} finally {
+  // 释放宿主子进程与其数据目录
+  await harness.server.close();
+}
+```
+
+| 约束 | 违反后的可观察后果 |
+| --- | --- |
+| 禁止在 `input` 等高频事件中调用未传入 `items` 的 `search()` | 每次击键均触发一次全量目录投影（逐条目读取磁盘 manifest，外加两次数据库查询）。传入预取 `items`（`search(q, { items })` / `searchWithHits(q, { items })`）后退化为本地匹配（**零 I/O**），方可安全置于事件中调用。 |
+| 禁止依据 `search()` 返回空数组判定目录为空 | 启动初期内置市场尚在异步注册中，空结果与「没有该条目」不可区分；必须通过 `listStatus().marketsPending` 判定就绪态。 |
+| 禁止将 `ranges` 作用于对应字段之外的字符串 | 区间偏移量与 `field` 指明的字段原始值绝对绑定，作用于其他文本会导致乱码或截断错位。 |
+| 禁止在 `offLanguage: true` 时按当前语言强行高亮 | 命中词位于另一语种文案，当前界面展示文本中不含该词，直接截取必然产生文本错位。 |
+
 ## 5. 进阶编排与资产物化导出
 
 ### 5.1 独立任务（Run）编排与 CAS 决策审批
@@ -405,24 +477,28 @@ const runId = receipt.run_id;
 
 // 2. 订阅运行状态与实时审批请求
 const runSub = await client.runs.follow(runId);
-runSub.onEvent(async (event) => {
-  if (event.event_type === "approval.requested") {
-    // 捕获决策请求并向服务端提交批准判定（必须携带三项版本乐观锁字段）
-    await client.runs.answerDecision({
-      runId,
-      stepId: event.step_id!,
-      attemptId: event.attempt_id!,
-      answer: "确认批准，准许写文件操作",
-      expectedExecutionVersion: event.expected_execution_version!,
-      expectedStepVersion: event.expected_step_version!,
-      expectedAttemptVersion: event.expected_attempt_version!,
-    });
-  }
-});
+try {
+  runSub.onEvent(async (event) => {
+    if (event.event_type === "approval.requested") {
+      // 捕获决策请求并向服务端提交批准判定（必须携带三项版本乐观锁字段）
+      await client.runs.answerDecision({
+        runId,
+        stepId: event.step_id!,
+        attemptId: event.attempt_id!,
+        answer: "确认批准，准许写文件操作",
+        expectedExecutionVersion: event.expected_execution_version!,
+        expectedStepVersion: event.expected_step_version!,
+        expectedAttemptVersion: event.expected_attempt_version!,
+      });
+    }
+  });
 
-// 3. 阻塞等待终态并提取执行结果
-const result = await client.runs.result(runId);
-console.log(`任务终态: ${result.status}`);
+  // 3. 阻塞等待终态并提取执行结果
+  const result = await client.runs.result(runId);
+  console.log(`任务终态: ${result.status}`);
+} finally {
+  runSub.close(); // 任务达到终态后主动释放订阅通道
+}
 ```
 
 ### 5.2 专家与团队全量资源物化导出
@@ -687,7 +763,7 @@ await webClient.connect();
 
 ```ts
 import { withRetry } from "@flowy-agent-store/client";
-import { AppServerError, formatError, isRetryableError } from "@flowy-agent-store/protocol";
+import { AppServerError, formatError, isRetryableTransportError } from "@flowy-agent-store/protocol";
 
 // 模式 A：使用 withRetry 自动执行幂等操作的指数退避重试
 const runDetails = await withRetry(() => client.runs.get("run-12345"), {
@@ -714,7 +790,7 @@ try {
       default:
         console.error(`服务端业务异常 [${error.code}]:`, formatError(error));
     }
-  } else if (isRetryableError(error)) {
+  } else if (isRetryableTransportError(error)) {
     console.warn("网络层瞬时异常，可择机重试");
   } else {
     throw error;

@@ -37,7 +37,7 @@ Compatibility statuses define the operational readiness and adapter boundary of 
 | `unsupported` | Explicitly unsupported in the current runtime |
 | `pending-legal-review` | Copyright or redistribution rights are unverified; excluded from public markets and default bundles |
 
-### It is really three dimensions
+### Three-dimensional orthogonal assessment system
 
 The single status displayed in the UI represents an aggregated view. The ingestion report evaluates three orthogonal dimensions to avoid conflating "convertible" with "verified runnable":
 

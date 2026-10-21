@@ -127,6 +127,7 @@ Developers can also drive executions programmatically via the TypeScript SDK:
 
 ```typescript
 import { AppServerClient, WebSocketTransport } from "@flowy-agent-store/client";
+import { decodeConversationEvent } from "@flowy-agent-store/protocol";
 
 // Connect to the local App Server instance
 const client = new AppServerClient({
@@ -135,22 +136,24 @@ const client = new AppServerClient({
 });
 await client.connect();
 
-// Create a conversation and bind an expert
+// Create a conversation and bind an expert (defaults to general assistant if omitted)
 const conv = await client.conversations.create({
   name: "Quick Start Session",
-  agentId: "expert_general_assistant",
+  expertId: "expert_general_assistant",
 });
 
 // Subscribe to real-time conversation event stream
-client.conversations.subscribe(conv.id, (event) => {
-  if (event.kind === "text_delta") {
+const sub = await client.conversations.follow(conv.conversation_id);
+sub.onEvent((rawEvent) => {
+  const event = decodeConversationEvent(rawEvent);
+  if (event.kind === "message.delta") {
     process.stdout.write(event.delta);
   }
 });
 
 // Dispatch inference prompt
 await client.conversations.send(
-  conv.id,
+  conv.conversation_id,
   "Explain Flowy Agent Store's local-first architecture in three sentences.",
   crypto.randomUUID(),
 );

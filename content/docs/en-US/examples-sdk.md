@@ -54,7 +54,7 @@ const conversationId = chat.conversation_id;
 
 // 1. Subscribe to event stream: receive model thinking and text deltas
 const subscription = await client.conversations.follow(conversationId);
-subscription.onEvent((rawEvent) => {
+const unsubscribe = subscription.onEvent((rawEvent) => {
   const event = decodeConversationEvent(rawEvent);
   if (event.kind === "message.thinking") {
     process.stderr.write(`[Thinking] ${event.thinking}\n`);
@@ -64,12 +64,18 @@ subscription.onEvent((rawEvent) => {
 });
 subscription.onError((error) => console.error("Streaming error:", error));
 
-// 2. Send message turn
-await client.conversations.send(
-  conversationId,
-  "Evaluate trade-offs of single-binary architectures and output an outline",
-  crypto.randomUUID(),
-);
+try {
+  // 2. Send message turn
+  await client.conversations.send(
+    conversationId,
+    "Evaluate trade-offs of single-binary architectures and output an outline",
+    crypto.randomUUID(),
+  );
+} finally {
+  // 3. Production cleanup: unsubscribe callbacks and close subscription channel
+  // unsubscribe(); // Deregisters event callback
+  // subscription.close(); // Closes streaming channel and frees WebSocket resources
+}
 ```
 
 ### 2.2 Dynamically mounting atomic skills per turn
@@ -136,7 +142,7 @@ if (!architect) throw new Error("Target expert not installed");
 // 2. Create conversation bound to expert (throws agent_not_installed if missing)
 const expertChat = await client.conversations.create({
   name: "Architecture Consultation",
-  agentId: architect.id,
+  expertId: architect.id,
 });
 await client.conversations.send(expertChat.conversation_id, "Design microkernel extension architecture", crypto.randomUUID());
 ```
@@ -149,7 +155,7 @@ Binding an expert team delegates orchestration to the Team Leader to dispatch su
 // 1. Query configured expert teams
 const teams = await client.teams.list();
 const teamChat = await client.conversations.create({
-  teamId: teams[0].id, // teamId and agentId are strictly mutually exclusive
+  teamId: teams[0].id, // teamId and expertId are strictly mutually exclusive
 });
 
 // 2. Dispatch cross-role collaborative prompt
@@ -264,7 +270,7 @@ if (invocation.is_error) {
 // 1. Inspect required credential schema
 const credForm = await client.connectors.credentials("weather-service");
 
-if (credForm.status === "missing") {
+if (credForm.missing.length > 0) {
   console.warn(`Missing required credentials: ${credForm.missing.join(", ")}`);
 
   // 2. Safely store sensitive secrets (encrypted on disk, never echoed in plaintext over network)
@@ -398,6 +404,72 @@ Both entries point at the **same remote service** as the official market's `gith
 
 Calling before a credential is stored is fail-closed: the host returns `MCP_MISSING_CREDENTIAL` and sends no request to the remote service.
 
+> **Protocol version note (since fp-17)**: The `auth_mode` in entry manifests maps to `auth_transport` in low-level protocol summaries (`token` maps to `user_token`, `server-side` maps to `platform_proxy`); SDK client and catalogue data models maintain seamless backward compatibility.
+
+### 4.8 Catalogue search, highlight ranges and prompt hints
+
+`store.search` supports multi-term matching: the query is split on whitespace and an entry matches when every term appears across its searchable fields (not necessarily within the same field). `store.searchWithHits` additionally returns the matched field name, detected language, and character-level highlight ranges; `store.searchInstalled` filters strictly within installed entries; `store.listStatus` probes the asynchronous readiness state of background markets. The complete contract specification is documented in the [TypeScript SDK reference](/en-US/docs/typescript-sdk) §3.3.
+
+The example below demonstrates the canonical workflow for interactive search and highlight rendering:
+1. **Startup readiness probing**: Fetch the catalogue once and check the `marketsPending` integrity flag;
+2. **High-frequency zero-I/O search**: Reuse in-memory `items` to avoid repeated disk projections, slicing `ranges` in reverse order to safely insert `<mark>` tags;
+3. **Installed-only filtering and prompt hint (`quick_prompts`) extraction**.
+
+```ts
+import { launchHarness } from "@flowy-agent-store/sdk";
+
+// Runtime: Node.js ≥ 22 / Bun; requires the host binary (AGENT_STORE_BIN or the @flowy-agent-store/runtime-* package)
+const harness = await launchHarness({
+  bin: process.env["AGENT_STORE_BIN"],
+  client: { name: "catalog-search-demo", version: "1.0.0" },
+  marketDownload: "lazy",
+});
+
+try {
+  // 1. Fetch catalogue once and inspect readiness: marketsPending is true while builtin markets register in background
+  const { items, marketsPending } = await harness.store.listStatus();
+  if (marketsPending) {
+    console.warn("Markets are still registering; an empty result does not mean the entry does not exist");
+  }
+
+  // 2. Zero-I/O afterwards: items is retained by the caller; subsequent searches filter in memory without IPC
+  const matches = await harness.store.searchWithHits("baidu netdisk", { items, kind: "connector" });
+  for (const { item, hits, offLanguage } of matches) {
+    const nameHit = hits.find((hit) => hit.field === "name");
+    // offLanguage: the hit matched in the alternate language, which the current display label does not contain
+    // reduceRight slices from end to start so preceding character offsets remain valid
+    const rendered =
+      nameHit && !offLanguage
+        ? nameHit.ranges.reduceRight(
+            (text, [start, end]) => `${text.slice(0, start)}<mark>${text.slice(start, end)}</mark>${text.slice(end)}`,
+            item.name,
+          )
+        : item.name;
+    console.log(rendered);
+  }
+
+  // 3. Search restricted to installed entries (reuses the same items, without re-fetching from host)
+  const installed = await harness.store.searchInstalled("netdisk", { items });
+  console.log("Installed hits:", installed.map((item) => item.entry_name).join(", "));
+
+  // 4. Prompt hints: skill/connector entries come from index row examples_*, experts/teams from plugin.json quickPrompts
+  for (const item of items.slice(0, 3)) {
+    const hint = item.quick_prompts?.[0];
+    console.log(`${item.name}: ${hint ? (hint.zh ?? hint.en) : "(market declared no hint, so no line is rendered)"}`);
+  }
+} finally {
+  // Release the host child process and its data directory
+  await harness.server.close();
+}
+```
+
+| Constraint | Observable consequence when violated |
+| --- | --- |
+| Do not invoke `search()` without passing `items` inside high-frequency events (e.g. `input`) | Each keystroke executes a full catalogue projection (scanning manifests from disk plus two database queries). Passing pre-fetched `items` (`search(q, { items })` / `searchWithHits(q, { items })`) degrades to local matching (**zero I/O**), making it safe inside event listeners. |
+| Do not infer an empty catalogue solely from `search()` returning empty arrays | During initial startup, builtin markets may still be registering asynchronously; an empty array is indistinguishable from "entry does not exist". Always inspect `listStatus().marketsPending`. |
+| Do not apply `ranges` across different text fields | Offset ranges strictly bind to the string identified by `field`; applying them to other strings causes slice misalignment or corruption. |
+| Do not highlight when `offLanguage: true` | The matched term resides in the alternate language text and does not exist in the rendered label; direct slicing causes misaligned markup. |
+
 ## 5. Advanced workflows and pack materialization
 
 ### 5.1 Standalone run orchestration and CAS decision approval
@@ -414,24 +486,28 @@ const runId = receipt.run_id;
 
 // 2. Subscribe to execution progress and intercept approval requests
 const runSub = await client.runs.follow(runId);
-runSub.onEvent(async (event) => {
-  if (event.event_type === "approval.requested") {
-    // Intercept decision request and submit approval with three CAS optimistic lock versions
-    await client.runs.answerDecision({
-      runId,
-      stepId: event.step_id!,
-      attemptId: event.attempt_id!,
-      answer: "Approved: file writing authorized",
-      expectedExecutionVersion: event.expected_execution_version!,
-      expectedStepVersion: event.expected_step_version!,
-      expectedAttemptVersion: event.expected_attempt_version!,
-    });
-  }
-});
+try {
+  runSub.onEvent(async (event) => {
+    if (event.event_type === "approval.requested") {
+      // Intercept decision request and submit approval with three CAS optimistic lock versions
+      await client.runs.answerDecision({
+        runId,
+        stepId: event.step_id!,
+        attemptId: event.attempt_id!,
+        answer: "Approved: file writing authorized",
+        expectedExecutionVersion: event.expected_execution_version!,
+        expectedStepVersion: event.expected_step_version!,
+        expectedAttemptVersion: event.expected_attempt_version!,
+      });
+    }
+  });
 
-// 3. Await terminal status and extract execution results
-const result = await client.runs.result(runId);
-console.log(`Run status: ${result.status}`);
+  // 3. Await terminal status and extract execution results
+  const result = await client.runs.result(runId);
+  console.log(`Run status: ${result.status}`);
+} finally {
+  runSub.close(); // Cleanly releases event subscription upon reaching terminal status
+}
 ```
 
 ### 5.2 Materializing expert and team resource packs to disk
@@ -697,7 +773,7 @@ await webClient.connect();
 
 ```ts
 import { withRetry } from "@flowy-agent-store/client";
-import { AppServerError, formatError, isRetryableError } from "@flowy-agent-store/protocol";
+import { AppServerError, formatError, isRetryableTransportError } from "@flowy-agent-store/protocol";
 
 // Mode A: Exponential backoff retry with jitter for idempotent operations
 const runDetails = await withRetry(() => client.runs.get("run-12345"), {
@@ -724,7 +800,7 @@ try {
       default:
         console.error(`App Server error [${error.code}]:`, formatError(error));
     }
-  } else if (isRetryableError(error)) {
+  } else if (isRetryableTransportError(error)) {
     console.warn("Transient network error, safe to retry");
   } else {
     throw error;
