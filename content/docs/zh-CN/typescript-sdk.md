@@ -43,7 +43,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出符号 | 类型定义与用途 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-17"`）。建连握手时执行全等校验，跨版本不兼容 |
+| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-18"`）。建连握手时执行全等校验，跨版本不兼容 |
 | `InitializeRequest` / `InitializeResult` | 协议初始化握手载荷（交换协议版本、客户端标识及服务端能力集） |
 | `ClientInfo` / `ClientCapabilities` | 客户端身份声明（名称、版本）与能力声明（`events`、`approvals`、`team_runtime`） |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | 统一资源商店目录结构与安装回执模型 |
@@ -57,6 +57,8 @@ bun add @flowy-agent-store/protocol
 | `ConversationView` / `ConversationMessage` / `ConversationEvent` | 会话视图、历史消息结构及流式增量事件模型 |
 | `RunReceipt` / `RunView` / `RunResult` / `RunEvent` | 批处理任务生命周期模型与决策事件 |
 | `ServerNotification` / `WireError` | 服务端下行推送通知与标准化错误传输载荷 |
+| `LocalizedText` / `LocalizedLang` | 多语言展示元数据契约（`{ en?, zh? }`）与语种枚举（`"zh"` \| `"en"`） |
+| `pickLocalized` / `pickLocalizedList` | 本地化文案解析纯函数工具（按语种优先级链回退并过滤空值） |
 
 ### 2.3 结构化错误模型与判定工具
 
@@ -713,6 +715,60 @@ export interface ModelsSubclient {
   list(): Promise<ModelSummary[]>;
 }
 ```
+
+---
+
+#### 应用面实体的展示字段（`fp-18`）
+
+自 `fp-18` 起，`agents`、`teams`、`skills`、`connectors` 四个子客户端返回的实体摘要均统一扩展**相同的四个可选多语言展示字段**。宿主在条目导入阶段从 `plugin.json` 与市场索引行按语种合并数据并持久化至快照，调用方可直接用于双语卡片渲染，无需额外请求市场源文件。
+
+```ts
+export interface LocalizedText {
+  /** 英文文案（未声明或缺席时为 null / undefined） */
+  en?: string | null;
+  /** 中文文案（未声明或缺席时为 null / undefined） */
+  zh?: string | null;
+}
+
+export type LocalizedLang = "zh" | "en";
+
+/** 四类应用实体摘要统一扩展的可选多语言展示字段集 */
+export interface LocalizedDisplayFields {
+  /** 实体展示名称（缺席时回退至 name；连接器 name 为内部标识禁止直出） */
+  display_name?: LocalizedText | null;
+  /** 实体展示简介完整长描述 */
+  display_description?: LocalizedText | null;
+  /** 双语展示标签列表（按数组索引位置配对） */
+  tags?: LocalizedText[] | null;
+  /** 引导提示词示例列表 */
+  quick_prompts?: LocalizedText[];
+}
+```
+
+| 字段 | 类型 | 语义契约 |
+| --- | --- | --- |
+| `display_name?` | `LocalizedText` | 展示名称。字段缺席时回退至 `name`；连接器的 `name` 为运行时内部标识（如 `fenbi_mcp`），禁止直接作为界面标题渲染 |
+| `display_description?` | `LocalizedText` | 展示简介（完整描述文本） |
+| `tags[]` | `LocalizedText[]` | 展示标签列表（按索引位置进行中英双语配对） |
+| `quick_prompts[]` | `LocalizedText[]` | 引导提示词列表（推荐的用户交互用例） |
+
+字段消费契约与边界约束：
+
+1. **可选字段无隐式默认值**：`display_*` 字段可能为 `null` 或未定义，数组可能为空；未声明展示字段时由调用方显式执行回退（Fallback）至单语言字段。协议层内置了开箱即用的解析工具：
+
+   ```ts
+   import { pickLocalized, pickLocalizedList } from "@flowy-agent-store/protocol";
+
+   // 单字段逐级回退（当前语言 -> 备选语言 -> ""），未命中时回退至运行名
+   const title = pickLocalized(item.display_name, "zh") || item.name;
+
+   // 列表字段批量解析，自动剔除空字符串
+   const prompts = pickLocalizedList(item.quick_prompts, "zh");
+   ```
+
+2. **多语种取值相互独立**：`display_name.zh` 与 `display_name.en` 独立解析，任一语种存在不保证另一语种同时存在（例如技能市场当前 268 个条目中仅 15 项声明中文名称）。UI 渲染需按目标语言优先级链逐级回退。
+3. **历史持久化快照不含新增字段**：在 `fp-18` 之前已安装的条目，宿主升级不会自动补齐展示字段；需通过 `store.updateEntry` 刷新或重新安装条目以生成新快照。业务层必须始终将上述字段视为可选。
+4. **仅作为 UI 展示元数据**：展示字段不参与目录检索索引构建，亦不改变运行时标识（如工具命名空间 `connector__<name>__<tool>` 始终以 `name` 为准）。各子客户端的 `get` 与 `list` 接口返回的展示字段保持一致。
 
 ---
 

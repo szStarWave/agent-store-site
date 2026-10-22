@@ -461,6 +461,59 @@ try {
 | 禁止将 `ranges` 作用于对应字段之外的字符串 | 区间偏移量与 `field` 指明的字段原始值绝对绑定，作用于其他文本会导致乱码或截断错位。 |
 | 禁止在 `offLanguage: true` 时按当前语言强行高亮 | 命中词位于另一语种文案，当前界面展示文本中不含该词，直接截取必然产生文本错位。 |
 
+### 4.9 按界面语言渲染条目卡片（`fp-18`）
+
+自 `fp-18` 起，已安装实体的四个目录接口（`agents` / `teams` / `skills` / `connectors`）均返回同构的可选展示字段集合。调用方可在**无需访问任何市场源文件**的前提下，统一执行标题、简介、标签与引导提示词的双语渲染：
+
+```ts
+import { launchHarness } from "@flowy-agent-store/sdk";
+
+const harness = await launchHarness({ bin, client: { name: "card-render", version: "1.0.0" } });
+try {
+  const lang = "zh" as const;
+
+  // 四个目录面：统一字段结构与渲染路径
+  const cards = [
+    ...(await harness.agents.list()).map((item) => ({ kind: "专家", ...pick(item) })),
+    ...(await harness.teams.list()).map((item) => ({ kind: "专家团", ...pick(item) })),
+    ...(await harness.skills.list()).map((item) => ({ kind: "技能", ...pick(item) })),
+    ...(await harness.connectors.list()).map((item) => ({ kind: "连接器", ...pick(item) })),
+  ];
+
+  for (const card of cards.slice(0, 5)) {
+    console.log(`[${card.kind}] ${card.title}`);
+    if (card.summary) console.log(`  ${card.summary}`);
+    if (card.hint) console.log(`  提示词：${card.hint}`);
+  }
+
+  function pick(item: {
+    name: string;
+    display_name?: { zh?: string; en?: string } | null;
+    display_description?: { zh?: string; en?: string } | null;
+    quick_prompts?: { zh?: string; en?: string }[];
+  }) {
+    // 逐语种回退：当前语言 -> 备选语言 -> name 运行时标识
+    const text = (pair?: { zh?: string; en?: string } | null) =>
+      (lang === "zh" ? (pair?.zh ?? pair?.en) : (pair?.en ?? pair?.zh)) ?? null;
+    return {
+      title: text(item.display_name) ?? item.name,
+      summary: text(item.display_description),
+      hint: text(item.quick_prompts?.[0]),
+    };
+  }
+} finally {
+  await harness.server.close();
+}
+```
+
+展示字段消费与边界契约：
+
+| 约束 | 违反后的可观察后果 |
+| --- | --- |
+| 连接器标题必须优先读取 `display_name`，禁止直接渲染 `name` | `name` 为运行时标识（如 `fenbi_mcp`），同时作为工具命名空间 `connector__<name>__<tool>` 的前缀段；直接上屏将导致内部系统标识泄露给终端用户。 |
+| 禁止假设展示字段必然存在 | 市场源仅部分声明多语言元数据（例如技能市场 268 项条目中仅 15 项声明中文名称）；`display_*` 缺席属于标准契约，回退至 `name` 为规范流程而非异常分支。 |
+| 禁止将顶层单语 `description` 假定为指定语种的展示文案 | 连接器索引行的顶层 `description` 语种未做规范化约束（当前 283 项中 210 项为英文）；确定性多语言展示文案必须严格提取自 `display_description`。 |
+
 ## 5. 进阶编排与资产物化导出
 
 ### 5.1 独立任务（Run）编排与 CAS 决策审批

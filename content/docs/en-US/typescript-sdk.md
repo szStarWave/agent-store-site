@@ -43,7 +43,7 @@ The protocol package serves as the definitive source of truth for wire interacti
 
 | Export symbol | Contract definition and usage |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-17"`). Enforces strict equality during handshakes |
+| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-18"`). Enforces strict equality during handshakes |
 | `InitializeRequest` / `InitializeResult` | Protocol handshake payloads exchanging protocol versions, client identities, and host capabilities |
 | `ClientInfo` / `ClientCapabilities` | Client identity declarations (name, version) and feature subscriptions (`events`, `approvals`, `team_runtime`) |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | Unified catalog structures and installation receipt models |
@@ -57,6 +57,8 @@ The protocol package serves as the definitive source of truth for wire interacti
 | `ConversationView` / `ConversationMessage` / `ConversationEvent` | Conversation models, transcript message structures, and streaming delta events |
 | `RunReceipt` / `RunView` / `RunResult` / `RunEvent` | Batch task execution lifecycle models and decision events |
 | `ServerNotification` / `WireError` | Downstream server push notifications and standardized wire error payloads |
+| `LocalizedText` / `LocalizedLang` | Localized display metadata contracts (`{ en?, zh? }`) and language union (`"zh"` \| `"en"`) |
+| `pickLocalized` / `pickLocalizedList` | Pure resolution utilities for localized text (locale fallback chain and empty string filtering) |
 
 ### 2.3 Structured error models and inspection utilities
 
@@ -711,6 +713,60 @@ export interface ModelsSubclient {
   list(): Promise<ModelSummary[]>;
 }
 ```
+
+---
+
+#### Display fields on application entities (`fp-18`)
+
+Starting in `fp-18`, entity summaries returned by the `agents`, `teams`, `skills`, and `connectors` catalog endpoints uniformly include the **same four optional localized display fields**. The host merges these fields at import time from `plugin.json` and market index rows per locale and persists them into snapshots, enabling callers to render bilingual cards without reading market source files.
+
+```ts
+export interface LocalizedText {
+  /** English copy (null or undefined when undeclared) */
+  en?: string | null;
+  /** Chinese copy (null or undefined when undeclared) */
+  zh?: string | null;
+}
+
+export type LocalizedLang = "zh" | "en";
+
+/** Optional localized display fields extended across all four entity summaries */
+export interface LocalizedDisplayFields {
+  /** Entity display name (falls back to name when absent; connector name must not render directly) */
+  display_name?: LocalizedText | null;
+  /** Full descriptive long text */
+  display_description?: LocalizedText | null;
+  /** Bilingual tags paired by array index */
+  tags?: LocalizedText[] | null;
+  /** Prompt examples for end-user interaction */
+  quick_prompts?: LocalizedText[];
+}
+```
+
+| Field | Type | Semantic contract |
+| --- | --- | --- |
+| `display_name?` | `LocalizedText` | Display name. Fall back to `name` when absent; a connector's `name` is an internal runtime identifier (e.g. `fenbi_mcp`) and must not be rendered directly as a UI title |
+| `display_description?` | `LocalizedText` | Display description (full descriptive text) |
+| `tags[]` | `LocalizedText[]` | Display tags (zh/en paired by array index) |
+| `quick_prompts[]` | `LocalizedText[]` | Prompt examples (recommended user query samples) |
+
+Field consumption contract and boundaries:
+
+1. **Optional fields with no implicit defaults**: `display_*` fields can be `null` or omitted, and array fields may be empty. Callers must handle fallbacks explicitly to the single-language field. The protocol package exports utility functions for this purpose:
+
+   ```ts
+   import { pickLocalized, pickLocalizedList } from "@flowy-agent-store/protocol";
+
+   // Single-field resolution (active locale -> alternate locale -> ""), falling back to name
+   const title = pickLocalized(item.display_name, "en") || item.name;
+
+   // List field batch resolution, dropping empty results
+   const prompts = pickLocalizedList(item.quick_prompts, "en");
+   ```
+
+2. **Independent locale resolution**: `display_name.zh` and `display_name.en` resolve independently. The presence of one language does not imply the presence of the other (e.g. only 15 of the skill market's 268 entries declare a Chinese name). UI rendering must traverse a language priority fallback chain.
+3. **Existing snapshots omit new fields**: Entries installed prior to `fp-18` do not automatically receive display fields upon host upgrade. Callers must run `store.updateEntry` or reinstall the entry to populate updated snapshots. Always handle these fields as optional in business logic.
+4. **Display metadata only**: Display fields are not indexed for catalogue search and do not alter runtime identities such as `connector__<name>__<tool>`. `get` and `list` methods across all subclients return identical display metadata.
 
 ---
 
