@@ -1,20 +1,20 @@
 # 用 API Token 部署到 EdgeOne Makers
 
-> 最后核对：2026-10-22（含一次真实部署 `dphseubl3zh9`）
-> 一句话：本站项目是 `Provider: Github` 型（平台拉仓库、云端构建），`edgeone makers deploy` 的上传通道不适用；可脚本化的部署方式是用 **EdgeOne API Token** 调 `CreatePagesDeployment`，让平台按指定提交重建。
+> 最后核对：2026-10-22（含真实部署验证 `dphseubl3zh9`）  
+> 核心机制：本站项目属性为 `Provider: Github` 型（平台拉取代码仓库并在云端构建），`edgeone makers deploy` 的静态产物上传通道不适用；自动化部署方案是通过 **EdgeOne API Token** 调用 `CreatePagesDeployment` 接口，指示平台基于指定 Git 提交重新拉取代码并构建上线。
 
-## 1. 参数与认证
+## 1. 参数与认证规范
 
-| 项 | 值 |
+| 属性项 | 生产取值 / 规范 |
 |---|---|
 | 端点（中国站） | `https://pages-api.cloud.tencent.com/v1` |
 | 端点（国际站） | `https://pages-api.edgeone.ai/v1` |
 | `Region` | 中国站 `ap-guangzhou`；国际站 `ap-singapore` |
 | `ProjectId` | `makers-yjnkgelxhduo`（`agent-store-site`） |
 | `RepoBranch` | `main` |
-| 认证头 | `Authorization: Bearer <API Token>` |
+| 认证请求头 | `Authorization: Bearer <API Token>` |
 | 内容类型 | `Content-Type: application/json` |
-| 请求体 | **平铺**：`Action` 与业务参数同级 |
+| 请求体结构 | **平铺结构**：`Action` 与业务参数同级 |
 
 Token 的三种注入方式：
 
