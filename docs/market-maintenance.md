@@ -1,104 +1,82 @@
 # 市场资源维护交接文档
 
-本文说明如何更新本站的三个市场资源：**专家 / 专家团 / 技能 / 连接器**。
-目标读者是接手维护的人，以及按文档执行的 agent。
+本文档规范本站四大类市场资源（**专家 / 专家团 / 技能 / 连接器**）的维护与同步流程。
+面向对象：接手维护的工程师与执行自动化同步任务的 Agent。
 
-- 适用范围：新增、修改、下架市场条目
-- 不适用：改站点页面与样式、改文档、发版（见文末「相关文档」）
-- **关键前提：所有资源改动都不需要改代码。** 目录页直接读 `content/market.json`，
-  路由 `/market` 与 `/{lang}/market` 已由 `src/pages/` 下的页面覆盖。
+- **适用范围**：市场条目的新增、更新、下架与校验。
+- **排除范围**：站点页面 UI 与样式调整、双语文档更新、发版上线（参考 §10「关联文档」）。
+- **核心前提**：**资源变更不触碰业务代码**。市场目录页直接消费生成物 `content/market.json`，相关路由 `/market` 与 `/{lang}/market` 已在 `src/pages/` 预置完成。
 
-## agent 执行须知
+## 自动化代理 (Agent) 执行契约规范
 
-1. 所有命令都在**仓库根目录**执行；`node` / `bun` 均可，本文用 `bun run <script>`。
-2. 先只读探测、再写盘：`--dry-run` 不会改动任何文件，任何没有把握的操作都先跑它。
-3. 上游市场工作目录不在本仓库内（由运行时维护）。文档中一律用环境变量指代，
-   不要把它写进文档、日志或提交信息。
-4. 写盘操作只有三个：`sync:tree`（镜像）、`sync:market`（快照）、`git commit`。
-   除此之外不应有任何文件被修改。
-5. `sync:tree` 是**单向镜像**，同一时刻只允许一台机器执行。在多个机器或 clone 之间
-   交替同步会静默删除资源。动手前先读第 4 节。
-6. 提交前跑 `bun run check:market`：查重与「两个产物是否一致」合成一条命令，退出码非 0
-   即有问题。这是整条流程里唯一挡住重复上线与半同步的检查（见 4.3、4.7）。
+1. **执行工作目录**：所有构建与同步指令必须在**仓库根目录**执行；运行环境支持 `node` 或 `bun`，本文以 `bun run <script>` 为标准范式。
+2. **只读探测先行**：支持 `--dry-run` 参数的操作必须先执行模拟试跑，确认变更范围无误后再落盘。
+3. **敏感环境隔离**：上游市场真实工作目录由外部运行时独立维护（非本仓库目录），禁止在文档、提交记录或日志中记录上游绝对路径，统一通过受控环境变量指代。
+4. **受控写盘操作边界**：允许落盘的操作仅限三项：`sync:tree`（文件树镜像同步）、`sync:market`（目录快照提取）以及 `git commit`。严禁擅自修改其他文件。
+5. **单向镜像互斥约束**：`sync:tree` 具备**单向强制镜像语义**，同一时间窗口仅允许单机单进程执行。严禁在多个客户端或独立 Clone 副本间交替执行同步，否则将触发未同步文件的静默剪除（操作前必须阅读 §4）。
+6. **门禁阻断判据**：提交前必须执行 `bun run check:market`。该门禁原子化校验清单查重与双生成物一致性，非 0 退出码属于阻断性错误，严禁绕过（详见 §4.3 与 §4.7）。
 
 ## 1. 数据流与目录角色
 
 ```text
 上游市场工作目录（运行时维护，非本仓库）
-        │  bun run sync:tree          镜像 + 生成 _files.txt + 门禁校验
+        │  bun run sync:tree          镜像同步 + 生成 _files.txt + 执行静态门禁校验
         ▼
-market-source/{experts,skills,connectors}/     提交进仓库，上游的 1:1 镜像
-        │  bun run sync:market        纯本地读取，生成目录页快照
+market-source/{experts,skills,connectors}/     版本库跟踪，上游目录的 1:1 镜像
+        │  bun run sync:market        本地离线解析，提取目录页数据快照
         ▼
-content/market.json                            提交进仓库，目录页数据源
+content/market.json                            版本库跟踪，前端目录页消费的结构化数据源
         │
-        ├─ bun run dev      →  http://127.0.0.1:5173/zh-CN/market（dev 直接把 /source/** 映射到 market-source/）
-        └─ bun run build    →  SSG 生成 HTML，并把目录页头像拷为
-                               build/source/  →  对外 /source/<market>/…
+        ├─ bun run dev      →  http://127.0.0.1:5173/zh-CN/market（dev 模式将 /source/** 动态映射至 market-source/）
+        └─ bun run build    →  SSG 预渲染生成 HTML，并将目录页引用的头像拷贝至
+                               build/source/  →  生产环境 /source/<market>/…
 ```
 
-| 路径 | 角色 | 谁维护 |
+| 路径 | 角色定义 | 维护职责方 |
 | --- | --- | --- |
-| 上游市场工作目录 | 原始资源树 | 运行时/市场侧；**不是本仓库** |
-| `market-source/` | 上游的 1:1 镜像，含每市场的 `_files.txt` | `sync:tree` 生成，**禁止手工编辑** |
-| `content/market.json` | 目录页用的精简快照 | `sync:market` 生成，**禁止手工编辑** |
-| `build/source/` | 构建产物里目录页引用的头像（`copy-market-tree.mjs` 生成，构建产物不入库） | `copy-market-tree.mjs` 生成，构建产物不入库 |
+| 上游市场工作目录 | 原始资产源目录树 | 运行时 / 市场侧独立维护；**非本仓库** |
+| `market-source/` | 上游目录的 1:1 本地镜像，包含各市场的 `_files.txt` | 由 `sync:tree` 脚本生成，**严禁手工编辑** |
+| `content/market.json` | 官网目录页消费的精简快照数据源 | 由 `sync:market` 脚本生成，**严禁手工编辑** |
+| `build/source/` | 构建产物中目录页引用的头像图标（临时产物，不纳入版本控制） | 由 `copy-market-tree.mjs` 构建阶段生成 |
 
-对外，本站同时是三个市场源（`url` 型 `source_kind`）：
+对外分发接口中，本站作为三个静态市场源（`source_kind: "url"`）：
 
-| 市场 | 清单地址 | 目录清单 |
+| 市场类别 | 元数据清单相对路径 | 文件目录树清单 |
 | --- | --- | --- |
-| 专家 | `/source/experts/.codebuddy-plugin/marketplace.json` | `/source/experts/_files.txt` |
-| 技能 | `/source/skills/.codebuddy-skill/marketplace.json` | `/source/skills/_files.txt` |
-| 连接器 | `/source/connectors/.codebuddy-connector/connectors.json` | `/source/connectors/_files.txt` |
+| 专家 (Experts) | `/source/experts/.codebuddy-plugin/marketplace.json` | `/source/experts/_files.txt` |
+| 技能 (Skills) | `/source/skills/.codebuddy-skill/marketplace.json` | `/source/skills/_files.txt` |
+| 连接器 (Connectors) | `/source/connectors/.codebuddy-connector/connectors.json` | `/source/connectors/_files.txt` |
 
-`_files.txt` 是镜像契约：一行一个相对 POSIX 路径、不含自身，客户端据此镜像整棵树。
-静态托管没有动态枚举端点，所以它必须在发布前生成好。
-
-**清单还必须等于「git 真正交付的集合」。** 清单由 `listFiles()` 扫磁盘生成，而 `git add`
-会静默跳过 `.gitignore` 命中的路径：被忽略且未跟踪的文件留在同步机的磁盘上、留在清单里，
-却进不了提交。客户端按清单逐个拉取，拿到的是 404；而同步机自己看不出任何异常——它的磁盘
-上确实有这些文件。2026-09-17 修掉的正是这样一处：不带根锚点的 `.codebuddy/` 让专家市场
-多出 84 条幽灵条目（见 4.3、7）。所以改 `.gitignore` 时不要写会命中市场树的宽松规则——那条
-契约写在 `.gitignore` 文件头，`check:market` 的 `ignore.market-tree` 会用一组代表名替你把关。
+- **`_files.txt` 协议契约**：按行存储的 POSIX 相对路径集合（排除自身），客户端据此对整棵目录树执行增量同步。在缺乏动态枚举接口的纯静态托管架构下，该清单必须在构建前预先静态生成。
+- **清单与 Git 跟踪范围强一致性**：清单生成逻辑依赖 `listFiles()` 扫描本地磁盘，而 `git add` 会自动过滤 `.gitignore` 规则命中的文件。若存在「磁盘存在但被 Git 忽略」的文件，该文件将写入 `_files.txt` 却无法提交进版本库，导致客户端请求时遭遇 HTTP 404，而本地开发机无法直接察觉异常。2026-09-17 曾排查修复此类问题：未锚定根目录的 `.codebuddy/` 导致专家市场产生 84 条孤立无效记录（见 §4.3 与 §7）。因此修改 `.gitignore` 时必须避免针对市场树设置宽泛规则，该约束已在 `.gitignore` 头部声明并通过 `check:market` 中的 `ignore.market-tree` 自动化门禁检验。
 
 ### 托管边界：哪些市场由本站整树托管
 
-EdgeOne Makers 对**构建产物**有两条硬上限（官方排障指南给出，且没有提额入口）：**≤ 20,000 个文件**、
-**单文件 ≤ 25 MiB**。三个市场整树加起来远超这条线：
+EdgeOne Makers 对**构建产物**设有两条硬性配额指标（源自官方排障指南，无工单提额途径）：**总文件数 ≤ 20,000** 且 **单文件体积 ≤ 25 MiB**。三个市场源全量文件规模显著超出该阈值：
 
-| 部分 | 文件数 |
+| 模块划分 | 文件总数 |
 | --- | --- |
-| 站点自身（页面、文档、资源） | 约 90 |
-| `experts` | 14,714（含 45.8 MiB 的 `malaysia-legal` 数据集） |
+| 站点基础（页面、文档、静态资产） | 约 90 |
+| `experts` | 14,714（包含 45.8 MiB 的 `malaysia-legal` 数据集） |
 | `skills` | 4,634 |
 | `connectors` | 3,264 |
-| 合计 | **约 22,700** ← 超限：日志停在 `Checking output`，随后 `File count exceeds project limit.` |
+| **全量合计** | **约 22,700** ← 超出平台配额：日志停滞于 `Checking output` 并抛出 `File count exceeds project limit.` |
 
-**现状（doc 30）：三个市场都已迁到 ModelScope 的 zip 归档**（`bun run pack:market` 打包、
-`bun run publish:market` 上传），本站**一个都不整树托管**，`copy-market-tree.mjs` 的
-`HOSTED_DEFAULT` 是**空数组**。产物里只留目录页引用的头像（648 个文件、约 103 MB）。
+**当前架构基线 (doc 30)**：三个市场源已全量迁移至 ModelScope ZIP 压缩包托管（通过 `bun run pack:market` 打包并由 `bun run publish:market` 发布），本站**不再对任何市场源进行整树全量托管**，构建脚本 `copy-market-tree.mjs` 中的 `HOSTED_DEFAULT` 已配置为**空数组**。生产构建产物仅保留目录页引用的头像资源（共 648 个文件，总计约 103 MB）。
 
-「只托管部分市场」这条能力仍然保留，将来若要回退，改 `HOSTED_DEFAULT` 这一个常量即可
-（随提交进仓库、推送即生效）；环境变量 `SITE_HOSTED_MARKETS` 只是本地试算用的覆盖：
+系统仍保留按需恢复整树托管的能力，修改 `HOSTED_DEFAULT` 常量即可调整生产产物范围；本地调试与测试可通过环境变量 `SITE_HOSTED_MARKETS` 临时覆盖：
 
 ```powershell
-$env:SITE_HOSTED_MARKETS="skills,connectors"   # 未列出的市场只留目录页引用的图片
+$env:SITE_HOSTED_MARKETS="skills,connectors"   # 未列出的市场源仅提取目录页头像
 bun run build
 ```
 
-- 不在列表里的市场**只保留目录页引用的图片**（从 `content/market.json` 的 `avatar` 路径取），
-  目录页的图标因此始终正常——目录页头像是按同源解析的；
-- 它只是产物侧的开关：不改 `market-source/`、不改 `content/market.json`、不影响 `check:market`。
+- **非托管市场资产裁剪保证**：未列入托管清单的市场源，构建流程将根据 `content/market.json` 中的 `avatar` 路径定向提取图标文件，确保前端展示始终正常。
+- **解耦独立性**：该开关仅控制生产构建输出，不改写 `market-source/` 镜像内容与 `content/market.json` 快照，亦不影响 `check:market` 校验逻辑。
 
-> **顺序铁律：先把新宿主和「老 URL 怎么办」安排妥当，再把某个市场放回 `HOSTED_DEFAULT` 或从
-> `SITE_HOSTED_MARKETS` 里去掉。** 客户端 `~/.agent-store/config.toml` 里写的是
-> `<站点>/source/<market>/…`；市场从站点消失而没有替代，那些客户端下次刷新就拉不到市场，
-> 而镜像语义是「上游没有即删除」，可能连带删掉用户已装的条目。官方源现已指向 ModelScope 的
-> zip 归档，与本站产物无关。
+> ⚠️ **下线与迁移前置条件**：从 `HOSTED_DEFAULT` 或 `SITE_HOSTED_MARKETS` 移除整树托管前，必须确认所有客户端配置与替代下载源已平稳切换。客户端配置文件 `~/.agent-store/config.toml` 中若仍指向本站原静态路径，失去镜像源将导致增量同步将本地条目误删。当前官方客户端源已全量重定向至 ModelScope ZIP 归档。
 
-开发态与产物**不一致**：`src/plugins/market-source-dev.ts` 直接把 `market-source/` 托管在
-`/source/**` 上、不看托管开关，所以本地永远能看到完整树（仅 dev，不进产物）。
+- **开发态映射特异性**：`src/plugins/market-source-dev.ts` 插件在本地开发环境下直接将 `market-source/` 映射为 `/source/**`，不受托管开关影响，本地调试环境始终可访问全量资源。
 
 ## 2. 四类资源的文件与字段规范
 
@@ -310,14 +288,9 @@ git commit -m "chore(market): …"
 git push origin main
 ```
 
-- **两个路径要一起提交**：只提交 `market-source/` 会让页面与树不一致，只提交
-  `content/market.json` 则指向了不存在的文件。
-- 推送 `main` **本应**触发 EdgeOne Makers 构建（该自动触发自 2026-09-17 起失效，需手动触发，
-  见 [`deploy-trigger.md`](deploy-trigger.md)）；构建里 `copy-market-tree.mjs` 把目录页头像拷进
-  `build/source/`。`/source/**` 在 `edgeone.json` 中被设为 `max-age=0, must-revalidate`，
-  因为头像与市场清单路径都不带 hash，长缓存会让新条目/新图标不可见。
-- 提交信息建议单独成一笔，不要和业务代码改动混在一起（`market-source/` 变动通常
-  几百个文件）。
+- **双产物原子化提交要求**：严禁单独提交 `market-source/` 或 `content/market.json`。单侧提交将导致页面与底层静态文件树失步，引发资源 404 或死链。
+- **自动化构建部署**：推送到 `main` 分支需触发 EdgeOne Makers 构建（自 2026-09-17 起 Webhook 自动触发失效，需按 [`deploy-trigger.md`](deploy-trigger.md) 执行 API 触发）。构建阶段通过 `copy-market-tree.mjs` 将目录页引用的头像拷贝至 `build/source/`。`edgeone.json` 中已针对 `/source/**` 配置 `max-age=0, must-revalidate`，避免无 hash 的静态资源因 CDN 强缓存延迟生效。
+- **提交历史规范**：市场资源同步变动通常涉及大量文件变更，建议独立提交，避免与应用业务代码混淆。
 
 ## 4. 换机器与多人协作
 
@@ -530,35 +503,34 @@ git status --short               # 两个产物成对出现，且没有手改过
 这几条是整条流程里**唯一**能挡住「静默丢失」与「重复上线」的检查——门禁只管树内部，
 既不看快照，也不查重复。
 
-## 5. 目录页映射与回落
+## 5. 目录页映射与回落规则
 
-`content/market.json` 的结构与取值来源：
+`content/market.json` 的结构与数据源映射规范：
 
-| 快照字段 | 来源 | 缺失时 |
+| 快照字段 | 来源字段 | 缺失时的回落行为 |
 | --- | --- | --- |
-| `updatedAt` | 每次 `sync:market` 的当前时间 | —（页面显示「更新于 …」） |
-| `base` | 固定 `"source"` | — |
-| 专家 `name` / `name_en` | 插件 `plugin.json` 的 `profession.zh` / `.en` | 回落清单 `name`（插件 id） |
-| 专家 `description_zh` / `_en` | 插件 `displayDescription.zh` / `.en` | 回落清单 `description` |
-| 专家 `tags_zh` / `_en` | 插件 `tags[{zh,en}]`，取前 5 | 空数组 |
-| 专家 `avatar` | 插件目录内四个候选文件，见 2.1 | `null` |
+| `updatedAt` | 执行 `sync:market` 时的系统时间戳 | —（前端展示「更新于 …」） |
+| `base` | 固定常量 `"source"` | — |
+| 专家 `name` / `name_en` | 插件 `plugin.json` 的 `profession.zh` / `.en` | 回落至清单中的 `name`（插件 ID） |
+| 专家 `description_zh` / `_en` | 插件 `displayDescription.zh` / `.en` | 回落至清单中的 `description` |
+| 专家 `tags_zh` / `_en` | 插件 `tags[{zh,en}]`，最多截取前 5 项 | 空数组 |
+| 专家 `avatar` | 插件目录内候选文件探测（详见 §2.1） | `null` |
 | 技能 `name` / `version` / `source` | 清单同名字段 | — |
-| 技能 `description_zh` / `_en` | 清单同名字段 | 回落 `description` |
+| 技能 `description_zh` / `_en` | 清单同名字段 | 回落至 `description` |
 | 技能 `tags_zh` / `_en` | 清单同名字段 | 空数组 |
-| 技能 `avatar` | 市场根 `icons/<slug>.<ext>` | `null` |
-| 连接器 `id` / `name` / `name_en` | 清单同名字段 | `id` 回落 `name`，`name` 回落 `id` |
-| 连接器 `description_zh` / `_en` | 清单同名字段 | 回落 `description` |
-| 连接器 `avatar` | 市场根 `icons/<slug>.<ext>` | `null` |
+| 技能 `avatar` | 市场根路径 `icons/<slug>.<ext>` | `null` |
+| 连接器 `id` / `name` / `name_en` | 清单同名字段 | `id` 回落至 `name`；`name` 回落至 `id` |
+| 连接器 `description_zh` / `_en` | 清单同名字段 | 回落至 `description` |
+| 连接器 `avatar` | 市场根路径 `icons/<slug>.<ext>` | `null` |
 
-页面读取规则（`app/lib/market.ts`）：
+页面渲染解析规则（实现见 `src/lib/market.ts`）：
 
-- `entryName`：当前语言是 `en-US` 且条目有 `name_en` 时用 `name_en`，否则用 `name`
-- `entryDescription`：取当前语言的 `description_*`，一侧为空时回落另一侧
-- `entryTags`：只有带 `tags_zh` 的条目有标签（即专家与技能；连接器没有）
-- `avatar` 为 `null` 时渲染 `market-avatar-fallback` 字母徽标，底色由 `nameHue(name)` 决定
+- `entryName`：当前语言为 `en-US` 且声明了 `name_en` 时使用英文名称，否则回落至 `name`。
+- `entryDescription`：读取当前语言对应的 `description_*`，若单侧缺失则跨语言回落。
+- `entryTags`：仅渲染声明了 `tags_zh` 的条目（专家与技能）；连接器不展示标签行。
+- `avatar` 为 `null` 时触发渲染 `market-avatar-fallback` 字母徽标，背景色依据 `nameHue(name)` 离散计算。
 
-> 由此可知：**上游缺字段时页面不报错，只是显示成回落值**。想让它显示正确，只能去上游
-> 补字段，不要在站点侧加推断。
+> **数据真实性原则**：上游元数据字段缺失时，前端仅展示回落值，不抛出异常。若需修复展示缺陷，必须在上游源数据中补全字段，严禁在站点前端层增加猜测或推断逻辑。
 
 ## 6. 校验结果解读
 
@@ -641,34 +613,19 @@ git check-ignore -v market-source/experts/plugins/<专家>/skills/<技能>/.code
 `bun run check:market` 的 `listing.undeliverable` 做的就是这件事，只是它会自己比对三份清单，
 并且把结果算进退出码。
 
-## 8. 不要做的事
+## 8. 反模式与操作禁区 (Anti-Patterns)
 
-1. **不要手工编辑 `market-source/` 里的任何文件**（包括清单与 `_files.txt`）。
-   它是上游的 1:1 镜像，下次 `sync:tree` 会覆盖改动，并把上游不存在的文件直接剪除。
-2. **不要在站点侧做字段推断或补齐。** 上游缺字段就按回落显示；站点侧补的东西既会与
-   上游不一致，也会在同步时被覆盖。
-3. **不要为了让某个条目「显示正常」而改脚本的回落逻辑**（`sync-market-data.mjs` 与
-   `app/lib/market.ts`）。回落规则是刻意的：显示必须能反映上游数据的真实状态。
-4. **不要提交临时文件**：`dev.log` / `dev.err` 已在 `.gitignore` 中；调试用的中间文件
-   用完删掉。
-5. **不要只提交一半**：`market-source/` 与 `content/market.json` 是同一次同步的两个
-   产物，必须一起提交。
-6. 不要在文档、日志、提交信息里写上游工作目录的绝对路径。
-7. **不要多人同时跑 `sync:tree`。** 同一时刻只允许一台机器，否则后同步者会删掉前者的
-   条目（见 4.3、4.4）。
-8. **不要在 `push` 被拒后直接合并含 `market-source/` 的分支再推。** 先按 4.5 处理。
-9. **不要手工合并生成物**（`_files.txt`、`content/market.json`）。它们由脚本整份重写，
-   冲突时重跑脚本（见 4.6）。
-10. **不要在 `.gitignore` 里写会命中市场树的宽松规则**，尤其是不带根锚点的目录名与宽通配
-    （`.codebuddy/`、`*.log` 这类）。命中就等于让清单指向客户端拉不到的 404，而且是静默的：
-    同步机、门禁、构建全都正常（见 1、7）。要忽略仓库自己的东西就**锚到根**（`/.codebuddy/`、
-    `/build/`、`/*.log`）；带中间斜杠的写法（`.edgeone/*`）git 也按根锚定，同样安全。
-    `check:market` 的第 7 条规则 `ignore.market-tree` 会用代表名探这类规则，写错会被它拦下。
-    `.gitignore` 文件头写了这条契约，改之前先看一眼。
-11. **不要在没核对预检 `-removed` 的情况下跑 `sync:tree`。** 它是**删除性**操作：判据是
-    「上游没有的就剪除」，而本机上游副本常见是**非空但不全**（实测 `experts` 2,102 对
-    镜像 14,713，一条命令删 12,857 个文件），且删完的树内部自洽、门禁全绿。只对齐清单用
-    `--listing-only`；要真同步先按 4.2 补全副本。
+1. **严禁手工编辑 `market-source/` 内部文件**（包含元数据清单与 `_files.txt`）。该目录为上游 1:1 镜像，执行 `sync:tree` 将直接覆盖修改并物理剪除非上游文件。
+2. **严禁在站点侧添加字段推断或数据补齐**。上游数据缺失应遵循默认回落逻辑；在站点侧做逻辑补丁会导致多端展现失真且在后续同步中被覆盖。
+3. **严禁改动脚本回落逻辑以迎合单个条目**（`sync-market-data.mjs` 与 `src/lib/market.ts`）。回落规范专为忠实反映上游数据质量而设计。
+4. **禁止提交临时与调试文件**：`dev.log` / `dev.err` 已由 `.gitignore` 规则屏蔽；临时测试文件测试完毕后必须及时清理。
+5. **严禁破坏生成物双提交原子性**：`market-source/` 与 `content/market.json` 为同次同步产生的耦合产物，必须捆绑提交。
+6. **严禁记录上游工作目录绝对路径**：文档、日志、提交说明中一律使用环境变量指代。
+7. **严禁并发运行 `sync:tree`**：同一时间窗口仅允许单机单进程执行，避免后执行者将前序产物误判为已下架而触发静默剪除（详见 §4.3 与 §4.4）。
+8. **严禁在 `push` 失败后盲目合并市场目录**：若远程主分支包含 `market-source/` 提交，禁止直接执行 Git 合并后推送，必须按 §4.5 流程重新拉取并重跑同步。
+9. **严禁手工解决生成物合并冲突**（`_files.txt`、`content/market.json`）。该类文件由脚本幂等全量生成，遭遇冲突时需依 §4.6 重新运行脚本覆盖生成。
+10. **严禁在 `.gitignore` 中声明命中市场树的宽泛规则**：尤其避免未锚定根目录的命名（如 `.codebuddy/`、`*.log`）。若规则命中市场文件，将导致 `_files.txt` 收录该路径但 Git 无法提交，引发线上 404 故障。忽略仓库内部文件时必须使用根锚点（`/.codebuddy/`、`/build/`、`/*.log`）。门禁规则 `ignore.market-tree` 会在提交流程中探测并拦截违规写法。
+11. **严禁在未检查预检 `-removed` 统计时执行 `sync:tree`**：该操作具备不可逆删除副作用。由于本地副本不完整（例如专家市场仅 2,102 个文件对比镜像 14,713 个文件），盲目执行将静默删除 12,857 个有效文件。若仅需对齐清单格式，应运行 `--listing-only`；正式更新前必须先补全本地工作副本（详见 §4.2）。
 
 ## 9. 当前基线（供交接时对照）
 
@@ -711,15 +668,15 @@ git check-ignore -v market-source/experts/plugins/<专家>/skills/<技能>/.code
 
 ## 10. 相关文档
 
-| 文档 | 用途 |
+| 文档 | 用途说明 |
 | --- | --- |
-| [`../README.md`](../README.md) | 命令速查、市场源地址表、部署说明 |
-| [`connector-coverage.md`](./connector-coverage.md) | 连接器覆盖现状、近似项甄别方法 |
-| [`modelscope-mcp-api.md`](./modelscope-mcp-api.md) | ModelScope MCP 开放接口（当前**未接入**本站） |
-| `scripts/sync-market-tree.mjs` | 门禁与警告判定的权威定义；排除项（`logs`/`dist`/`market-icons`/`.git`/`node_modules`/`FILE_EXCLUDES`）、`--listing-only` 也在这里 |
-| `scripts/check-market.mjs` | 查重、两产物一致性、清单与 git 交付集、`.gitignore` 体检的权威定义（`bun run check:market`） |
-| `.gitignore` | 哪条规则会命中市场树；文件头写着契约（规则要锚到根），第 7 条规则按它判定 |
-| `scripts/sync-market-data.mjs` | 快照字段映射与回落规则的权威定义 |
-| `scripts/copy-market-tree.mjs` | 构建期拷贝逻辑（纯拷贝，不做过滤：被排除的东西根本没进 `market-source/`） |
-| `app/lib/market.ts` | 目录页读取快照的规则 |
-| `edgeone.json` | `_files.txt` 的缓存策略与路由重写 |
+| [`../README.md`](../README.md) | 指令速查、市场源地址清单、生产部署说明 |
+| [`connector-coverage.md`](./connector-coverage.md) | 连接器覆盖现状与近似项甄别规范 |
+| [`modelscope-mcp-api.md`](./modelscope-mcp-api.md) | ModelScope MCP 开放接口规范（当前未接入本站） |
+| `scripts/sync-market-tree.mjs` | 门禁与警告规则真源；定义目录排除项（`logs`/`dist`/`market-icons`/`.git`/`node_modules`/`FILE_EXCLUDES`）与 `--listing-only` 逻辑 |
+| `scripts/check-market.mjs` | 清单查重、双产物一致性、清单与 Git 跟踪一致性、`.gitignore` 体检规则实现（`bun run check:market`） |
+| `.gitignore` | 市场树忽略规则契约（根锚定约束）；`check:market` 规则 7 据此执行校验 |
+| `scripts/sync-market-data.mjs` | 目录快照字段抽取与多语言回落规则实现 |
+| `scripts/copy-market-tree.mjs` | 构建期静态资源拷贝逻辑（无过滤拷贝；排除项在 `market-source/` 阶段已剔除） |
+| `src/lib/market.ts` | 前端目录页读取与解析快照数据的规则实现 |
+| `edgeone.json` | 静态分发缓存策略（`_files.txt` 与头像缓存）及重写规则 |
