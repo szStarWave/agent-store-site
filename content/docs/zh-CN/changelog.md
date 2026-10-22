@@ -254,9 +254,10 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 | 批次 | 内容 | 线协议 | 指针 |
 | --- | --- | --- | --- |
 | 连接器认证字段改名 | `ConnectorSummary.auth_mode` → `auth_transport`；授权入口改由 `credential.mode` + `status` 决定，不再由 transport 形状推导 | `fp-16` → **`fp-17`** | [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §3.3 |
-| 目录检索与使用提示 | `store.search` 改为多词 AND + 三档相关性排序；新增 `store.searchWithHits` / `searchInstalled` / `listStatus`；技能与连接器条目的索引行 `examples_*` 进入 `StoreItem.quick_prompts` | 不改指纹（仍 `fp-17`，无方法增删） | [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §3.3、[实战示例](/zh-CN/docs/examples-sdk) §4.8 |
+| 目录检索与使用提示 | `store.search` 改为多词 AND + 三档相关性排序；新增 `store.searchWithHits` / `searchInstalled` / `listStatus`；技能与连接器条目的索引行 `examples_*` 进入 `StoreItem.quick_prompts` | 不改指纹（当时为 `fp-17`，无方法增删） | [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §3.3、[实战示例](/zh-CN/docs/examples-sdk) §4.8 |
+| 四类实体多语言展示字段 | 四类实体摘要模型（`AgentSummary` / `TeamSummary` / `SkillSummary` / `ConnectorSummary`）统一扩展可选展示字段：`display_name`、`display_description`、`tags`、`quick_prompts`；`agent.get` 对应字段提升至摘要层（保持 JSON 兼容）；连接器首次补齐展示字段。导入期按「作者声明 → 市场索引」逐语种合并并持久化至快照，读取时零额外查询 | `fp-17` → **`fp-18`** | [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §3.3「应用面实体的展示字段」 |
 
-当前稳定发布版本为 `0.1.0-beta.11`（对应线协议 `fp-16`）。未收录于本页的版本特性不应假定为已生效。
+当前稳定发布版本为 `0.1.0-beta.11`（对应线协议 `fp-16`）。未收录于本页的版本特性不应假定为已生效；未发布批次已推进到 `fp-18`。
 
 ## 5. 另见
 
