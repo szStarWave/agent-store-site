@@ -470,6 +470,59 @@ try {
 | Do not apply `ranges` across different text fields | Offset ranges strictly bind to the string identified by `field`; applying them to other strings causes slice misalignment or corruption. |
 | Do not highlight when `offLanguage: true` | The matched term resides in the alternate language text and does not exist in the rendered label; direct slicing causes misaligned markup. |
 
+### 4.9 Render entity cards per UI language (`fp-18`)
+
+Starting in `fp-18`, the catalog endpoints for installed entities (`agents`, `teams`, `skills`, `connectors`) return an identical set of optional display fields. Consumers can render titles, descriptions, tags, and prompt hints bilingually **without reading market source files**:
+
+```ts
+import { launchHarness } from "@flowy-agent-store/sdk";
+
+const harness = await launchHarness({ bin, client: { name: "card-render", version: "1.0.0" } });
+try {
+  const lang = "en" as const;
+
+  // Four catalog endpoints: unified field structure and rendering path
+  const cards = [
+    ...(await harness.agents.list()).map((item) => ({ kind: "expert", ...pick(item) })),
+    ...(await harness.teams.list()).map((item) => ({ kind: "team", ...pick(item) })),
+    ...(await harness.skills.list()).map((item) => ({ kind: "skill", ...pick(item) })),
+    ...(await harness.connectors.list()).map((item) => ({ kind: "connector", ...pick(item) })),
+  ];
+
+  for (const card of cards.slice(0, 5)) {
+    console.log(`[${card.kind}] ${card.title}`);
+    if (card.summary) console.log(`  ${card.summary}`);
+    if (card.hint) console.log(`  Prompt: ${card.hint}`);
+  }
+
+  function pick(item: {
+    name: string;
+    display_name?: { zh?: string; en?: string } | null;
+    display_description?: { zh?: string; en?: string } | null;
+    quick_prompts?: { zh?: string; en?: string }[];
+  }) {
+    // Per-locale fallback: active locale -> alternate locale -> name identifier
+    const text = (pair?: { zh?: string; en?: string } | null) =>
+      (lang === "zh" ? (pair?.zh ?? pair?.en) : (pair?.en ?? pair?.zh)) ?? null;
+    return {
+      title: text(item.display_name) ?? item.name,
+      summary: text(item.display_description),
+      hint: text(item.quick_prompts?.[0]),
+    };
+  }
+} finally {
+  await harness.server.close();
+}
+```
+
+Display field consumption and boundary contract:
+
+| Constraint | Observable consequence when violated |
+| --- | --- |
+| Connector titles must read from `display_name`; do not render `name` directly | `name` is the runtime identifier (e.g. `fenbi_mcp`) and forms a segment of tool namespaces (`connector__<name>__<tool>`); rendering it directly leaks internal identifiers to end users. |
+| Do not assume display fields are always present | Market records frequently omit localized fields (only 15 of 268 skill entries declare a Chinese name); absent `display_*` fields conform to the protocol contract, and falling back to `name` is standard flow rather than an error branch. |
+| Do not assume the top-level single-language `description` matches the active UI locale | Connector index rows carry unconstrained locales in top-level `description` (210 of 283 rows are English); deterministic localized descriptions must be read exclusively from `display_description`. |
+
 ## 5. Advanced workflows and pack materialization
 
 ### 5.1 Standalone run orchestration and CAS decision approval

@@ -254,9 +254,10 @@ npm view @flowy-agent-store/sdk versions dist-tags time --json
 | Batch | Content | Wire protocol | Pointer |
 | --- | --- | --- | --- |
 | Connector auth field rename | `ConnectorSummary.auth_mode` → `auth_transport`; the authorization affordance now follows `credential.mode` + `status` instead of being derived from the transport's shape | `fp-16` → **`fp-17`** | [TypeScript SDK reference](/en-US/docs/typescript-sdk) §3.3 |
-| Catalogue search and prompt hints | `store.search` moves to multi-term AND with three relevance buckets; adds `store.searchWithHits` / `searchInstalled` / `listStatus`; the index row's `examples_*` for skill and connector entries reaches `StoreItem.quick_prompts` | No fingerprint change (still `fp-17`, no methods added or removed) | [TypeScript SDK reference](/en-US/docs/typescript-sdk) §3.3, [SDK cookbook](/en-US/docs/examples-sdk) §4.8 |
+| Catalogue search and prompt hints | `store.search` moves to multi-term AND with three relevance buckets; adds `store.searchWithHits` / `searchInstalled` / `listStatus`; the index row's `examples_*` for skill and connector entries reaches `StoreItem.quick_prompts` | No fingerprint change (still `fp-17` at the time, no methods added or removed) | [TypeScript SDK reference](/en-US/docs/typescript-sdk) §3.3, [SDK cookbook](/en-US/docs/examples-sdk) §4.8 |
+| Localized display fields on four entity kinds | Entity summary models (`AgentSummary` / `TeamSummary` / `SkillSummary` / `ConnectorSummary`) uniformly extend optional display fields: `display_name`, `display_description`, `tags`, `quick_prompts`; `agent.get` fields move to summary level (JSON-compatible); connectors gain all four display fields for the first time. Values merge at import from author declarations and market index rows per locale, persisted to snapshots for zero-query reads | `fp-17` → **`fp-18`** | [TypeScript SDK reference](/en-US/docs/typescript-sdk) §3.3 "Display fields on application entities" |
 
-The current stable release is `0.1.0-beta.11` (wire protocol `fp-16`). Features not listed on this page should not be considered active.
+The current stable release is `0.1.0-beta.11` (wire protocol `fp-16`). Features not listed on this page should not be considered active; the unpublished batches have advanced to `fp-18`.
 
 ## 5. See also
 
