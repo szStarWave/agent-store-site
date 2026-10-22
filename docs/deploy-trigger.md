@@ -1,66 +1,62 @@
-# 用 API 触发部署（EdgeOne Makers）
+# 用 API Token 部署到 EdgeOne Makers
 
-> 最后核对：2026-09-17
-> 背景：2026-09-17 本站的 **GitHub 自动触发失效**——最后一次由平台产生的部署是当日 07:38 的
-> `dp8pmldfzpbw`（提交 `47bcdff5`，Failed），其后的 `c5293ba8` / `e7901aad` / `4b6b32ff` 三次推送
-> **一个部署都没生成**。本文记录不依赖 GitHub 集成的触发方式，以及一次完整实测。
+> 最后核对：2026-10-22（含一次真实部署 `dphseubl3zh9`）
+> 一句话：本站项目是 `Provider: Github` 型（平台拉仓库、云端构建），`edgeone makers deploy` 的上传通道不适用；可脚本化的部署方式是用 **EdgeOne API Token** 调 `CreatePagesDeployment`，让平台按指定提交重建。
 
-## 1. 先分清项目类型：决定 CLI 能不能用
-
-| `Provider` | 谁构建 | `edgeone makers deploy` 能用吗 |
-|---|---|---|
-| `Github` | 平台拉仓库、按 `edgeone.json` 构建 | **不能** |
-| `Upload` | 本地构建后上传产物 | 能 |
-
-本站 `agent-store-site` 是 **`Github`** 型，所以 CLI 的上传通道不适用。实测原始报错（原样引用，不转述）：
-
-```
-[getOrCreateProject] Project agent-store-site exists but has Provider 'Github'.
-This project type does not support direct folder or zip file deployment.
-Only projects with Provider 'Upload' are supported.
-```
-
-> 官方「[使用 Github Action](https://cloud.tencent.com/document/product/1552/127398)」那条路
-> （`npx edgeone makers deploy <outputDirectory> -n <projectName> -t <token>`）走的也是**上传**通道，
-> 所以同样不适用于本站——除非把项目改成 `Upload` 型（那是换一种部署模型，不是修一个开关）。
-
-## 2. 先查清，再动手：三条只读接口
-
-统一约定：
+## 1. 参数与认证
 
 | 项 | 值 |
 |---|---|
-| 端点（china） | `https://pages-api.cloud.tencent.com/v1` |
-| 端点（global） | `https://pages-api.edgeone.ai/v1` |
-| `Region` | china = `ap-guangzhou`；global = `ap-singapore` |
-| 认证 | 请求头 `Authorization: Bearer <API Token>`（**不是**腾讯云 SecretId/SecretKey） |
-| 请求体 | **平铺**：`Action` 与参数同级 |
+| 端点（中国站） | `https://pages-api.cloud.tencent.com/v1` |
+| 端点（国际站） | `https://pages-api.edgeone.ai/v1` |
+| `Region` | 中国站 `ap-guangzhou`；国际站 `ap-singapore` |
+| `ProjectId` | `makers-yjnkgelxhduo`（`agent-store-site`） |
+| `RepoBranch` | `main` |
+| 认证头 | `Authorization: Bearer <API Token>` |
+| 内容类型 | `Content-Type: application/json` |
+| 请求体 | **平铺**：`Action` 与业务参数同级 |
 
-> ⚠️ **不要把参数套进 `Data`**。套了会得到 `InvalidParameter.Security: ProjectId should not be empty`
-> ——这个报错指向的是包装层次，不是参数本身。
+Token 的三种注入方式：
 
-### 2.1 列项目 `DescribePagesProjects`（**必须先做**）
+| 方式 | 取值来源 | 适用 |
+|---|---|---|
+| 本地密钥文件 | `C:\Users\<user>\Documents\flowy-edgeone-token.key`（单行纯文本） | 本机手工部署 |
+| 环境变量 | `EDGEONE_API_TOKEN` | CI / 定时任务 |
+| CLI 登录态 | `edgeone login -t <token>` → `~/.edgeone/<hash>` | 需要 CLI 其它子命令时（触发部署不需要） |
+
+约束：
+
+- 这是 **EdgeOne API Token**（控制台 API Token 页创建），不是腾讯云 `SecretId`/`SecretKey`，不做 TC3 签名。
+- 严禁写进仓库、严禁作为命令行参数传递（`argv` 会在进程列表与审计日志里留存）；Token 是账号级权限。
+- **参数不要套进 `Data`**：包裹后会返回 `InvalidParameter.Security: ProjectId should not be empty`（该报错指向包装层次，不是参数为空）。
+
+## 2. 触发部署 `CreatePagesDeployment`
 
 ```jsonc
-{ "Action": "DescribePagesProjects", "PageNumber": 1, "PageSize": 50,
-  "Region": "ap-guangzhou" }
+{ "Action": "CreatePagesDeployment",
+  "ProjectId": "makers-yjnkgelxhduo",
+  "Region": "ap-guangzhou",
+  "Env": "Production",              // 或 Preview
+  "Provider": "Github",
+  "ViaMeta": "Github",
+  "RepoBranch": "main",
+  "RepoCommitHash": "<已推送到 main 的 40 位 sha>" }
 ```
 
-返回里每个项目带 `ProjectId` / `Name` / `Status` / `RepoUrl` / `Provider` / `RepoBranch` /
-`OutputDir` / `CustomDomains` / `Deployment{ DeploymentId, Status, RepoCommitHash … }`。
+响应：
 
-**为什么这步不能跳**：`edgeone` CLI **没有列举项目的命令**，而 `-n <名字>` 对**不存在的名字会直接
-创建项目**（`link` / `deploy` 都是），账号还有 40 个项目上限。2026-09-17 就是因为拿一个名字去试，
-误建了一个 `agent-store-market`。**先用本接口拿到确切名字，再用 CLI 或 API。**
+```jsonc
+{ "Code": 0, "Data": { "Response": { "RequestId": "…", "DeploymentId": "dp…" } } }
+```
 
-本站的真实读数（14 个项目里相关两行）：
+语义：
 
-| Name | ProjectId | Provider | RepoBranch | OutputDir | CustomDomains |
-|---|---|---|---|---|---|
-| `agent-store-site` | `makers-yjnkgelxhduo` | Github | `main` | `build` | `agent-store.flowyaipc.cn` |
-| `agent-store-market` | `makers-cl4lnfggoyim` | — | — | — | — |
+- **非幂等**：每次调用都新建一个部署，同一次提交调用两次就有两个部署。
+- **失败不动线上**：未拿到 `UsedInProd: true` 的部署不接流量。
+- 平台按 `RepoCommitHash` 拉仓库，执行 `bun install` → `bun run build`，构建通过后自动切生产。
+- 请求超时不等于没触发：先用 §3 查最近部署，再决定是否重发。
 
-### 2.2 列部署 `DescribePagesDeployments`
+## 3. 轮询状态 `DescribePagesDeployments`
 
 ```jsonc
 { "Action": "DescribePagesDeployments", "ProjectId": "makers-yjnkgelxhduo",
@@ -68,101 +64,108 @@ Only projects with Provider 'Upload' are supported.
   "Region": "ap-guangzhou" }
 ```
 
-**分页要开大一点**：`Limit: 3` 时新部署可能不在返回里，用它轮询会误判成「已经结束」。
+- `Limit` 必须 ≥ 20：设小了（如 `Limit: 3`）新部署可能不在第一页，轮询会误判成「已结束」。
+- 关键字段：`DeploymentId` / `Status`（`Process` → `Success` | `Failed`）/ `UsedInProd` / `Code`。
+- 耗时基准：成功约 2 分钟，失败通常 1 分钟内出结果。
 
-### 2.3 取构建日志 `DescribePagesDeploymentLog`
+## 4. 取构建日志 `DescribePagesDeploymentLog`（仅在失败时）
 
 ```jsonc
 { "Action": "DescribePagesDeploymentLog", "ProjectId": "makers-yjnkgelxhduo",
-  "DeploymentId": "dp0u1kd7xfh8", "Region": "ap-guangzhou" }
+  "DeploymentId": "dp…", "Region": "ap-guangzhou" }
 ```
 
-返回 `LogUrl`，形如：
+返回 `LogUrl`：
 
 ```
 https://dpl-edgeone.cloud.tencent.com/<APPID>/<ProjectId>/<DeploymentId>/build.log
 ```
 
-该地址可**匿名**取到，内容是逐行 JSON（`{"t":"i","ls":[[<ms>,"<文本>"]]}`），即控制台构建日志的原文。
-**失败原因只在日志里**——部署对象只给 `Status: Failed` 与一个数字 `Code`。
+- 可匿名 GET，内容为逐行 JSON（`{"t":"i","ls":[[<ms>,"<文本>"]]}`），与控制台日志一致。
+- 部署对象只给 `Status: Failed` 与数字 `Code`，**失败原因只在这份日志里**。
 
-## 3. 触发部署 `CreatePagesDeployment`
+## 5. 端到端脚本（PowerShell）
 
-```jsonc
-{ "Action": "CreatePagesDeployment",
-  "ProjectId": "makers-yjnkgelxhduo",
-  "Region": "ap-guangzhou",
-  "Env": "Production",          // 或 Preview
-  "Provider": "Github",
-  "ViaMeta": "Github",
-  "RepoBranch": "main",
-  "RepoCommitHash": "<推送后 main 的 40 位 sha>" }
+```powershell
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory = $true)][string]$CommitSha,   # 40 位小写 hex，取自 `git rev-parse main`
+  [string]$TokenFile   = "C:\Users\$env:USERNAME\Documents\flowy-edgeone-token.key",
+  [string]$ProjectId   = 'makers-yjnkgelxhduo',
+  [string]$Region      = 'ap-guangzhou',
+  [string]$Endpoint    = 'https://pages-api.cloud.tencent.com/v1',
+  [int]$TimeoutMinutes = 10
+)
+
+$ErrorActionPreference = 'Stop'
+if ($CommitSha -notmatch '^[0-9a-f]{40}$') { throw "CommitSha 必须是 40 位小写 hex：$CommitSha" }
+if (-not (Test-Path $TokenFile)) { throw "缺少 token 文件：$TokenFile" }
+
+$token   = (Get-Content $TokenFile -Raw).Trim()
+$headers = @{ Authorization = "Bearer $token"; 'Content-Type' = 'application/json' }
+
+function Invoke-Eo {
+  param([hashtable]$Payload)
+  $res = Invoke-RestMethod -Method Post -Uri $Endpoint -Headers $headers -Body ($Payload | ConvertTo-Json -Compress)
+  if ($res.Code -ne 0) { throw "EdgeOne API 失败: Code=$($res.Code) Message=$($res.Message)" }
+  return $res.Data.Response
+}
+
+# 1) 触发
+$deploymentId = (Invoke-Eo @{
+  Action = 'CreatePagesDeployment'; ProjectId = $ProjectId; Region = $Region
+  Env = 'Production'; Provider = 'Github'; ViaMeta = 'Github'
+  RepoBranch = 'main'; RepoCommitHash = $CommitSha
+}).DeploymentId
+Write-Host "已触发部署：$deploymentId（commit $CommitSha）"
+
+# 2) 轮询
+$deadline = (Get-Date).AddMinutes($TimeoutMinutes)
+$d = $null
+do {
+  Start-Sleep -Seconds 20
+  $list = (Invoke-Eo @{ Action = 'DescribePagesDeployments'; ProjectId = $ProjectId; Offset = 0; Limit = 20
+                        OrderBy = 'CreatedOn'; Order = 'Desc'; Region = $Region }).Deployments
+  $d = $list | Where-Object { $_.DeploymentId -eq $deploymentId }
+  if (-not $d) { Write-Host ("{0} 尚未出现在部署列表（继续等待）" -f (Get-Date -Format HH:mm:ss)); continue }
+  Write-Host ("{0} status={1} usedInProd={2}" -f (Get-Date -Format HH:mm:ss), $d.Status, $d.UsedInProd)
+} while ((Get-Date) -lt $deadline -and $d.Status -notin @('Success', 'Failed'))
+
+# 3) 收尾：成功必须 Status=Success 且 UsedInProd=true；否则输出日志地址并非零退出
+if ($d -and $d.Status -eq 'Success' -and $d.UsedInProd) {
+  Write-Host "✓ 部署成功并已切流：$deploymentId"
+} else {
+  $logUrl = (Invoke-Eo @{ Action = 'DescribePagesDeploymentLog'; ProjectId = $ProjectId
+                          DeploymentId = $deploymentId; Region = $Region }).LogUrl
+  Write-Warning "✗ 未成功（status=$($d.Status) code=$($d.Code)）；构建日志：$logUrl"
+  exit 1
+}
 ```
 
-返回 `{"Data":{"Response":{"DeploymentId":"dp…"}}}`。平台随后按该提交拉仓库、跑 `edgeone.json` 的
-安装/构建命令（本站是 `bun install` / `bun run build`，产物 `build`），成功即自动切到生产。
+用法：
 
-> ⚠️ **该请求形状未见于官方文档**。CLI 包内只实现了 `ViaMeta:"Upload"` 那条路（
-> `CreatePagesDeployment` + `Provider:"Upload"` + `DistType` + `TempBucketPath` + `BuildFrom:"CLI"`），
-> Github 这条是从 CLI 的接口封装与已有部署对象的字段推出的，**并已实测两次**（见 §4）。
-> 平台侧若调整契约，这里要重新核对；核对方法就是拿一次真实提交触发，看是否真的产生了部署。
-
-**幂等性**：每次调用都会新建一个部署（不会去重）。同一次推送触发两次就会有两个部署。
-
-**失败不会动线上**：失败的部署不会拿到 `UsedInProd`，当前生产始终是最后一个 `UsedInProd: true` 的成功部署。
-
-## 4. 一次完整实测（2026-09-17）
-
-| 提交 | 部署 | 结果 | 说明 |
-|---|---|---|---|
-| `4b6b32ff`（市场源改 zip） | `dp0u1kd7xfh8` | **Failed**（`Code 18`，46s） | 构建失败：`content/market.json` 里的头像路径大小写与磁盘不符，Linux 构建机上找不到文件（详见 §5 日志） |
-| `02703bfc`（修大小写） | `dp8tjrs20wnj` | **Success**（`UsedInProd: true`） | 构建通过并切到生产 |
-
-对照：上一次由平台自己触发的部署是 `dp8pmldfzpbw`（`47bcdff5`，Failed）——**GitHub 触发已经不再产生部署**。
-
-## 5. 失败时怎么定位（真实例子）
-
-`dp0u1kd7xfh8` 的日志末尾（节选，`\u001b` 为 ANSI 色码）：
-
-```
-[copy-market-tree] experts  catalog-assets=306（整树托管在别处）
-[copy-market-tree] skills: content/market.json 指向 icons/fbs-bookwriter.png，树里却没有 —— 先跑 `bun run check:market`
-error: script "build" exited with code 1
-[builder] "bun run build" failed, exit code: 1
-[CI][dp0u1kd7xfh8] ✗ CLI Building failed after 14.62s (exit: 18)
+```bash
+pwsh ./deploy.ps1 -CommitSha (git -C ../agent-store-site rev-parse main)
 ```
 
-原因值得记住：Windows 文件系统大小写不敏感，`icons/fbs-bookwriter.png` 在**本机**能匹配到磁盘上的
-`icons/FBS-BookWriter.png`，于是本机 `bun run build` 通过、`check:market` 也是 0 发现；**Linux 构建机上
-这个路径不存在，构建直接失败**。这类「只在本机看不见」的问题，定位入口就是这份构建日志。
+失败语义：
 
-## 6. 令牌
+| 阶段 | 表现 | 处置 |
+|---|---|---|
+| 前置校验 | 提交号形状不符 / 令牌文件缺失 | 修正输入，未产生任何云端调用 |
+| 触发 | `Code != 0` | 按 `Message` 定位；鉴权类错误不可重试，重建 Token |
+| 轮询 | 超时未到终态 | 先按 §3 复查是否已有该提交的部署，**确认没触发再重发**（重发会多建部署） |
+| 收尾 | `Failed` 或 `UsedInProd=false` | 打开 `LogUrl` 查构建日志 |
 
-- 在控制台 **API Token** 页创建：china <https://console.cloud.tencent.com/edgeone/pages?tab=settings>；
-  global <https://console.intl.cloud.tencent.com/edgeone/pages?tab=settings>。
-- CLI 的 `edgeone login -t <token>` 会自动识别 china/global 并持久化到 `~/.edgeone/<hash>`；
-  之后再跑 CLI 命令不必再带 `-t`。
-- **本题流程不需要把令牌交给任何人**：它只从环境变量/本地文件读，**不要写进仓库、不要作为命令行参数**
-  （argv 在进程列表里可见）。
-- 令牌是**账号级**权限，泄漏等同于交出该腾讯云账号的 Makers 控制面。
+## 6. 单条调用（排查用）
 
-## 7. 部署后自检（本站判据）
+```bash
+curl -sS https://pages-api.cloud.tencent.com/v1 \
+  -H "Authorization: Bearer $(cat ~/Documents/flowy-edgeone-token.key)" \
+  -H 'Content-Type: application/json' \
+  -d '{"Action":"DescribePagesDeployments","ProjectId":"makers-yjnkgelxhduo","Offset":0,"Limit":20,"OrderBy":"CreatedOn","Order":"Desc","Region":"ap-guangzhou"}'
+```
 
-按用户体验顺序：
+## 7. 成功判据
 
-1. `/<lang>/docs/typescript-sdk` 中英两页有正文（不是 SPA 空壳）；
-2. **产物规模**：构建日志里没有 `File count exceeds project limit` / `File size limit exceeded`。
-   上限是 **20,000 个文件**与**单文件 25 MiB**（[排障指南](https://cloud.tencent.com/document/product/1552/127457)），
-   另有一条**账号存储 5 GiB**（超出时报 `The account storage limit is 5 GiB`）。本站自 doc 30 起
-   不再整树托管市场，产物约 **742 个文件 / 102.9 MiB**；
-3. **退役路径不应存在**：`/source/<market>/_files.txt` 与 `/source/<market>/.codebuddy-*/…` 应返回 **404**
-   ——这是「新产物真的上线了」最省事的判据（旧产物是 200）；
-4. 目录页头像可取：例如 `/source/skills/icons/FBS-BookWriter.png` 返回 200（**注意大小写**，CDN 是大小写敏感的）；
-5. 首页下载直链真能下到 `v<版本>` 的 zip。
-
-## 8. 仍然待办
-
-- **GitHub 集成仍是断的**（本文只绕过它，没有修它）。修复途径在控制台：项目的 Git 集成重新授权/重连仓库。
-  在修好之前，每次发布都要按本文手动触发一次。
-- **误建的项目待删**：`agent-store-market`（`makers-cl4lnfggoyim`，Status `Pending`），
-  在控制台项目列表里删除。CLI 没有删除命令，且官方技能明确要求**代理不得自行删除项目**。
+轮询到 `Status: Success` 且 `UsedInProd: true`，即部署完成并已切生产；随后打开目标页面确认内容已更新（静态站有 CDN 缓存，必要时等 1–2 分钟）。
