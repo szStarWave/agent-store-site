@@ -43,7 +43,7 @@ The protocol package serves as the definitive source of truth for wire interacti
 
 | Export symbol | Contract definition and usage |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-18"`). Enforces strict equality during handshakes |
+| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-19"`). Enforces strict equality during handshakes |
 | `InitializeRequest` / `InitializeResult` | Protocol handshake payloads exchanging protocol versions, client identities, and host capabilities |
 | `ClientInfo` / `ClientCapabilities` | Client identity declarations (name, version) and feature subscriptions (`events`, `approvals`, `team_runtime`) |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | Unified catalog structures and installation receipt models |
@@ -770,6 +770,41 @@ Field consumption contract and boundaries:
 
 ---
 
+#### Per-entity icon references inside an export pack (`fp-19`)
+
+Starting in `fp-19` (`pack_format 4`), the `ExpertPack` returned by `agents.export()` / `teams.export()` names an **icon path** for each skill and connector it references. The pack carries **paths only**; the bytes stay on the two existing read faces — the same rule `pack.avatar` / `assets` already follow.
+
+```ts
+export interface ExpertSkillRef {
+  name: string;
+  id: string;
+  /** Skill-directory-relative path (e.g. "assets/icon.png"); the key is absent when there is no icon */
+  icon?: string | null;
+}
+
+export interface ExpertConnectorRef {
+  id: string;
+  name: string;
+  enabled: boolean;
+  /** Snapshot-relative path (e.g. "avatars/connectors/github.svg"); must appear in the pack's assets */
+  icon?: string | null;
+}
+```
+
+| Field | Coordinate system | How to fetch the bytes |
+| --- | --- | --- |
+| `skills[].icon` | **skill-directory relative** (the same frame as `SKILL.md`) | `harness.skills.readFile(skillId, icon)` |
+| `connectors[].icon` | **snapshot relative** | `harness.readImportAsset(pack.provenance.snapshot_id, icon)` |
+| `avatar?` / `assets[]` (since `fp-14`) | snapshot relative | same as above |
+
+Consumption contract and boundaries:
+
+1. **The bytes are fossilised at install time**: a market's `icons/<entry>.<ext>` is a *sibling* of the entry directory, so it cannot be carried into the snapshot by the copy step; the host places it in the immutable snapshot during install and stamps the path into the component payload. Exports therefore read only the snapshot, which is why two exports of one snapshot stay byte-identical. **The author's `plugin.json.avatar` always wins; a market icon only fills a gap and never overwrites.**
+2. **No extra SDK code**: `materializePack` already walks both faces — a skill icon lands at `<dir>/skills/<name>/assets/icon.*`, a connector icon at `<dir>/avatars/connectors/…` (and appears in `ExportResult.writtenAssets`).
+3. **Reachability boundary for `connectors[].icon`**: it appears only where the connector itself declares an icon (in today's market shapes: single-connector entries). Connectors declared by a team package's `mcpServers` have no icon source of their own, so `icon` is always absent — the host will not broadcast the package icon to the connectors inside it, because that would give one picture two semantic owners. Treat absence as the norm and fall back to a placeholder.
+4. **Absent is not `null`**: an absent field means "no icon", and stays distinguishable from "this format has no such field"; packs with `pack_format < 4` never carry these keys. Existing snapshots are not backfilled — run `store.updateEntry` or reinstall to pick icons up.
+
+---
 ## 4. @flowy-agent-store/sdk — Node host orchestration
 
 ### 4.1 launchHarness integration entrypoint
