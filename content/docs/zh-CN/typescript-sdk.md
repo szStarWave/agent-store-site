@@ -774,13 +774,13 @@ export interface LocalizedDisplayFields {
 
 #### 导出包内的逐实体图标引用（`fp-19`）
 
-自 `fp-19`（`pack_format 4`）起，`agents.export()` / `teams.export()` 返回的 `ExpertPack` 里，被引用的技能与连接器各自带上**图标路径**。包**只带路径**，字节仍走已有的两个读取面——这与 `pack.avatar` / `assets` 的口径一致。
+自 `fp-19`（对应打包格式 `pack_format 4`）起，`agents.export()` 与 `teams.export()` 返回的 `ExpertPack` 对象中，被引用的技能与连接器条目均支持携带**图标相对路径**。导出包物理上**仅声明路径字符串**，图标二进制字节仍通过既有的两个离线读取接口获取，遵循与 `pack.avatar` 及 `assets` 相同的资源解析契约。
 
 ```ts
 export interface ExpertSkillRef {
   name: string;
   id: string;
-  /** 技能目录相对路径（如 "assets/icon.png"）；无图标则整个键缺席 */
+  /** 技能目录相对路径（例如 "assets/icon.png"）；未声明图标时该属性缺省 */
   icon?: string | null;
 }
 
@@ -788,23 +788,23 @@ export interface ExpertConnectorRef {
   id: string;
   name: string;
   enabled: boolean;
-  /** 快照相对路径（如 "avatars/connectors/github.svg"）；必须在包的 assets 里 */
+  /** 快照根目录相对路径（例如 "avatars/connectors/github.svg"）；必须已登记于包的 assets 列表 */
   icon?: string | null;
 }
 ```
 
-| 字段 | 坐标系 | 字节怎么取 |
+| 字段名 | 寻址基准坐标系 | 二进制读取接口 |
 | --- | --- | --- |
-| `skills[].icon` | **技能目录相对**（与 `SKILL.md` 同一坐标系） | `harness.skills.readFile(skillId, icon)` |
-| `connectors[].icon` | **快照相对** | `harness.readImportAsset(pack.provenance.snapshot_id, icon)` |
-| `avatar?` / `assets[]`（`fp-14` 起） | 快照相对 | 同上 |
+| `skills[].icon` | **技能根目录相对**（与 `SKILL.md` 处于同一相对寻址坐标系） | `harness.skills.readFile(skillId, icon)` |
+| `connectors[].icon` | **不可变快照根目录相对** | `harness.readImportAsset(pack.provenance.snapshot_id, icon)` |
+| `avatar?` / `assets[]`（自 `fp-14` 起） | 不可变快照根目录相对 | 同上 |
 
 消费契约与边界约束：
 
-1. **字节的来路是安装期固化**：市场里 `icons/<entry>.<ext>` 与 entry 目录是兄弟关系，导入时带不进快照，所以宿主在安装那一步把它落进不可变快照，并把路径写进组件 payload；导出期只读快照，因此同一快照两次导出逐字节相同。**作者的 `plugin.json.avatar` 永远优先，市场图标只补空缺且绝不覆盖**。
-2. **SDK 零额外代码**：`materializePack` 已经走过这两个面——技能图标落在 `<dir>/skills/<name>/assets/icon.*`，连接器图标落在 `<dir>/avatars/connectors/…`（并出现在 `ExportResult.writtenAssets` 里）。
-3. **`connectors[].icon` 的可达性边界**：它只在"连接器自己有声明的场合"出现（当前市场形态下 = 单连接器条目）。团包里由 `mcpServers` 声明的连接器**没有自己的图标来源**，`icon` 恒缺席——宿主不会把包级图标广播给包里的连接器，因为那等于给同一张图造两个语义主体。调用方应把缺席当作常态并回落默认图。
-4. **缺席 ≠ `null`**：字段缺席表示"没有图标"，与"这个格式没有该字段"可区分；`pack_format < 4` 的包不会有这两个键。老快照不会回填，需 `store.updateEntry` 或重装才会带上图标。
+1. **不可变快照安装期固化 (Immutability Invariant)**：在静态市场源中，`icons/<entry>.<ext>` 图标文件位于条目目录的外层同级路径，无法通过条目子目录复制直接带入快照。宿主在安装执行阶段将市场图标写入不可变快照，并将归一化路径持久化至组件元数据载荷；导出阶段仅直接读取快照记录，确保同一快照多次导出的字节哈希严格幂等全等。**插件创作者在 `plugin.json` 中显式声明的 `avatar` 拥有最高优先级；市场目录中的图标仅作为兜底补齐，绝不覆盖已有声明**。
+2. **解包物化透明兼容 (Zero-overhead SDK Materialization)**：`materializePack` 内部实现已完整覆盖上述两套寻址路径——技能图标自动落地至 `<dir>/skills/<name>/assets/icon.*`，连接器图标自动写入 `<dir>/avatars/connectors/…`（并自动登记至返回值 `ExportResult.writtenAssets` 列表中），调用方无需编写额外资产写入逻辑。
+3. **`connectors[].icon` 作用域可达性边界 (Reachability Boundary)**：该字段仅在连接器本身具备独立图标声明时存在（在当前市场规范下特指独立连接器条目）。对于在专家团配置（Team Package）中由 `mcpServers` 声明的连接器，因其缺乏独立的图标物理源，`icon` 字段**恒定缺省**。宿主不会将团队包级图标广播至内部连接器，以避免同一视觉资产产生二义性语义所有权；调用方必须将字段缺省视为合法常规状态并回落至默认占位图标。
+4. **字段缺省与空值语义区分 (Field Absence vs null)**：键缺省表示“当前条目未配置图标”，用于与协议版本特性缺省明确区分；`pack_format < 4` 格式的历史导出包中恒不包含上述键。历史安装生成的持久化快照不会自动执行数据回填，必须调用 `store.updateEntry` 刷新或重新安装条目以生成包含图标引用的最新快照。
 
 ---
 ## 4. `@flowy-agent-store/sdk` — Node 宿主

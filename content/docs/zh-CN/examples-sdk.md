@@ -633,6 +633,53 @@ console.log(`解析后: ${categoryName(result.pack.category_id)}`);
 
 已安装资源的目录面与导出面同源：`client.teams.list()` 的 `tags` / `category_id` 为包级声明；`client.skills.list()` 的 `tags` 取自市场索引行，导入时固化，市场侧后续修改标签需经一次 `store.update()` 才生效。
 
+#### 5.2.3 逐实体图标引用消费与物化（pack_format 4 起）
+
+自 `fp-19`（`pack_format 4`）起，`ExpertPack` 中的被引用技能（`skills[].icon`）与连接器（`connectors[].icon`）可携带独立的图标相对路径。导出包物理上仅声明路径字符串，读取字节需根据不同实体的寻址坐标系走对应的读取接口：
+
+```ts
+import { exportAgent, materializePack } from "@flowy-agent-store/sdk";
+
+// 模式 A：使用 exportAgent / exportTeam 自动物化落盘（推荐）
+// materializePack 会自动遍历两套寻址坐标系并将图标写出至对应子目录
+const result = await exportAgent(client, "wb-architect", "./exported-expert");
+
+console.log(`导出包格式版本: ${result.pack.pack_format}`); // 4
+console.log(`物化落盘的资产文件清单: ${result.writtenAssets.join(", ")}`);
+
+// 模式 B：直接在内存中消费 ExpertPack 并按坐标系分流读取图标字节
+const pack = await client.agents.export("wb-architect");
+
+// 1. 技能图标：技能目录相对路径，通过 skills.readFile 读取字节
+for (const skill of pack.skills ?? []) {
+  if (skill.icon) {
+    console.log(`技能 [${skill.name}] 图标路径: ${skill.icon}`);
+    const iconBytes = await client.skills.readFile(skill.id, skill.icon);
+    console.log(`技能图标读取成功，字节长度: ${iconBytes.byteLength}`);
+  }
+}
+
+// 2. 连接器图标：不可变快照根目录相对路径，通过 readImportAsset 读取字节
+for (const conn of pack.connectors ?? []) {
+  // 注意：团队包内通过 mcpServers 声明的连接器无独立图标源，icon 属性恒缺省
+  if (conn.icon) {
+    console.log(`连接器 [${conn.name}] 图标路径: ${conn.icon}`);
+    const iconBytes = await client.readImportAsset(pack.provenance.snapshot_id, conn.icon);
+    console.log(`连接器图标读取成功，字节长度: ${iconBytes.byteLength}`);
+  }
+}
+```
+
+```text
+./exported-expert/
+├── expert-pack.json
+├── persona.md
+├── skills/code-analysis/
+│   ├── SKILL.md
+│   └── assets/icon.png             ← 技能图标自动落盘至 skills/<name>/ 内部
+└── avatars/connectors/github.svg   ← 连接器图标自动落盘至快照资产路径
+```
+
 ### 5.3 工作区管理与技能内部文件读取
 
 ```ts
