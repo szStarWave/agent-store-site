@@ -643,6 +643,53 @@ console.log(`resolved: ${categoryName(result.pack.category_id)}`);
 
 The installed catalogs read the same facts as the export face: `client.teams.list()` carries the package-level `tags` / `category_id`, and `client.skills.list()` carries `tags` taken from the market index row and fixed at import time — a later market-side edit only lands through a `store.update()`.
 
+#### 5.2.3 Per-entity icon reference consumption and materialization (since pack_format 4)
+
+Starting in `fp-19` (`pack_format 4`), referenced skills (`skills[].icon`) and connectors (`connectors[].icon`) within an `ExpertPack` can carry independent icon relative paths. The pack payload carries path strings only; retrieving binary bytes requires routing through the appropriate interface based on each entity's addressing coordinate frame:
+
+```ts
+import { exportAgent, materializePack } from "@flowy-agent-store/sdk";
+
+// Pattern A: Automated materialization to disk via exportAgent / exportTeam (recommended)
+// materializePack automatically traverses both coordinate systems and writes icons to disk
+const result = await exportAgent(client, "wb-architect", "./exported-expert");
+
+console.log(`Pack format version: ${result.pack.pack_format}`); // 4
+console.log(`Written asset files: ${result.writtenAssets.join(", ")}`);
+
+// Pattern B: Inspecting ExpertPack in memory and reading icon bytes by coordinate system
+const pack = await client.agents.export("wb-architect");
+
+// 1. Skill icons: Skill-directory relative path, retrieved via skills.readFile
+for (const skill of pack.skills ?? []) {
+  if (skill.icon) {
+    console.log(`Skill [${skill.name}] icon path: ${skill.icon}`);
+    const iconBytes = await client.skills.readFile(skill.id, skill.icon);
+    console.log(`Skill icon byte length: ${iconBytes.byteLength}`);
+  }
+}
+
+// 2. Connector icons: Immutable snapshot root relative path, retrieved via readImportAsset
+for (const conn of pack.connectors ?? []) {
+  // Note: Connectors declared via team package mcpServers lack independent icon sources; icon is always absent
+  if (conn.icon) {
+    console.log(`Connector [${conn.name}] icon path: ${conn.icon}`);
+    const iconBytes = await client.readImportAsset(pack.provenance.snapshot_id, conn.icon);
+    console.log(`Connector icon byte length: ${iconBytes.byteLength}`);
+  }
+}
+```
+
+```text
+./exported-expert/
+├── expert-pack.json
+├── persona.md
+├── skills/code-analysis/
+│   ├── SKILL.md
+│   └── assets/icon.png             ← Skill icon materialized inside skills/<name>/
+└── avatars/connectors/github.svg   ← Connector icon materialized to snapshot asset path
+```
+
 ### 5.3 Workspace management and reading internal skill files
 
 ```ts
