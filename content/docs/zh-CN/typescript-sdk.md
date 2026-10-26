@@ -43,7 +43,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出符号 | 类型定义与用途 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-18"`）。建连握手时执行全等校验，跨版本不兼容 |
+| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-19"`）。建连握手时执行全等校验，跨版本不兼容 |
 | `InitializeRequest` / `InitializeResult` | 协议初始化握手载荷（交换协议版本、客户端标识及服务端能力集） |
 | `ClientInfo` / `ClientCapabilities` | 客户端身份声明（名称、版本）与能力声明（`events`、`approvals`、`team_runtime`） |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | 统一资源商店目录结构与安装回执模型 |
@@ -772,6 +772,41 @@ export interface LocalizedDisplayFields {
 
 ---
 
+#### 导出包内的逐实体图标引用（`fp-19`）
+
+自 `fp-19`（`pack_format 4`）起，`agents.export()` / `teams.export()` 返回的 `ExpertPack` 里，被引用的技能与连接器各自带上**图标路径**。包**只带路径**，字节仍走已有的两个读取面——这与 `pack.avatar` / `assets` 的口径一致。
+
+```ts
+export interface ExpertSkillRef {
+  name: string;
+  id: string;
+  /** 技能目录相对路径（如 "assets/icon.png"）；无图标则整个键缺席 */
+  icon?: string | null;
+}
+
+export interface ExpertConnectorRef {
+  id: string;
+  name: string;
+  enabled: boolean;
+  /** 快照相对路径（如 "avatars/connectors/github.svg"）；必须在包的 assets 里 */
+  icon?: string | null;
+}
+```
+
+| 字段 | 坐标系 | 字节怎么取 |
+| --- | --- | --- |
+| `skills[].icon` | **技能目录相对**（与 `SKILL.md` 同一坐标系） | `harness.skills.readFile(skillId, icon)` |
+| `connectors[].icon` | **快照相对** | `harness.readImportAsset(pack.provenance.snapshot_id, icon)` |
+| `avatar?` / `assets[]`（`fp-14` 起） | 快照相对 | 同上 |
+
+消费契约与边界约束：
+
+1. **字节的来路是安装期固化**：市场里 `icons/<entry>.<ext>` 与 entry 目录是兄弟关系，导入时带不进快照，所以宿主在安装那一步把它落进不可变快照，并把路径写进组件 payload；导出期只读快照，因此同一快照两次导出逐字节相同。**作者的 `plugin.json.avatar` 永远优先，市场图标只补空缺且绝不覆盖**。
+2. **SDK 零额外代码**：`materializePack` 已经走过这两个面——技能图标落在 `<dir>/skills/<name>/assets/icon.*`，连接器图标落在 `<dir>/avatars/connectors/…`（并出现在 `ExportResult.writtenAssets` 里）。
+3. **`connectors[].icon` 的可达性边界**：它只在"连接器自己有声明的场合"出现（当前市场形态下 = 单连接器条目）。团包里由 `mcpServers` 声明的连接器**没有自己的图标来源**，`icon` 恒缺席——宿主不会把包级图标广播给包里的连接器，因为那等于给同一张图造两个语义主体。调用方应把缺席当作常态并回落默认图。
+4. **缺席 ≠ `null`**：字段缺席表示"没有图标"，与"这个格式没有该字段"可区分；`pack_format < 4` 的包不会有这两个键。老快照不会回填，需 `store.updateEntry` 或重装才会带上图标。
+
+---
 ## 4. `@flowy-agent-store/sdk` — Node 宿主
 
 ### 4.1 `launchHarness` 集成入口
