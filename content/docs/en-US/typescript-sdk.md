@@ -43,7 +43,7 @@ The protocol package serves as the definitive source of truth for wire interacti
 
 | Export symbol | Contract definition and usage |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-19"`). Enforces strict equality during handshakes |
+| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-20"`). Enforces strict equality during handshakes |
 | `InitializeRequest` / `InitializeResult` | Protocol handshake payloads exchanging protocol versions, client identities, and host capabilities |
 | `ClientInfo` / `ClientCapabilities` | Client identity declarations (name, version) and feature subscriptions (`events`, `approvals`, `team_runtime`) |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | Unified catalog structures and installation receipt models |
@@ -769,6 +769,10 @@ Field consumption contract and boundaries:
 4. **Display metadata only**: Display fields are not indexed for catalogue search and do not alter runtime identities such as `connector__<name>__<tool>`. `get` and `list` methods across all subclients return identical display metadata.
 
 ---
+
+#### Market index sources and entry download fields (`fp-20`)
+
+Starting in `fp-20`, the `index` marketplace source kind is supported: the market manifest is an `index.json` (`schema_version: 2`), `store.list()` reads only the index, and an entry's archive is downloaded from its absolute `download` URL only when it is actually installed or updated. `StoreItem` gains the optional fields `icon_url` (absolute market icon; `avatar_url` prefers it), `download_size`, `sha256`, `available`, `unavailable_reason`, and `default_init_prompt`. Older hosts omit them; clients must treat `available ?? true`.
 
 #### Per-entity icon references inside an export pack (`fp-19`)
 
