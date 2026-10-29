@@ -43,7 +43,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出符号 | 类型定义与用途 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-19"`）。建连握手时执行全等校验，跨版本不兼容 |
+| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-20"`）。建连握手时执行全等校验，跨版本不兼容 |
 | `InitializeRequest` / `InitializeResult` | 协议初始化握手载荷（交换协议版本、客户端标识及服务端能力集） |
 | `ClientInfo` / `ClientCapabilities` | 客户端身份声明（名称、版本）与能力声明（`events`、`approvals`、`team_runtime`） |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | 统一资源商店目录结构与安装回执模型 |
@@ -771,6 +771,10 @@ export interface LocalizedDisplayFields {
 4. **仅作为 UI 展示元数据**：展示字段不参与目录检索索引构建，亦不改变运行时标识（如工具命名空间 `connector__<name>__<tool>` 始终以 `name` 为准）。各子客户端的 `get` 与 `list` 接口返回的展示字段保持一致。
 
 ---
+
+#### 市场索引源与条目下载字段（`fp-20`）
+
+自 `fp-20` 起支持 `index` 市场源类型：市场清单是一个 `index.json`（`schema_version: 2`），`store.list()` 只读索引，条目在实际安装/更新时才按其 `download` 绝对 URL 下载。`StoreItem` 相应新增可选字段：`icon_url`（市场声明的绝对图标 URL，`avatar_url` 会优先采用它）、`download_size`、`sha256`、`available`、`unavailable_reason`、`default_init_prompt`。旧宿主不发送这些字段，客户端必须按 `available ?? true` 处理。
 
 #### 导出包内的逐实体图标引用（`fp-19`）
 
