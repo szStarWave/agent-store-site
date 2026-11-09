@@ -1,0 +1,49 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="lineGrad" x1="174" y1="132" x2="842" y2="940" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F5B89A" />
+      <stop offset="46%" stop-color="#E4885F" />
+      <stop offset="100%" stop-color="#CC5F3E" />
+    </linearGradient>
+    <linearGradient id="nodeMain" x1="214" y1="232" x2="764" y2="946" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E58B61" />
+      <stop offset="100%" stop-color="#CA5E3D" />
+    </linearGradient>
+    <linearGradient id="nodeSoft" x1="296" y1="122" x2="744" y2="812" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F4BC9E" />
+      <stop offset="100%" stop-color="#E68F68" />
+    </linearGradient>
+  </defs>
+
+  <g stroke="#FFFFFF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M206 318L512 176L818 318" />
+    <path d="M206 318L512 558L818 318" />
+    <path d="M206 318L292 738" />
+    <path d="M818 318L732 738" />
+    <path d="M292 738L512 926L732 738" />
+    <path d="M292 738L512 558L732 738" />
+    <path d="M512 558L512 926" />
+    <path d="M292 738L512 926" />
+    <path d="M732 738L512 926" />
+  </g>
+
+  <g stroke="url(#lineGrad)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M206 318L512 176L818 318" />
+    <path d="M206 318L512 558L818 318" />
+    <path d="M206 318L292 738" />
+    <path d="M818 318L732 738" />
+    <path d="M292 738L512 926L732 738" />
+    <path d="M292 738L512 558L732 738" />
+    <path d="M512 558L512 926" />
+    <path d="M292 738L512 926" />
+    <path d="M732 738L512 926" />
+  </g>
+
+  <circle cx="512" cy="176" r="82" fill="url(#nodeSoft)" stroke="#FFFFFF" stroke-width="3" />
+  <circle cx="206" cy="318" r="96" fill="url(#nodeMain)" stroke="#FFFFFF" stroke-width="3" />
+  <circle cx="818" cy="318" r="96" fill="url(#nodeMain)" stroke="#FFFFFF" stroke-width="3" />
+  <circle cx="512" cy="558" r="138" fill="url(#nodeMain)" stroke="#FFFFFF" stroke-width="3" />
+  <circle cx="292" cy="738" r="68" fill="url(#nodeSoft)" stroke="#FFFFFF" stroke-width="3" />
+  <circle cx="732" cy="738" r="68" fill="url(#nodeSoft)" stroke="#FFFFFF" stroke-width="3" />
+  <circle cx="512" cy="926" r="86" fill="url(#nodeMain)" stroke="#FFFFFF" stroke-width="3" />
+</svg>

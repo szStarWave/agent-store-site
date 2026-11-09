@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">YI-BI 数据分析</title>
+  <g fill="#285BF0" transform="translate(9 6) scale(.16)">
+    <path d="M0 2C53 4 86-2 121 34C161 75 180 137 146 193C142 150 121 126 74 100C25 73 3 42 0 2Z"/>
+    <path d="M286 67C300 131 275 176 238 219C209 253 190 287 195 324C149 325 117 300 124 258C131 214 184 155 286 67Z"/>
+    <circle cx="247" cy="33" r="33"/>
+  </g>
+</svg>

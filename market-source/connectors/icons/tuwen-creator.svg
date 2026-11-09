@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <!-- 图文卡片 -->
+  <rect x="60" y="64" width="112" height="140" rx="14" fill="#FFFFFF" opacity="0.96"/>
+  <rect x="76" y="84" width="80" height="44" rx="8" fill="#C7D2FE"/>
+  <rect x="76" y="140" width="80" height="8" rx="4" fill="#A5B4FC"/>
+  <rect x="76" y="156" width="64" height="8" rx="4" fill="#A5B4FC"/>
+  <rect x="76" y="172" width="72" height="8" rx="4" fill="#A5B4FC"/>
+  <!-- 星光 -->
+  <path d="M186 56 l8 20 20 8 -20 8 -8 20 -8 -20 -20 -8 20 -8z" fill="#FDE68A"/>
+  <path d="M196 150 l5 12 12 5 -12 5 -5 12 -5 -12 -12 -5 12 -5z" fill="#FDE68A" opacity="0.9"/>
+</svg>

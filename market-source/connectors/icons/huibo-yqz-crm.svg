@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Yunqianzai CRM">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2F6BFF"/>
+      <stop offset="1" stop-color="#6A3CF5"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#g)" d="M19 48c-6.6 0-12-5.1-12-11.5 0-5.7 4.3-10.5 10-11.3C18.8 18.2 24.8 13 32 13c6.6 0 12.2 4.4 14.1 10.5 6 .7 10.9 5.8 10.9 12.1C57 42.5 51.4 48 44.5 48H19z"/>
+  <rect x="22" y="33" width="5" height="9" rx="1.5" fill="#FFFFFF"/>
+  <rect x="30" y="27" width="5" height="15" rx="1.5" fill="#FFFFFF"/>
+  <rect x="38" y="30" width="5" height="12" rx="1.5" fill="#FFFFFF"/>
+</svg>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6C5CE7"/>
+      <stop offset="100%" stop-color="#3B2E9E"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#D8D0FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 圆角方形底 -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
+
+  <!-- 连接线（中心枢纽到三个节点） -->
+  <path d="M256 256 L256 168" stroke="url(#mark)" stroke-width="24" stroke-linecap="round" opacity="0.55"/>
+  <path d="M256 256 L168 344" stroke="url(#mark)" stroke-width="24" stroke-linecap="round" opacity="0.55"/>
+  <path d="M256 256 L344 344" stroke="url(#mark)" stroke-width="24" stroke-linecap="round" opacity="0.55"/>
+
+  <!-- 中心枢纽 -->
+  <circle cx="256" cy="256" r="44" fill="url(#mark)"/>
+
+  <!-- 三个连接节点 -->
+  <circle cx="256" cy="160" r="30" fill="url(#mark)" opacity="0.85"/>
+  <circle cx="160" cy="344" r="30" fill="url(#mark)" opacity="0.85"/>
+  <circle cx="352" cy="344" r="30" fill="url(#mark)" opacity="0.85"/>
+</svg>

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="D1 题录中枢">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2C6BED"/>
+      <stop offset="1" stop-color="#0B3FA8"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#g)"/>
+  <!-- 数据库圆柱体：题录库意象 -->
+  <ellipse cx="32" cy="19" rx="15" ry="5.4" fill="none" stroke="#FFFFFF" stroke-width="2.6"/>
+  <path d="M17 19v13c0 3 6.7 5.4 15 5.4s15-2.4 15-5.4V19" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M17 26.5v11.2c0 3 6.7 5.4 15 5.4s15-2.4 15-5.4V26.5" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" opacity="0.55"/>
+  <!-- 检索放大镜：叠加于右下 -->
+  <circle cx="42.5" cy="41" r="10.5" fill="none" stroke="#FFD34D" stroke-width="3.2"/>
+  <path d="M50 48.5L57.5 56" stroke="#FFD34D" stroke-width="4" stroke-linecap="round"/>
+</svg>

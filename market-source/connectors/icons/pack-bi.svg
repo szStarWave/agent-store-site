@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="160 140 760 790" width="64" height="64" role="img" aria-label="派可BI">
+  <title>派可BI</title>
+  <rect x="180" y="160" width="95" height="82" fill="#0A0A0A"/>
+  <rect x="180" y="315" width="95" height="175" fill="#F2C200"/>
+  <rect x="180" y="550" width="95" height="360" fill="#0A0A0A"/>
+  <path d="M350 160 H895 V250 H445 V910 H350 Z" fill="#0A0A0A"/>
+  <path d="M520 315 H895 V405 H615 V815 H710 V910 H520 Z" fill="#0A0A0A"/>
+  <path d="M705 490 H895 V580 H800 V910 H705 Z" fill="#F2C200"/>
+</svg>

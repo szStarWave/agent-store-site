@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="glow4" cx="0.55" cy="0.58" r="0.65">
+      <stop offset="0" stop-color="#8CE08A" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#8CE08A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bg4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#DFF6EC"/>
+      <stop offset="1" stop-color="#E4EEFB"/>
+    </linearGradient>
+    <linearGradient id="face4" x1="0.05" y1="0" x2="0.95" y2="1">
+      <stop offset="0" stop-color="#E9FF7A"/>
+      <stop offset="0.5" stop-color="#5BE08A"/>
+      <stop offset="1" stop-color="#0E9E7A"/>
+    </linearGradient>
+    <filter id="shadow4" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#2E9E7C" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+  <!-- V4: bold glow, bigger face fills more of the canvas -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bg4)"/>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#glow4)"/>
+  <path d="M17 11.5c0.8 4.4 1.7 5.3 6.1 6.1c-4.4 0.8-5.3 1.7-6.1 6.1c-0.8-4.4-1.7-5.3-6.1-6.1c4.4-0.8 5.3-1.7 6.1-6.1z" fill="#123023"/>
+  <circle cx="33" cy="34" r="17" fill="url(#face4)" filter="url(#shadow4)"/>
+  <circle cx="27" cy="26.5" r="2.6" fill="#FFFFFF" fill-opacity="0.65"/>
+  <path d="M24 38.5c3.7 4.6 11 4.6 14.8 0.4" fill="none" stroke="#123023" stroke-width="3.1" stroke-linecap="round"/>
+</svg>

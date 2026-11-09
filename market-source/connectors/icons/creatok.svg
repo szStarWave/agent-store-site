@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">CreatOK</title>
+  <g fill="#ff4b0b">
+    <path d="M168 88a168 168 0 1 0 119 287l-70-70a70 70 0 1 1 0-98l70-70A167 167 0 0 0 168 88Z"/>
+    <path d="m337 88 170 0-170 168-70-70zM267 326l70-70 170 168H337z"/>
+  </g>
+</svg>

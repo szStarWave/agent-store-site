@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>瀚與·知识产权图标（文字版）</title>
+  <desc>依赖系统宋体（SimSun / Songti SC），适合需要改字的场合。</desc>
+  <rect x="16" y="16" width="480" height="480" rx="22" fill="#16324F"/>
+  <rect x="62" y="62" width="388" height="388" rx="10" fill="none" stroke="#C0A062" stroke-opacity="0.7" stroke-width="3"/>
+  <text x="262" y="313" text-anchor="middle" font-family="Songti SC,SimSun,serif" font-size="140" font-weight="bold" letter-spacing="12" fill="#FFFFFF">瀚與</text>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="70" height="70" viewBox="0 0 70 70" role="img" aria-labelledby="title desc">
+  <title id="title">星创 WiMO Icon Dark</title>
+  <desc id="desc">Logo icon for dark mode: black circular star icon.</desc>
+  <g transform="translate(7 7)">
+    <circle cx="28" cy="28" r="27" fill="#05070A"/>
+    <path d="M28 8 34 23 50 29 34 35 28 50 22 35 6 29 22 23Z" fill="#FFFFFF"/>
+    <circle cx="38.5" cy="15" r="3.3" fill="#58D9E9"/>
+  </g>
+</svg>

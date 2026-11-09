@@ -1,0 +1,21 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">PatchXFreeNote</title>
+  <desc id="desc">PatchXFreeNote connector icon</desc>
+  <g clip-path="url(#clip0_1232_9045)">
+    <path d="M64 0H0V64H64V0Z" fill="url(#paint0_linear_1232_9045)"/>
+    <path d="M18.25 40.375V22.375C18.25 18.875 20 17.125 23.5 17.125H40.75" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M23.625 46.875H41.625C45.125 46.875 46.875 45.125 46.875 41.625V23.875" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M30.375 27.75C30.8582 27.75 31.25 27.3582 31.25 26.875C31.25 26.3918 30.8582 26 30.375 26C29.8918 26 29.5 26.3918 29.5 26.875C29.5 27.3582 29.8918 27.75 30.375 27.75Z" fill="white"/>
+    <path d="M34.125 27.75C34.6082 27.75 35 27.3582 35 26.875C35 26.3918 34.6082 26 34.125 26C33.6418 26 33.25 26.3918 33.25 26.875C33.25 27.3582 33.6418 27.75 34.125 27.75Z" fill="white"/>
+  </g>
+  <defs>
+    <linearGradient id="paint0_linear_1232_9045" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F8CFF"/>
+      <stop offset="0.5" stop-color="#3A8BD6"/>
+      <stop offset="1" stop-color="#A44DDE"/>
+    </linearGradient>
+    <clipPath id="clip0_1232_9045">
+      <rect width="64" height="64" fill="white"/>
+    </clipPath>
+  </defs>
+</svg>

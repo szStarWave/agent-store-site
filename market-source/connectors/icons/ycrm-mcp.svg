@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <!-- Background -->
+  <rect x="0" y="0" width="200" height="200" rx="45" fill="#7A00C6"/>
+
+  <!-- Left branch -->
+  <path d="M57 61 L99 103"
+        fill="none"
+        stroke="#AF66DC"
+        stroke-width="22"
+        stroke-linecap="round"/>
+  <circle cx="57" cy="61" r="11.5" fill="#FFFFFF"/>
+
+  <!-- Main Y shape -->
+  <path d="M100 149
+           L100 112
+           C100 103 104 96 110 90
+           L143 61"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="23"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+</svg>

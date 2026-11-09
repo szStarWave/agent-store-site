@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="雨大王 MCP 连接器">
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="#EAF5F0"/>
+  <path d="M18 29a9 9 0 0 1 2-17 13 13 0 0 1 24 3 7 7 0 0 1 1 14Z" fill="#208569"/>
+  <path d="M24 35v5m16-5v5M32 29v15" fill="none" stroke="#208569" stroke-width="4" stroke-linecap="round"/>
+  <path d="M24 44h16" fill="none" stroke="#208569" stroke-width="4"/>
+  <rect x="19" y="39" width="10" height="12" rx="4" fill="#EAF5F0" stroke="#208569" stroke-width="3"/>
+  <rect x="35" y="39" width="10" height="12" rx="4" fill="#EAF5F0" stroke="#208569" stroke-width="3"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="File Toolkit">
+  <title>File Toolkit</title>
+  <rect width="128" height="128" rx="26" fill="#2563EB"/>
+  <path d="M38 20h48l22 22v66a8 8 0 0 1-8 8H38a8 8 0 0 1-8-8V28a8 8 0 0 1 8-8z" fill="#FFFFFF"/>
+  <path d="M86 20l22 22H94a8 8 0 0 1-8-8V20z" fill="#BFDBFE"/>
+  <path d="M48 62h40M81 55l7 7-7 7" fill="none" stroke="#2563EB" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M88 86H48M55 79l-7 7 7 7" fill="none" stroke="#2563EB" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

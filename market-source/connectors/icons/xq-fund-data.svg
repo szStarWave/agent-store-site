@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <title>基金数据</title>
+  <rect x="7" y="7" width="50" height="50" rx="14" stroke="#2563EB" stroke-width="3"/>
+  <path d="M18 43h28M21 36V29m11 7V22m11 14V17" stroke="#2563EB" stroke-width="4" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" fill="none" role="img" aria-labelledby="jb-title jb-desc">
+  <title id="jb-title">憬泊AI云</title>
+  <desc id="jb-desc">云形玉环品牌标志：青蓝渐变云环内嵌字母 P，右上角镶一颗玉绿宝石。</desc>
+  <defs>
+    <linearGradient id="jb-cloud" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#35D6FF"/>
+      <stop offset="1" stop-color="#1B47FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 云形玉环：底角R20 侧瓣R36 谷口凹弧R26 顶弧R54，四处接点全相切 -->
+  <path d="M188 200 L68 200 A20 20 0 0 1 54.88 195.1 A36 36 0 0 1 61.04 136.4 A26 26 0 0 0 74.29 116.4 A54 54 0 0 1 181.7 116.4 A26 26 0 0 0 195 136.4 A36 36 0 0 1 201.1 195.1 A20 20 0 0 1 188 200 Z" stroke="url(#jb-cloud)" stroke-width="24" stroke-linejoin="round"/>
+  <path d="M114 166 V104 H133 A16 16 0 0 1 133 136 H114" stroke="url(#jb-cloud)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M177 82 L194 99 L177 116 L160 99 Z" fill="#17C98B" stroke="#FFFFFF" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>

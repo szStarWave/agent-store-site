@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">金融云-泰康展业助手连接器</title>
+  <desc id="desc">自绘的盾牌与连接节点示意图标。</desc>
+  <path d="M32 5 54 13v18c0 13-9 22-22 28C19 53 10 44 10 31V13Z" fill="#07834B"/>
+  <path d="M32 11 48 17v14c0 9-6 17-16 22-10-5-16-13-16-22V17Z" fill="#F0FAF4"/>
+  <path d="M24 23h16M24 23v15m16-15v15m-16 0h16" fill="none" stroke="#07834B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="24" cy="23" r="5" fill="#07834B"/>
+  <circle cx="40" cy="23" r="5" fill="#07834B"/>
+  <circle cx="24" cy="38" r="5" fill="#07834B"/>
+  <circle cx="40" cy="38" r="5" fill="#D4A341"/>
+</svg>

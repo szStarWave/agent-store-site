@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="t">
+  <title id="t">KongMing AI</title>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="#15201C"/>
+  <path fill="#FFFEFA" d="M260 220h140v234L628 220h180L514 512l294 292H628L400 570v234H260z"/>
+  <circle cx="418" cy="512" r="72" fill="#FFFEFA"/>
+  <circle cx="418" cy="512" r="50" fill="#2457F5"/>
+</svg>

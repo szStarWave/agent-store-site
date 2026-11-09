@@ -1,0 +1,82 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- 桌面端图标源文件（桌面壳图标集由 scripts/gen-brand-icon.mjs 从本文件生成）。 -->
+  <!-- 风格：WorkBuddy 式构图（紫渐变圆角底板 + 白色剪影），配色 = AIWHO 品牌紫。 -->
+  <!-- 形象：**值班长蛛**（2026-09-22 定稿），与桌宠同源（web/src/assets/pet-spider.svg）：
+         大圆头 + 窄钝双角 + 粗短圆头腿 + 耳麦 + 围巾。
+       🔴 与旧版（v1 小蜘蛛）的差异：**无蛛丝吊挂、无腹纹、眼是竖椭圆且不镂空当作** ——
+          这几处是 v2 定稿的硬特征，改图标时必须跟着改，否则图标与桌宠会不同源。
+       几何直接取定稿 SVG 的 viewBox 坐标（0 0 64 72），整组等比缩放居中，故与桌宠逐点对齐。 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7C6CF6"/>
+      <stop offset="1" stop-color="#2E2178"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 圆角底板 -->
+  <rect width="512" height="512" rx="115" fill="url(#bg)"/>
+
+  <!-- 定稿几何：viewBox 64×72 等比放大 → 512 底板内留 ~56 边距 -->
+  <g transform="translate(78 52) scale(5.55)">
+
+    <!-- 六条腿：两段铰接（股节 + 胫节），末端圆头球 -->
+    <g fill="none" stroke="#FFFFFF" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M40.0 51.6 L53.0 50.6"/>
+      <path d="M53.0 50.6 L56.2 61.3"/>
+      <path d="M24.0 51.6 L11.0 50.6"/>
+      <path d="M11.0 50.6 L7.8 61.3"/>
+      <path d="M34.0 50.0 L43.0 59.5"/>
+      <path d="M43.0 59.5 L45.4 64.2"/>
+      <path d="M30.0 50.0 L21.0 59.5"/>
+      <path d="M21.0 59.5 L18.6 64.2"/>
+      <path d="M30.0 56.0 L33.5 60.0"/>
+      <path d="M33.5 60.0 L36.4 65.7"/>
+      <path d="M34.0 56.0 L30.5 60.0"/>
+      <path d="M30.5 60.0 L27.6 65.7"/>
+    </g>
+    <g fill="#FFFFFF">
+      <circle cx="56.3" cy="61.6" r="2.8"/>
+      <circle cx="7.7"  cy="61.6" r="2.8"/>
+      <circle cx="45.5" cy="64.5" r="2.8"/>
+      <circle cx="18.5" cy="64.5" r="2.8"/>
+      <circle cx="36.5" cy="66.0" r="2.8"/>
+      <circle cx="27.5" cy="66.0" r="2.8"/>
+    </g>
+
+    <!-- 躯干 + 头圆：头身融合的一整块团身 -->
+    <ellipse cx="32" cy="48.8" rx="12.5" ry="11.2" fill="#FFFFFF"/>
+    <circle  cx="32" cy="27.2" r="19.1" fill="#FFFFFF"/>
+
+    <!-- 双角：窄而圆的钝角（剪影第一特征） -->
+    <path d="M17.8 16 Q17.1 7.6 20.2 5.3 Q21.4 4.5 22.7 5.7 Q25.1 8.2 25.4 15.6 Z" fill="#FFFFFF"/>
+    <path d="M46.2 16 Q46.9 7.6 43.8 5.3 Q42.6 4.5 41.3 5.7 Q38.9 8.2 38.6 15.6 Z" fill="#FFFFFF"/>
+
+    <!-- 眼：竖椭圆，**无瞳孔**。填底板色（该处的紫 ≈ #5F50C8）做成镂空 -->
+    <ellipse cx="24.2" cy="28.45" rx="2.05" ry="3.47" fill="#5F50C8"/>
+    <ellipse cx="39.9" cy="28.45" rx="2.05" ry="3.47" fill="#5F50C8"/>
+
+    <!-- 耳麦：头带 + 两侧耳罩 + 侧置麦克风（值班长的识别特征） -->
+    <path d="M11.1 27.5 C11.1 -1.9 52.9 -1.9 52.9 27.5" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
+    <g fill="#FFFFFF">
+      <rect x="8.6"  y="24.5" width="4.9" height="9.4" rx="2.4"/>
+      <rect x="50.5" y="24.5" width="4.9" height="9.4" rx="2.4"/>
+      <circle cx="45.2" cy="30.4" r="2.0"/>
+    </g>
+    <path d="M50.5 34.0 C49.8 32.8 47.6 31.2 46.2 30.8" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round"/>
+
+    <!-- 围巾：唯一彩色部件（桌宠里 = 部门色）。图标底板已是品牌紫，
+         故这里用**浅紫白**区分层次 —— 用品牌紫会直接消失在底板上。 -->
+    <path d="M20.2 41.4 Q32 49.6 43.2 41.4 L43.2 44.6 Q32 53 20.2 44.6 Z" fill="#E5DFFF"/>
+    <path d="M32.4 46.6 L38.6 45.8 L37.3 54.6 Q36.9 57.4 34.6 56.6 Q32.2 55.7 32.9 52.4 Z" fill="#E5DFFF"/>
+
+    <!-- 两只「手」：单节直臂 + 末端球（画在身体之上） -->
+    <g fill="none" stroke="#FFFFFF" stroke-width="4.8" stroke-linecap="round">
+      <path d="M40.2 43.0 L45.4 44.2"/>
+      <path d="M23.8 43.0 L18.6 44.2"/>
+    </g>
+    <g fill="#FFFFFF">
+      <circle cx="45.4" cy="44.2" r="2.1"/>
+      <circle cx="18.6" cy="44.2" r="2.1"/>
+    </g>
+  </g>
+</svg>

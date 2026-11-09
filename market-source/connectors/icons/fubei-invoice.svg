@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 付呗智能开票连接器图标：付呗红圆角底 + 白色发票 + 深红对勾 -->
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#E83E43"/>
+  <rect x="17" y="12" width="30" height="36" rx="3.5" fill="#FFFFFF"/>
+  <line x1="23" y1="21" x2="41" y2="21" stroke="#E83E43" stroke-width="2.6" stroke-linecap="round"/>
+  <line x1="23" y1="28" x2="41" y2="28" stroke="#E83E43" stroke-width="2.6" stroke-linecap="round"/>
+  <line x1="23" y1="35" x2="34" y2="35" stroke="#E83E43" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="44" cy="45" r="8.5" fill="#C43136" stroke="#FFFFFF" stroke-width="2.6"/>
+  <path d="m40.2 45 2.6 2.6 4.6-5.2" stroke="#FFFFFF" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

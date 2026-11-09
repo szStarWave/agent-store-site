@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">秒绘管家 Shopkeeping</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#554a38"/>
+      <stop offset="1" stop-color="#201d17"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#tile)"/>
+  <g fill="none" stroke="#f2dfb7" stroke-width="14" stroke-linecap="square" stroke-linejoin="round">
+    <path d="M130 70H96C67 70 51 91 51 124v10c0 33 16 52 45 52h33v-57H96"/>
+    <path d="M193 70v80c0 24-13 36-36 36h-12"/>
+  </g>
+</svg>
