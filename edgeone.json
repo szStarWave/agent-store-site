@@ -1,16 +1,27 @@
 {
-  "installCommand": "corepack pnpm install --frozen-lockfile",
+  "installCommand": "corepack pnpm install --frozen-lockfile --config.minimumReleaseAge=0",
   "buildCommand": "pnpm run build",
   "outputDirectory": "build",
   "headers": [
     {
       "source": "/assets/**",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     },
     {
       "source": "/source/**",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
     }
   ],
   "rewrites": []
 }
+
