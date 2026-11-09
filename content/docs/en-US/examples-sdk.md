@@ -14,7 +14,7 @@ This document serves as the practical companion cookbook for the [TypeScript SDK
 
 ```bash
 # Install the unified SDK package (requires Node.js ≥ 22 or Bun)
-bun add @flowy-agent-store/sdk # or npm install @flowy-agent-store/sdk
+npm install @flowy-agent-store/sdk # or pnpm add @flowy-agent-store/sdk
 ```
 
 ```ts

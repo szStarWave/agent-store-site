@@ -7,10 +7,10 @@
  * （EdgeOne Makers）提供的市场必须在发布时预先算好清单——不存在动态目录接口。
  *
  * 用法：
- *   bun run sync:tree                     # 镜像 + 生成清单 + 校验
- *   bun run sync:tree -- --dry-run        # 只显示差异，不写任何东西
- *   bun run sync:tree -- --listing-only   # 只从镜像重生成清单，不需要源
- *   bun run sync:tree -- --markets experts=D:\\exp skills=D:\\skl connectors=D:\\con
+ *   pnpm run sync:tree                     # 镜像 + 生成清单 + 校验
+ *   pnpm run sync:tree -- --dry-run        # 只显示差异，不写任何东西
+ *   pnpm run sync:tree -- --listing-only   # 只从镜像重生成清单，不需要源
+ *   pnpm run sync:tree -- --markets experts=D:\\exp skills=D:\\skl connectors=D:\\con
  *
  * 默认值：每个市场从运行环境的标准工作目录读取（见下面的 `DEFAULT_SOURCES`）。
  * 可用环境变量 MARKET_SRC_EXPERTS / MARKET_SRC_SKILLS / MARKET_SRC_CONNECTORS 按市场覆盖，
@@ -84,7 +84,7 @@ const FILE_EXCLUDES = new Set([".DS_Store", "Thumbs.db"]);
 function parseArgs(argv) {
   const sources = { ...DEFAULT_SOURCES };
   // 被显式指定的市场（环境变量或 --markets）。只有这些市场才允许覆盖 index-only 镜像；
-  // 默认源永远不碰索引型市场，否则一次 `bun run sync` 就会把 1889 条索引换成 578 条载荷树。
+  // 默认源永远不碰索引型市场，否则一次 `pnpm run sync` 就会把 1889 条索引换成 578 条载荷树。
   const explicit = new Set(
     Object.keys(MANIFESTS).filter((name) => process.env[`MARKET_SRC_${name.toUpperCase()}`] !== undefined),
   );

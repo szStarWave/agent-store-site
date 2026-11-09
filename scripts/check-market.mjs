@@ -32,7 +32,7 @@
  *
  *   node scripts/check-market.mjs
  *   node scripts/check-market.mjs --json
- *   bun test scripts/check-market.test.mjs
+ *   pnpm vitest run scripts/check-market.test.mjs
  */
 
 import { spawnSync } from "node:child_process";
@@ -142,7 +142,7 @@ export function checkSnapshot(market, { manifestEntries, snapshotEntries, base, 
       finding(
         market,
         "snapshot.count",
-        `${market}: manifest has ${manifestEntries.length} entr(ies), content/market.json has ${snapshotEntries.length} — re-run \`bun run sync:market\` and commit both paths`,
+        `${market}: manifest has ${manifestEntries.length} entr(ies), content/market.json has ${snapshotEntries.length} — re-run \`pnpm run sync:market\` and commit both paths`,
       ),
     );
   }

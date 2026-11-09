@@ -30,7 +30,7 @@
 | 仅 ModelScope 广场收录 | 百度地图、快递100、高德地图、航班管家 |
 | 均未收录官方版本 | T3出行、喜马拉雅、同程搜索、携程系 3 项、京东金融、小米商城、哈啰出行、闲鱼 |
 
-> **缺口判定逻辑**：WorkBuddy 侧未收录条目源于上游连接器源本身未提供，非本站静态快照未同步导致。若需验证上游变动，运行 `bun run sync:tree -- --dry-run` 即可确认（详见 §9）。
+> **缺口判定逻辑**：WorkBuddy 侧未收录条目源于上游连接器源本身未提供，非本站静态快照未同步导致。若需验证上游变动，运行 `pnpm run sync:tree -- --dry-run` 即可确认（详见 §9）。
 
 ## 2. 16 项能力全维度对照矩阵
 
@@ -163,19 +163,19 @@ WorkBuddy 三大市场当前镜像基线：
 
 ```powershell
 # 对比本地快照与上游目录差异（只读探测）
-bun run sync:tree -- --dry-run
+pnpm run sync:tree -- --dry-run
 
 # 基于本地镜像重新提取快照
-bun run sync:market
+pnpm run sync:market
 
 # 启动本地开发服务核验前端渲染
-bun run dev            # 访问 http://127.0.0.1:5173/zh-CN/market
+pnpm run dev            # 访问 http://127.0.0.1:5173/zh-CN/market
 ```
 
 针对收录条目执行名称精确核对：
 
 ```powershell
-bun -e "const c = require('./content/market.json').connectors; console.log(c.filter(x => x.name.includes('飞常准')).map(x => x.name + '/' + x.id));"
+node -e "const c = require('./content/market.json').connectors; console.log(c.filter(x => x.name.includes('飞常准')).map(x => x.name + '/' + x.id));"
 ```
 
 ### ModelScope 侧接口核查

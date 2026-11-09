@@ -12,9 +12,9 @@
  *                                                                          (连接器富字段)
  *
  * 只重写生成物 market-source；写完后再跑：
- *   bun run sync:tree -- --listing-only
- *   bun run sync:market
- *   bun run check:market
+ *   pnpm run sync:tree -- --listing-only
+ *   pnpm run sync:market
+ *   pnpm run check:market
  */
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";

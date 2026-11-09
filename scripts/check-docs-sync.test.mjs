@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 
 import { checkDocs, compareSkeletons, scanDoc, selfTestCases } from "./check-docs-sync.mjs";
 

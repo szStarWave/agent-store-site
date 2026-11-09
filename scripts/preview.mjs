@@ -27,7 +27,7 @@ const port = Number(process.env.PORT ?? 4173);
 const host = process.env.HOST ?? "127.0.0.1";
 
 if (!existsSync(root)) {
-  console.error("[preview] build/ 不存在 —— 先跑 `bun run build`");
+  console.error("[preview] build/ 不存在 —— 先跑 `pnpm run build`");
   process.exit(1);
 }
 

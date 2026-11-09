@@ -25,7 +25,7 @@
     "paths": {
       "@site/*": ["./*"]
     },
-    "types": ["bun", "@docusaurus/module-type-aliases", "@docusaurus/theme-classic"]
+    "types": ["@docusaurus/module-type-aliases", "@docusaurus/theme-classic", "vite/client"]
   },
   "include": ["src", "docusaurus.config.ts", "scripts"],
   "exclude": ["build", ".docusaurus", "node_modules"]

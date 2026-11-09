@@ -9,26 +9,26 @@
 
 ## 自动化代理 (Agent) 执行契约规范
 
-1. **执行工作目录**：所有构建与同步指令必须在**仓库根目录**执行；运行环境支持 `node` 或 `bun`，本文以 `bun run <script>` 为标准范式。
+1. **执行工作目录**：所有构建与同步指令必须在**仓库根目录**执行；运行环境支持 `node` 或 `pnpm`，本文以 `pnpm run <script>` 为标准范式。
 2. **只读探测先行**：支持 `--dry-run` 参数的操作必须先执行模拟试跑，确认变更范围无误后再落盘。
 3. **敏感环境隔离**：上游市场真实工作目录由外部运行时独立维护（非本仓库目录），禁止在文档、提交记录或日志中记录上游绝对路径，统一通过受控环境变量指代。
 4. **受控写盘操作边界**：允许落盘的操作仅限三项：`sync:tree`（文件树镜像同步）、`sync:market`（目录快照提取）以及 `git commit`。严禁擅自修改其他文件。
 5. **单向镜像互斥约束**：`sync:tree` 具备**单向强制镜像语义**，同一时间窗口仅允许单机单进程执行。严禁在多个客户端或独立 Clone 副本间交替执行同步，否则将触发未同步文件的静默剪除（操作前必须阅读 §4）。
-6. **门禁阻断判据**：提交前必须执行 `bun run check:market`。该门禁原子化校验清单查重与双生成物一致性，非 0 退出码属于阻断性错误，严禁绕过（详见 §4.3 与 §4.7）。
+6. **门禁阻断判据**：提交前必须执行 `pnpm run check:market`。该门禁原子化校验清单查重与双生成物一致性，非 0 退出码属于阻断性错误，严禁绕过（详见 §4.3 与 §4.7）。
 
 ## 1. 数据流与目录角色
 
 ```text
 上游市场工作目录（运行时维护，非本仓库）
-        │  bun run sync:tree          镜像同步 + 生成 _files.txt + 执行静态门禁校验
+        │  pnpm run sync:tree          镜像同步 + 生成 _files.txt + 执行静态门禁校验
         ▼
 market-source/{experts,skills,connectors}/     版本库跟踪，上游目录的索引型镜像（清单 + 图标）
-        │  bun run sync:market        本地离线解析，提取目录页数据快照
+        │  pnpm run sync:market        本地离线解析，提取目录页数据快照
         ▼
 content/market.json                            版本库跟踪，前端目录页消费的结构化数据源
         │
-        ├─ bun run dev      →  http://127.0.0.1:5173/zh-CN/market（dev 模式将 /source/** 动态映射至 market-source/）
-        └─ bun run build    →  SSG 预渲染生成 HTML，并将目录页引用的头像拷贝至
+        ├─ pnpm run dev      →  http://127.0.0.1:5173/zh-CN/market（dev 模式将 /source/** 动态映射至 market-source/）
+        └─ pnpm run build    →  SSG 预渲染生成 HTML，并将目录页引用的头像拷贝至
                                build/source/  →  生产环境 /source/<market>/…
 ```
 
@@ -69,13 +69,13 @@ EdgeOne Makers 对**构建产物**设有两条硬性配额指标（源自官方�
 | `connectors` | 3,264 |
 | **全量合计** | **约 22,700** ← 超出平台配额：日志停滞于 `Checking output` 并抛出 `File count exceeds project limit.` |
 
-**当前架构基线 (doc 30)**：三个市场源已全量迁移至 ModelScope 托管，且都以**索引型**发布（`wb-market/<market>/index.json` + `payload`/`entries`，由 `workbuddy-market-collect` 生成上传；站点仓 `bun run pack:market`/`publish:market` 只对应**冻结的旧 `{market}.zip`**）。本站**不再对任何市场源进行整树全量托管**，构建脚本 `copy-market-tree.mjs` 中的 `HOSTED_DEFAULT` 已配置为**空数组**。生产构建产物仅保留目录页引用的头像资源（共 1,708 个文件）。
+**当前架构基线 (doc 30)**：三个市场源已全量迁移至 ModelScope 托管，且都以**索引型**发布（`wb-market/<market>/index.json` + `payload`/`entries`，由 `workbuddy-market-collect` 生成上传；站点仓 `pnpm run pack:market`/`publish:market` 只对应**冻结的旧 `{market}.zip`**）。本站**不再对任何市场源进行整树全量托管**，构建脚本 `copy-market-tree.mjs` 中的 `HOSTED_DEFAULT` 已配置为**空数组**。生产构建产物仅保留目录页引用的头像资源（共 1,708 个文件）。
 
 系统仍保留按需恢复整树托管的能力，修改 `HOSTED_DEFAULT` 常量即可调整生产产物范围；本地调试与测试可通过环境变量 `SITE_HOSTED_MARKETS` 临时覆盖：
 
 ```powershell
 $env:SITE_HOSTED_MARKETS="skills,connectors"   # 未列出的市场源仅提取目录页头像
-bun run build
+pnpm run build
 ```
 
 - **非托管市场资产裁剪保证**：未列入托管清单的市场源，构建流程将根据 `content/market.json` 中的 `avatar` 路径定向提取图标文件，确保前端展示始终正常。
@@ -111,7 +111,7 @@ experts/plugins/<name>/
 > **当前专家市场是索引型**：`market-source/experts/` 只保留
 > `.codebuddy-plugin/marketplace.json` 与 `icons/<name>.<ext>`，不再保留 `plugins/<name>/`。
 > 本地化字段（`profession` / `displayDescription` / `tags`）内联在清单条目里，
-> 由 `bun run import:index` 从 WMC 的 `dist-market/experts/index.json` 生成；
+> 由 `pnpm run import:index` 从 WMC 的 `dist-market/experts/index.json` 生成；
 > 完整专家载荷在 ModelScope 的 `wb-market/experts/` 归档里。
 
 `plugin.json` 里**影响本站显示**的字段（值都是 `{ "zh": …, "en": … }` 对）：
@@ -160,7 +160,7 @@ skills/.codebuddy-skill/marketplace.json
 
 > **当前 `skills` 是索引型市场（index-only）**：`market-source/skills/` 只保留清单与
 > `icons/`，没有 `skills/<slug>/` 载荷；1889 条索引由
-> `bun run import:skills-index` 从 WMC 的 `recommend-build/market/index.json` 生成，
+> `pnpm run import:skills-index` 从 WMC 的 `recommend-build/market/index.json` 生成，
 > 完整技能载荷在 ModelScope 的 `wb-market/skills/` 归档里。`sync:tree` 会跳过索引型
 > 市场的默认源，`pack:market` 也会跳过它——不要去本地载荷树上跑全量 `sync` 再提交，
 > 那会把 1889 条索引换回 578 条。
@@ -192,7 +192,7 @@ connectors/.codebuddy-connector/connectors.json
 > **当前连接器市场是索引型**：`market-source/connectors/` 只保留
 > `.codebuddy-connector/connectors.json` 与 `icons/<member>.<ext>`，不再保留
 > `connectors/<slug>/`。中文名、英文名、简介与示例都内联在清单里，由
-> `bun run import:index` 从 WMC 的 `dist-market/connectors/index.json` 生成；
+> `pnpm run import:index` 从 WMC 的 `dist-market/connectors/index.json` 生成；
 > 完整连接器载荷在 ModelScope 的 `wb-market/connectors/` 归档里。
 
 清单条目中影响显示的字段：
@@ -231,7 +231,7 @@ node scripts/sync-market-tree.mjs --markets experts=<路径> skills=<路径> con
 ### 第 2 步：预检（不写盘）
 
 ```powershell
-bun run sync:tree -- --dry-run
+pnpm run sync:tree -- --dry-run
 ```
 
 输出形如（**示意**，数字随上游变化）：
@@ -252,7 +252,7 @@ bun run sync:tree -- --dry-run
 ### 第 3 步：正式同步
 
 ```powershell
-bun run sync          # = sync:tree + sync:market
+pnpm run sync          # = sync:tree + sync:market
 ```
 
 它会：镜像上游 → 重写三个 `_files.txt` → 跑门禁 → 重新生成 `content/market.json`。
@@ -260,9 +260,9 @@ bun run sync          # = sync:tree + sync:market
 也可以分开跑：
 
 ```powershell
-bun run sync:tree                # 只镜像与生成清单
-bun run sync:market              # 只由 market-source/ 重新生成 content/market.json
-bun run sync:tree -- --listing-only   # 只由镜像重出三份清单，不读上游源
+pnpm run sync:tree                # 只镜像与生成清单
+pnpm run sync:market              # 只由 market-source/ 重新生成 content/market.json
+pnpm run sync:tree -- --listing-only   # 只由镜像重出三份清单，不读上游源
 ```
 
 `--listing-only` 是给「排除规则变了、但本机没有上游副本」准备的：上游工作目录是每台机器
@@ -275,7 +275,7 @@ bun run sync:tree -- --listing-only   # 只由镜像重出三份清单，不读�
 > **2,102** 个文件、镜像有 **14,713** 个，预检报 **`-12857`**——跑一次就少掉专家市场的
 > 六分之五。`-removed` 只要不是「你这一步刚删的那几个条目」，就**不要**继续：
 >
-> - 只对齐清单（不读上游、不删文件）：`bun run sync:tree -- --listing-only`；
+> - 只对齐清单（不读上游、不删文件）：`pnpm run sync:tree -- --listing-only`；
 > - 真正要更新：先把上游副本补全，或用 `--markets experts=<完整副本>` 指向一份完整目录（见 4.2）。
 >
 > 万一已经跑过：`git checkout origin/main -- market-source/<market>` 取回镜像，再 `--listing-only` 重出清单。
@@ -291,7 +291,7 @@ bun run sync:tree -- --listing-only   # 只由镜像重出三份清单，不读�
 ### 第 4 步：验证
 
 ```powershell
-bun run dev            # http://127.0.0.1:5173
+pnpm run dev            # http://127.0.0.1:5173
 ```
 
 - 目录页：`/zh-CN/market` 与 `/en-US/market` —— 切到对应标签页，确认新条目的
@@ -308,7 +308,7 @@ bun run dev            # http://127.0.0.1:5173
 ### 第 5 步：提交与部署
 
 ```powershell
-bun run check:market             # 查重 + 两个产物是否一致，见 4.3
+pnpm run check:market             # 查重 + 两个产物是否一致，见 4.3
 git add market-source content/market.json
 git commit -m "chore(market): …"
 git push origin main
@@ -335,10 +335,10 @@ git push origin main
 这三条都无法自动校验，唯一的守卫是预检，**只看 `-removed`**：
 
 ```powershell
-bun run sync:tree -- --dry-run
+pnpm run sync:tree -- --dry-run
 ```
 
-- `-0`，或数量很小且能解释成「上游确实下架了这些条目」→ 可以继续 `bun run sync`
+- `-0`，或数量很小且能解释成「上游确实下架了这些条目」→ 可以继续 `pnpm run sync`
 - 出现无法解释的大量 `-N` → 停下，让对方的副本补齐或更新到与镜像同级后再预检
 
 > 预检明细每条只打印**前 5 行**（`+` / `-` / `~` 各 5 条），真实数量以汇总行为准。
@@ -360,7 +360,7 @@ bun run sync:tree -- --dry-run
 （镜像 14,713），预检报 `-12857`；同一次预检里 `connectors` 反而是 `+1678 -197`
 （副本与镜像各有漂移）。所以判断办法只有一个：**看预检的 `-removed`**——只要它不是
 「自己刚删的那几个条目」，就按上面两条路径之一先补全副本，或改用
-`bun run sync:tree -- --listing-only`（只由镜像重出清单，不读上游、不删文件）。
+`pnpm run sync:tree -- --listing-only`（只由镜像重出清单，不读上游、不删文件）。
 
 第 2 条与「禁止手改 `market-source/`」（见第 8 节）不冲突：被编辑的是**仓库之外的
 中间副本**，仓库里的镜像仍然只由 `sync:tree` 生成。反过来，直接编辑仓库里的
@@ -410,7 +410,7 @@ bun run sync:tree -- --dry-run
 查重与「两个产物是否一致」由同一条命令完成：
 
 ```powershell
-bun run check:market          # 退出码非 0 即有问题；--json 供脚本消费
+pnpm run check:market          # 退出码非 0 即有问题；--json 供脚本消费
 ```
 
 它逐市场检查七件事：清单内重复登记（`manifest.duplicate`）、快照条目数与清单是否一致
@@ -448,8 +448,8 @@ bun run check:market          # 退出码非 0 即有问题；--json 供脚本�
 
 ```powershell
 git pull                                   # 1. 先对齐仓库
-bun run sync:tree -- --dry-run             # 2. 预检，只看 -removed（判读见 4.1）
-bun run sync                               # 3. 同步：镜像 + 清单 + 快照
+pnpm run sync:tree -- --dry-run             # 2. 预检，只看 -removed（判读见 4.1）
+pnpm run sync                               # 3. 同步：镜像 + 清单 + 快照
 git add market-source content/market.json  # 4. 两个路径一起提交
 git commit -m "chore(market): …"
 git push origin main                       # 5. 被拒则回到第 1 步重来（见 4.5）
@@ -490,7 +490,7 @@ git --no-pager diff --stat HEAD..origin/main -- market-source content/market.jso
   git checkout origin/main -- market-source content/market.json
   # 把对方新增的条目放回自己的上游副本（可从 market-source/ 拷出），再走 4.4 的五步
   ```
-- **对方改的是代码或文档** → 常规合并即可，但**合并后必须重跑 `bun run sync`**
+- **对方改的是代码或文档** → 常规合并即可，但**合并后必须重跑 `pnpm run sync`**
   （至少 `sync:market`），让生成物与树重新对齐，然后单独提交生成物。
 
 一条硬规则：**只要合并动过 `market-source/`，就必须重跑同步，不能手工解冲突。**
@@ -502,26 +502,26 @@ git --no-pager diff --stat HEAD..origin/main -- market-source content/market.jso
 
 | 冲突文件 | 处理 |
 | --- | --- |
-| `market-source/*/_files.txt` | 任选一侧，随后 `bun run sync:tree` 整份重写 |
+| `market-source/*/_files.txt` | 任选一侧，随后 `pnpm run sync:tree` 整份重写 |
 | `market-source/*/.codebuddy-*/**.json` | 以上游为准：改上游副本后重新同步，不要用编辑器手工合并两个分支的清单 |
 | 图标等二进制文件 | 不要用 merge 工具挑一侧；先决定保留哪份文件，两份都要就给不同 slug 并分别登记 |
-| `content/market.json` | 永远由 `bun run sync:market` 重新生成，禁止手工合并 |
+| `content/market.json` | 永远由 `pnpm run sync:market` 重新生成，禁止手工合并 |
 
 ```powershell
 git checkout --theirs -- market-source/*/_files.txt
-bun run sync:tree
-bun run sync:market
+pnpm run sync:tree
+pnpm run sync:market
 ```
 
 ### 4.7 提交前自检
 
 ```powershell
-bun run check:market             # 查重 + 两个产物是否一致，一条命令覆盖第 1–3 条
-bun run sync:tree -- --dry-run   # 应为 +0 -0 ~0（幂等：镜像与来源一致）
+pnpm run check:market             # 查重 + 两个产物是否一致，一条命令覆盖第 1–3 条
+pnpm run sync:tree -- --dry-run   # 应为 +0 -0 ~0（幂等：镜像与来源一致）
 git status --short               # 两个产物成对出现，且没有手改过的文件
 ```
 
-1. `bun run check:market` 退出码为 0。它查清单内重复、快照与清单的条目数及条目集合是否
+1. `pnpm run check:market` 退出码为 0。它查清单内重复、快照与清单的条目数及条目集合是否
    一致、快照头像是否真有文件、`_files.txt` 与树是否互相覆盖（判读见 4.3）。
 2. `sync:tree` 的门禁输出 `validation passed — tree is publishable`；出现任何 `✗` 都不提交。
 3. `git status` 里 `market-source/` 与 `content/market.json` **成对出现**，且没有手改过的文件。
@@ -578,7 +578,7 @@ git status --short               # 两个产物成对出现，且没有手改过
 | `listing must exclude itself` / `illegal path in listing` | 清单格式被手工破坏 | 重跑 `sync:tree` |
 
 > 门禁比对的是**磁盘上的镜像**，所以它发现不了「清单收录了 git 不会交付的路径」——那些文件
-> 就在磁盘上。这一类由 `bun run check:market` 的 `listing.undeliverable` 判定，见 7。
+> 就在磁盘上。这一类由 `pnpm run check:market` 的 `listing.undeliverable` 判定，见 7。
 
 ### 警告项（不阻断发布）
 
@@ -605,19 +605,19 @@ git status --short               # 两个产物成对出现，且没有手改过
 | 中文站出现英文简介 | 专家缺 `profession`/`displayDescription`，或技能/连接器缺 `description_zh` | 上游补字段（站点不推断） |
 | 卡片标题变成插件 id | 专家/团队缺 `profession` | 上游补 `profession` |
 | 英文站技能标题是中文 | 技能清单没有 `name_en` | 上游数据限制，需上游补字段 |
-| 目录页数字没变化 | 只跑了 `sync:tree`，或 `content/market.json` 没提交 | 跑 `bun run sync`，并把两个路径一起提交 |
+| 目录页数字没变化 | 只跑了 `sync:tree`，或 `content/market.json` 没提交 | 跑 `pnpm run sync`，并把两个路径一起提交 |
 | 条目在树里但页面搜不到 | 只提交了 `market-source/` | 补提交 `content/market.json` |
-| 线上 `/source/…` 404 | 构建未完成，或直接跑了 `docusaurus build`（漏掉拷贝步骤） | 用 `bun run build`；本地 `preview` 刻意不兜底 `/source`，以便暴露这种情况 |
-| `bun run dev` 起不来，报 safe-delete / trash 操作失败 | 环境变量 `NODE_OPTIONS` 注入了 node-language-shim | 先 `$env:NODE_OPTIONS=""` 再启动 |
-| 市场镜像客户端连不上开发服务器，本地代理报 502 / ECONNREFUSED | 默认 host 解析在 Windows 上只绑到 `::1`，而代理转发到 `127.0.0.1` 被拒 | 已由 `bun run dev` 里的 `--host 127.0.0.1` 处理；浏览器访问 `localhost` 仍可用（会回落） |
+| 线上 `/source/…` 404 | 构建未完成，或直接跑了 `docusaurus build`（漏掉拷贝步骤） | 用 `pnpm run build`；本地 `preview` 刻意不兜底 `/source`，以便暴露这种情况 |
+| `pnpm run dev` 起不来，报 safe-delete / trash 操作失败 | 环境变量 `NODE_OPTIONS` 注入了 node-language-shim | 先 `$env:NODE_OPTIONS=""` 再启动 |
+| 市场镜像客户端连不上开发服务器，本地代理报 502 / ECONNREFUSED | 默认 host 解析在 Windows 上只绑到 `::1`，而代理转发到 `127.0.0.1` 被拒 | 已由 `pnpm run dev` 里的 `--host 127.0.0.1` 处理；浏览器访问 `localhost` 仍可用（会回落） |
 | git 提示 `CRLF will be replaced by LF` | Windows 行尾差异 | 正常，忽略 |
 | 同步后条目「凭空」少了几个 | 本机上游副本旧或不全，预检的 `-removed` 没被检查（见 4.3） | 从 `git log` 找回被删条目并补回上游副本，再按 4.4 重做 |
-| 预检（`--dry-run`）报 `-removed` 上千条 | 本机上游副本**非空但严重不全**（每台机器一份，见 4.2 / 4.4）；`sync:tree` 的判据是「上游没有的就剪除」，所以它会安静删掉镜像里上游缺的那部分 | **不要进第 3 步**。只对齐清单：`bun run sync:tree -- --listing-only`；要真正更新：先补全上游副本，或 `--markets <market>=<完整副本>`。已误删则 `git checkout origin/main -- market-source/<market>` 后 `--listing-only` 重出清单 |
+| 预检（`--dry-run`）报 `-removed` 上千条 | 本机上游副本**非空但严重不全**（每台机器一份，见 4.2 / 4.4）；`sync:tree` 的判据是「上游没有的就剪除」，所以它会安静删掉镜像里上游缺的那部分 | **不要进第 3 步**。只对齐清单：`pnpm run sync:tree -- --listing-only`；要真正更新：先补全上游副本，或 `--markets <market>=<完整副本>`。已误删则 `git checkout origin/main -- market-source/<market>` 后 `--listing-only` 重出清单 |
 | 目录页出现两张重复卡片 | 上游清单里同一资源登记了两次（门禁不拦，见 4.3） | 上游删掉重复条目后重新同步；提交前跑 4.3 的查重命令 |
 | 门禁报 `listing misses` / `listing references` | 合并动过 `market-source/` 但没重跑同步（见 4.5） | 按 4.6 重跑 `sync:tree` 与 `sync:market` |
-| `check:market` 报 `snapshot.count` / `snapshot.entry` | 只改或只提交了两个产物中的一个 | 跑 `bun run sync:market` 重新生成快照，再成对提交 |
+| `check:market` 报 `snapshot.count` / `snapshot.entry` | 只改或只提交了两个产物中的一个 | 跑 `pnpm run sync:market` 重新生成快照，再成对提交 |
 | `check:market` 报 `snapshot.avatar-missing` | 快照指向的图标文件不在树里（通常是被剪除或没随树提交） | 重新同步；若上游确实没有图标，让快照回落为 `null`（即重新生成） |
-| `check:market` 报 `listing.undeliverable` | 清单收录了被 `.gitignore` 忽略且未跟踪的路径——同步机的磁盘有这些文件，`git add` 不会把它们放进提交 | 用 `git check-ignore -v <路径>` 看是哪条规则：把规则锚到根（`/.codebuddy/`）或收窄，再 `bun run sync:tree -- --listing-only` 重出清单；若这些文件确实不该上架，就按 4.6 的思路重跑同步 |
+| `check:market` 报 `listing.undeliverable` | 清单收录了被 `.gitignore` 忽略且未跟踪的路径——同步机的磁盘有这些文件，`git add` 不会把它们放进提交 | 用 `git check-ignore -v <路径>` 看是哪条规则：把规则锚到根（`/.codebuddy/`）或收窄，再 `pnpm run sync:tree -- --listing-only` 重出清单；若这些文件确实不该上架，就按 4.6 的思路重跑同步 |
 | `check:market` 报 `listing.phantom`（或有人比对出「清单里有文件、提交里没有」），本机磁盘上文件都在 | 与上一条同源：清单由磁盘生成，提交由 git 决定，两侧对「被忽略的文件」看法不同 | 同上；排查命令见 7 末「一条命令自检清单与提交是否一致」 |
 | `check:market` 报 `listing.missing`（例：`…/fbsir-super-partner/.DS_Store`），但 `git status` 里看不到这些文件 | 镜像里有**未跟踪且被忽略**的垃圾文件（macOS 元数据等） | 删掉即可；`sync:tree` 的 `FILE_EXCLUDES` 已把 `.DS_Store` / `Thumbs.db` 排除在清单外，重出清单不会再收录它们 |
 
@@ -636,7 +636,7 @@ git check-ignore -v market-source/experts/plugins/<专家>/skills/<技能>/.code
 # 形如：.gitignore:28:.codebuddy/  …   ← 第 28 行的规则命中了它
 ```
 
-`bun run check:market` 的 `listing.undeliverable` 做的就是这件事，只是它会自己比对三份清单，
+`pnpm run check:market` 的 `listing.undeliverable` 做的就是这件事，只是它会自己比对三份清单，
 并且把结果算进退出码。
 
 ## 8. 反模式与操作禁区 (Anti-Patterns)
@@ -694,7 +694,7 @@ git check-ignore -v market-source/experts/plugins/<专家>/skills/<技能>/.code
 - 4 个专家的技能载荷缺失：`behavioral-nudge-engine`、`book-co-creator`、
   `feedback-synthesis-analyst`、`seo-expert` 的 `skills/fbs-bookwriter/.codebuddy/{agents,providers}`
   （共 84 个文件）曾因 `.gitignore` 误伤而进不了提交。规则已修正，下一次在**拥有上游副本的
-  机器**上跑 `bun run sync` 会随树与清单一起自动补回（本机源不含这些文件时补不回来）。
+  机器**上跑 `pnpm run sync` 会随树与清单一起自动补回（本机源不含这些文件时补不回来）。
 
 ## 10. 相关文档
 
@@ -704,7 +704,7 @@ git check-ignore -v market-source/experts/plugins/<专家>/skills/<技能>/.code
 | [`connector-coverage.md`](./connector-coverage.md) | 连接器覆盖现状与近似项甄别规范 |
 | [`modelscope-mcp-api.md`](./modelscope-mcp-api.md) | ModelScope MCP 开放接口规范（当前未接入本站） |
 | `scripts/sync-market-tree.mjs` | 门禁与警告规则真源；定义目录排除项（`logs`/`dist`/`market-icons`/`.git`/`node_modules`/`FILE_EXCLUDES`）与 `--listing-only` 逻辑 |
-| `scripts/check-market.mjs` | 清单查重、双产物一致性、清单与 Git 跟踪一致性、`.gitignore` 体检规则实现（`bun run check:market`） |
+| `scripts/check-market.mjs` | 清单查重、双产物一致性、清单与 Git 跟踪一致性、`.gitignore` 体检规则实现（`pnpm run check:market`） |
 | `.gitignore` | 市场树忽略规则契约（根锚定约束）；`check:market` 规则 7 据此执行校验 |
 | `scripts/sync-market-data.mjs` | 目录快照字段抽取与多语言回落规则实现 |
 | `scripts/copy-market-tree.mjs` | 构建期静态资源拷贝逻辑（无过滤拷贝；排除项在 `market-source/` 阶段已剔除） |

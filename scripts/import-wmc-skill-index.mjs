@@ -23,9 +23,9 @@
  *   node scripts/import-wmc-skill-index.mjs --python C:\\...\\python.exe
  *
  * 写完后再跑：
- *   bun run sync:tree -- --listing-only
- *   bun run sync:market
- *   bun run check:market
+ *   pnpm run sync:tree -- --listing-only
+ *   pnpm run sync:market
+ *   pnpm run check:market
  */
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";

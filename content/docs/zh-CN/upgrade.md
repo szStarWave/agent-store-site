@@ -64,9 +64,9 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 默认安装命令将解析至 `latest` 标签对应的历史版本；部分包管理器写入的非精确版本范围（如 `^0.1.0-beta.2`）在不同工具间可能产生歧义解析。
 
 ```bash
-bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2（latest）
-bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.11
-bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → 解析为 0.1.0-beta.2
+npm install @flowy-agent-store/sdk                     # → 0.1.0-beta.2（latest）
+npm install @flowy-agent-store/sdk@beta                # → 0.1.0-beta.11
+npm install '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → 解析为 0.1.0-beta.2
 npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → 可能解析为 0.1.0
 ```
 
@@ -76,14 +76,14 @@ npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → 可能解析为 
 
 ```bash
 # 声明确切版本号安装
-bun add @flowy-agent-store/sdk@0.1.0-beta.7
-bun add @flowy-agent-store/protocol@0.1.0-beta.7
+npm install @flowy-agent-store/sdk@0.1.0-beta.7
+npm install @flowy-agent-store/protocol@0.1.0-beta.7
 
 # 使用 npm / pnpm
 npm install @flowy-agent-store/sdk@0.1.0-beta.7
 ```
 
-确保 `package.json` 中移除了 `^` 或 `~` 等范围前缀，并将生成的 Lockfile（`bun.lock`、`package-lock.json` 或 `pnpm-lock.yaml`）提交至代码版本控制系统。
+确保 `package.json` 中移除了 `^` 或 `~` 等范围前缀，并将生成的 Lockfile（`pnpm-lock.yaml`、`package-lock.json` 或 `yarn.lock`）提交至代码版本控制系统。
 
 ## 6. 逐版本升级步骤
 
@@ -93,14 +93,14 @@ npm install @flowy-agent-store/sdk@0.1.0-beta.7
 
 ```bash
 # 1) 查看当前安装版本
-bun pm ls | grep '@flowy-agent-store'
+npm ls | grep '@flowy-agent-store'
 # 2) 安装目标固定版本
-bun add @flowy-agent-store/sdk@0.1.0-beta.3
-bun add @flowy-agent-store/protocol@0.1.0-beta.3
+npm install @flowy-agent-store/sdk@0.1.0-beta.3
+npm install @flowy-agent-store/protocol@0.1.0-beta.3
 # 3) 校验解析结果
 node -p "require('@flowy-agent-store/sdk/package.json').version"
 # 4) 执行类型检查与单测
-bun run typecheck && bun run test
+pnpm run typecheck && pnpm run test
 ```
 
 若通过 `AGENT_STORE_BIN` 引用自定义二进制，需确保二进制版本与 SDK 同步更新以满足握手校验。
@@ -110,8 +110,8 @@ bun run typecheck && bun run test
 从未打标的 `0.1.0` 迁移至标准预发布版本：
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.7
-bun pm ls | grep '@flowy-agent-store'
+npm install @flowy-agent-store/sdk@0.1.0-beta.7
+npm ls | grep '@flowy-agent-store'
 ```
 
 ### 6.3 从 0.1.0-beta.3 升到 0.1.0-beta.4
@@ -119,9 +119,9 @@ bun pm ls | grep '@flowy-agent-store'
 此版本引入破坏性变更：
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.4
-bun add @flowy-agent-store/protocol@0.1.0-beta.4
-bun run typecheck && bun run test
+npm install @flowy-agent-store/sdk@0.1.0-beta.4
+npm install @flowy-agent-store/protocol@0.1.0-beta.4
+pnpm run typecheck && pnpm run test
 ```
 
 核心适配项：
@@ -131,9 +131,9 @@ bun run typecheck && bun run test
 ### 6.4 从 0.1.0-beta.4 升到 0.1.0-beta.5
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.5
-bun add @flowy-agent-store/protocol@0.1.0-beta.5
-bun run typecheck && bun run test
+npm install @flowy-agent-store/sdk@0.1.0-beta.5
+npm install @flowy-agent-store/protocol@0.1.0-beta.5
+pnpm run typecheck && pnpm run test
 ```
 
 - **协议指纹变更**：指纹升级为 `fp-7`，需同批升级二进制运行时。
@@ -144,9 +144,9 @@ bun run typecheck && bun run test
 此版本调整了 SDK 编程接口：
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.6
-bun add @flowy-agent-store/protocol@0.1.0-beta.6
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.6
+npm install @flowy-agent-store/protocol@0.1.0-beta.6
+pnpm run typecheck
 ```
 
 代码迁移对照：
@@ -170,9 +170,9 @@ harness.handshake.protocol_version;
 ### 6.6 从 0.1.0-beta.6 升到 0.1.0-beta.7
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.7
-bun add @flowy-agent-store/protocol@0.1.0-beta.7
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.7
+npm install @flowy-agent-store/protocol@0.1.0-beta.7
+pnpm run typecheck
 ```
 
 - 协议指纹递增至 `fp-8`，客户端与运行时需保持版本对齐；
@@ -181,9 +181,9 @@ bun run typecheck
 ### 6.7 从 0.1.0-beta.7 升到 0.1.0-beta.8
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.8
-bun add @flowy-agent-store/protocol@0.1.0-beta.8
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.8
+npm install @flowy-agent-store/protocol@0.1.0-beta.8
+pnpm run typecheck
 ```
 
 - **协议指纹由 `fp-11` 递增到 `fp-12`**（叠加本次跨过的 `fp-9` 至 `fp-11`），握手执行严格全等校验：**客户端与运行时必须同批升级**，只升一边会直接连不上；
@@ -194,13 +194,13 @@ bun run typecheck
 ### 6.8 从 0.1.0-beta.8 升到 0.1.0-beta.9
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.9
-bun add @flowy-agent-store/protocol@0.1.0-beta.9
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.9
+npm install @flowy-agent-store/protocol@0.1.0-beta.9
+pnpm run typecheck
 ```
 
 - **协议指纹由 `fp-12` 递增到 `fp-13`**，握手执行严格全等校验：**客户端与运行时必须同批升级**，只升一边会直接连不上；
-- 本次**没有 TypeScript 签名破坏**：新增的 `getMarketSettings()` / `setMarketSettings()` 与 `SpawnOptions.marketDownload` / `configPath` 都是加法，`bun run typecheck` 应当照旧通过；
+- 本次**没有 TypeScript 签名破坏**：新增的 `getMarketSettings()` / `setMarketSettings()` 与 `SpawnOptions.marketDownload` / `configPath` 都是加法，`pnpm run typecheck` 应当照旧通过；
 - 新增两个 HTTP 映射方法 `market/settings` / `market/settings-set`（`GET` / `POST /api/app-server/market-settings`），协议方法总数 80、HTTP 路由映射数 55；
 - **`exportTeam()` 的输出变了**（协议与类型形态未变）：团队的 `pack.skills` 不再恒为空，它现在是该团队包级声明且已安装的技能；若你此前自行遍历 `pack.team.members[].skills` 来收集团队技能，那段代码可以删掉，直接读 `result.writtenSkills`（用法见 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §5.2）；
 - 若你希望宿主启动时不自动下载市场源，可用 `download_on_start = false` 或 `AGENT_STORE_MARKET_DOWNLOAD=none`；自动升级的条目类型与扫掠周期可在运行期经 `market/settings-set` 改写（配置写法见 [配置参考](/zh-CN/docs/configuration)）。
@@ -208,13 +208,13 @@ bun run typecheck
 ### 6.9 从 0.1.0-beta.9 升到 0.1.0-beta.10
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.10
-bun add @flowy-agent-store/protocol@0.1.0-beta.10
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.10
+npm install @flowy-agent-store/protocol@0.1.0-beta.10
+pnpm run typecheck
 ```
 
 - **协议指纹由 `fp-13` 递增到 `fp-14`**，握手执行严格全等校验：**客户端与运行时必须同批升级**，只升一边会直接连不上；
-- **没有 TypeScript 签名破坏**：`ExpertPack.assets` / `ExpertPack.avatar`、`ExpertAssetRef`、`client.listImportAssets()` / `client.readImportAsset()`、`ExportResult.writtenAssets`、能力位 `snapshot_assets` 全部是**加法**，`bun run typecheck` 应当照旧通过；
+- **没有 TypeScript 签名破坏**：`ExpertPack.assets` / `ExpertPack.avatar`、`ExpertAssetRef`、`client.listImportAssets()` / `client.readImportAsset()`、`ExportResult.writtenAssets`、能力位 `snapshot_assets` 全部是**加法**，`pnpm run typecheck` 应当照旧通过；
 - 新增两个 **WebSocket-only** 方法 `import/assets` / `import/asset`，协议方法总数 82、HTTP 路由映射数保持 55；
 - **`exportTeam()` / `exportAgent()` 的输出目录变多了**（不删任何东西）：插件级 `avatars/`、`bin/`、`scripts/` 会按快照相对路径落盘（`result.writtenAssets`），物化目录成为完整的插件根——若你的消费逻辑此前假设目录里只有 `expert-pack.json` / `persona.md` / `members/` / `skills/`，需要确认新增目录不会干扰它；
 - **可执行内容的边界**：`kind: "script"` 是类别标注不是许可——宿主自己从不执行插件级脚本，字节按 0644 交付；不想让包声明这一类的运营者，在 `config.toml` 加 `[expert_export] scripts = false` 即可（头像不受影响）；
@@ -223,13 +223,13 @@ bun run typecheck
 ### 6.10 从 0.1.0-beta.10 升到 0.1.0-beta.11
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.11
-bun add @flowy-agent-store/protocol@0.1.0-beta.11
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.11
+npm install @flowy-agent-store/protocol@0.1.0-beta.11
+pnpm run typecheck
 ```
 
 - **协议指纹由 `fp-14` 递增到 `fp-16`**（一次发布跨过 `fp-15`），握手执行严格全等校验：**客户端与运行时必须同批升级**，只升一边会直接连不上；
-- **没有 TypeScript 签名破坏**：新字段全部是**可选**加法——`StoreItem.category_id` / `.category`、`AgentSummary.tags` / `.category_id`、`TeamSummary.tags` / `.category_id`、`SkillSummary.tags`、`ExpertPack.tags` / `.category_id`、`StoreCategories`、`client.listStoreCategories()` / `client.store.categories()`，`bun run typecheck` 应当照旧通过；
+- **没有 TypeScript 签名破坏**：新字段全部是**可选**加法——`StoreItem.category_id` / `.category`、`AgentSummary.tags` / `.category_id`、`TeamSummary.tags` / `.category_id`、`SkillSummary.tags`、`ExpertPack.tags` / `.category_id`、`StoreCategories`、`client.listStoreCategories()` / `client.store.categories()`，`pnpm run typecheck` 应当照旧通过；
 - **有一处字段搬家**：`AgentDetail` 的 `tags` / `category_id` 上移到 `AgentSummary`（扁平 JSON 无法让同一个键在 summary 与 detail 各出现一次）。`AgentDetail` 继承 `AgentSummary`，读 `detail.tags` 的代码照旧可用；若你的代码里手写了 `AgentDetail` 对象字面量去喂断言或 mock，需要把这两个键挪到 summary 那一层；
 - 新增 `store/categories`（HTTP `GET /api/app-server/store/categories`），协议方法总数 83、HTTP 路由映射数 56；它返回所有**已启用**市场的分类字典与市场级标签词表（`marketplace_tags`，按位配对的双语数组），冷启动即完整；
 - **新字段的读取口径**：`category` 是宿主用字典解析出来的名字，**id 未命中字典时就缺席**（宿主不猜）；技能的 `tags` 来自市场索引行并在导入时固化，市场事后改标签需要升级该条目才生效；连接器条目**没有标签来源**，其标签恒为缺席。请把这几处都按「有就读、没有就退化成原始 id」写，`item.tags ?? []` 是安全默认；
@@ -238,13 +238,13 @@ bun run typecheck
 ### 6.11 从 0.1.0-beta.11 升到 0.1.0-beta.12
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.12
-bun add @flowy-agent-store/protocol@0.1.0-beta.12
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.12
+npm install @flowy-agent-store/protocol@0.1.0-beta.12
+pnpm run typecheck
 ```
 
 - **协议指纹由 `fp-16` 递增到 `fp-18`**（一次发布跨过 `fp-17`），握手仍是严格全等校验：**客户端与运行时必须同批升级**，只升一边连不上；
-- **一处真正的破坏性改名**：`ConnectorSummary.auth_mode` → **`auth_transport`**（`fp-17`），取值仍是 `none` / `oauth`，旧字段**直接消失、没有过渡双写**。语义同时收窄：它只适合展示「凭据怎么送出去」，**「是否显示授权按钮」必须改看 `credential.mode` + `credential.status`**，不再从 transport 形状反推。`bun run typecheck` 会把读旧字段名的地方直接报出来（详见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §3.3）；
+- **一处真正的破坏性改名**：`ConnectorSummary.auth_mode` → **`auth_transport`**（`fp-17`），取值仍是 `none` / `oauth`，旧字段**直接消失、没有过渡双写**。语义同时收窄：它只适合展示「凭据怎么送出去」，**「是否显示授权按钮」必须改看 `credential.mode` + `credential.status`**，不再从 transport 形状反推。`pnpm run typecheck` 会把读旧字段名的地方直接报出来（详见 [TypeScript SDK 接口参考](/zh-CN/docs/typescript-sdk) §3.3）；
 - **展示字段是纯加法（`fp-18`）**：`AgentSummary` / `TeamSummary` / `SkillSummary` / `ConnectorSummary` 各带 `display_name` / `display_description` / `tags` / `quick_prompts` 四个**可选**字段，取值在条目导入期按「作者声明 → 市场索引行」逐语种合并后固化，读面不产生额外请求。**每一侧都独立可选，缺席就是缺席**：`display_name?.zh ?? display_name?.en ?? name` 是约定写法，不要假设四个字段必然存在（技能市场 268 条里只有 15 条声明中文名）；
 - **一处字段搬家**：`AgentDetail` 的 `display_description` / `quick_prompts` 上移到 `AgentSummary`（与上一版 `tags` / `category_id` 同型）。`AgentDetail` 继承 `AgentSummary`，读 `detail.display_description` 照旧可用；手写 `AgentDetail` 字面量喂 mock 的代码需要把这两个键挪到 summary 那一层；
 - **老快照不会自己长出新字段**：`fp-18` 之前安装的条目，宿主升级后仍没有这四个键，需要 `store.update()` 或重装该条目才生成新快照——所以必须按可选字段读；
@@ -255,11 +255,11 @@ bun run typecheck
 
 ```bash
 # 查看项目实际解析到的版本
-bun pm ls | grep '@flowy-agent-store'
+npm ls | grep '@flowy-agent-store'
 # 读取已安装模块 package.json
 node -p "require('@flowy-agent-store/protocol/package.json').version"
 # 校验 Lockfile 锁定记录
-grep -o '@flowy-agent-store/sdk@[0-9][^"]*' bun.lock | head -1
+grep -o '@flowy-agent-store/sdk@[0-9][^"]*' pnpm-lock.yaml | head -1
 # 查看远程仓库标签状态
 npm view @flowy-agent-store/sdk versions dist-tags --json
 ```

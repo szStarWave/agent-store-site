@@ -21,7 +21,7 @@
 
 URL 结构的向下兼容是本次迁移的基础约束：
 
-- **上游绝对路径站内链硬性约束**：`content/docs/{zh-CN,en-US}/` 源自上游 `Michael-Lfx/allo` 仓库同步，文档正文硬编码了 70 处 `/zh-CN/docs/x` 与 70 处 `/en-US/docs/x` 绝对链接（例如 `configuration.md` 中的 `[升级与迁移指引](/zh-CN/docs/upgrade)`）。此类文件作为跨仓同步产物与 `bun run check:docs-sync` 门禁输入，严禁为适应站点框架调整内部路径。
+- **上游绝对路径站内链硬性约束**：`content/docs/{zh-CN,en-US}/` 源自上游 `Michael-Lfx/allo` 仓库同步，文档正文硬编码了 70 处 `/zh-CN/docs/x` 与 70 处 `/en-US/docs/x` 绝对链接（例如 `configuration.md` 中的 `[升级与迁移指引](/zh-CN/docs/upgrade)`）。此类文件作为跨仓同步产物与 `pnpm run check:docs-sync` 门禁输入，严禁为适应站点框架调整内部路径。
 - **路由无缝平移矩阵**：
   ```
   /                      /zh-CN                  /en-US

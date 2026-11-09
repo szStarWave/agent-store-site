@@ -20,10 +20,10 @@ For comprehensive end-to-end integration examples, refer to the companion [TypeS
 
 ```bash
 # Standard workflow: install the unified SDK package (bundles client and process management)
-bun add @flowy-agent-store/sdk # or npm install @flowy-agent-store/sdk
+npm install @flowy-agent-store/sdk # or pnpm add @flowy-agent-store/sdk
 
 # Consume protocol types standalone
-bun add @flowy-agent-store/protocol
+npm install @flowy-agent-store/protocol
 ```
 
 All packages distribute standard dual ESM and CommonJS bundles, exposing TypeScript type declarations through `package.json` `exports`.

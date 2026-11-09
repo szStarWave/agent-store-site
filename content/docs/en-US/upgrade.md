@@ -64,9 +64,9 @@ Key considerations:
 Unspecified installation targets resolve against `latest`; ambiguous version ranges (such as `^0.1.0-beta.2`) resolve inconsistently across package managers.
 
 ```bash
-bun add @flowy-agent-store/sdk                     # → 0.1.0-beta.2 (latest)
-bun add @flowy-agent-store/sdk@beta                # → 0.1.0-beta.11
-bun add '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → resolves 0.1.0-beta.2
+npm install @flowy-agent-store/sdk                     # → 0.1.0-beta.2 (latest)
+npm install @flowy-agent-store/sdk@beta                # → 0.1.0-beta.11
+npm install '@flowy-agent-store/sdk@^0.1.0-beta.2'     # → resolves 0.1.0-beta.2
 npm view '@flowy-agent-store/sdk@^0.1.0-beta.2' version   # → resolves 0.1.0
 ```
 
@@ -76,14 +76,14 @@ Policy: **Production dependencies must declare exact package versions** rather t
 
 ```bash
 # Pin exact package versions
-bun add @flowy-agent-store/sdk@0.1.0-beta.7
-bun add @flowy-agent-store/protocol@0.1.0-beta.7
+npm install @flowy-agent-store/sdk@0.1.0-beta.7
+npm install @flowy-agent-store/protocol@0.1.0-beta.7
 
 # Using npm / pnpm
 npm install @flowy-agent-store/sdk@0.1.0-beta.7
 ```
 
-Ensure `package.json` entries omit `^` or `~` prefixes, and commit generated lockfiles (`bun.lock`, `package-lock.json`, or `pnpm-lock.yaml`) to version control.
+Ensure `package.json` entries omit `^` or `~` prefixes, and commit generated lockfiles (`pnpm-lock.yaml`, `package-lock.json`, or `yarn.lock`) to version control.
 
 ## 6. Per-version upgrade steps
 
@@ -93,14 +93,14 @@ Additive release requiring no code changes:
 
 ```bash
 # 1) Inspect installed packages
-bun pm ls | grep '@flowy-agent-store'
+npm ls | grep '@flowy-agent-store'
 # 2) Pin target version
-bun add @flowy-agent-store/sdk@0.1.0-beta.3
-bun add @flowy-agent-store/protocol@0.1.0-beta.3
+npm install @flowy-agent-store/sdk@0.1.0-beta.3
+npm install @flowy-agent-store/protocol@0.1.0-beta.3
 # 3) Verify resolved revision
 node -p "require('@flowy-agent-store/sdk/package.json').version"
 # 4) Run typecheck and test suite
-bun run typecheck && bun run test
+pnpm run typecheck && pnpm run test
 ```
 
 Update custom binaries referenced via `AGENT_STORE_BIN` concurrently to maintain handshake compatibility.
@@ -110,8 +110,8 @@ Update custom binaries referenced via `AGENT_STORE_BIN` concurrently to maintain
 Migrate untagged `0.1.0` installations to the active beta branch:
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.7
-bun pm ls | grep '@flowy-agent-store'
+npm install @flowy-agent-store/sdk@0.1.0-beta.7
+npm ls | grep '@flowy-agent-store'
 ```
 
 ### 6.3 From 0.1.0-beta.3 to 0.1.0-beta.4
@@ -119,9 +119,9 @@ bun pm ls | grep '@flowy-agent-store'
 Introduces breaking changes:
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.4
-bun add @flowy-agent-store/protocol@0.1.0-beta.4
-bun run typecheck && bun run test
+npm install @flowy-agent-store/sdk@0.1.0-beta.4
+npm install @flowy-agent-store/protocol@0.1.0-beta.4
+pnpm run typecheck && pnpm run test
 ```
 
 Migration requirements:
@@ -131,9 +131,9 @@ Migration requirements:
 ### 6.4 From 0.1.0-beta.4 to 0.1.0-beta.5
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.5
-bun add @flowy-agent-store/protocol@0.1.0-beta.5
-bun run typecheck && bun run test
+npm install @flowy-agent-store/sdk@0.1.0-beta.5
+npm install @flowy-agent-store/protocol@0.1.0-beta.5
+pnpm run typecheck && pnpm run test
 ```
 
 - **Protocol Fingerprint**: Incremented to `fp-7`; requires binary updates.
@@ -144,9 +144,9 @@ bun run typecheck && bun run test
 Refactors SDK interface contracts:
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.6
-bun add @flowy-agent-store/protocol@0.1.0-beta.6
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.6
+npm install @flowy-agent-store/protocol@0.1.0-beta.6
+pnpm run typecheck
 ```
 
 Code migration mapping:
@@ -170,9 +170,9 @@ harness.handshake.protocol_version;
 ### 6.6 From 0.1.0-beta.6 to 0.1.0-beta.7
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.7
-bun add @flowy-agent-store/protocol@0.1.0-beta.7
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.7
+npm install @flowy-agent-store/protocol@0.1.0-beta.7
+pnpm run typecheck
 ```
 
 - Protocol fingerprint advances to `fp-8`; host and client must align;
@@ -181,9 +181,9 @@ bun run typecheck
 ### 6.7 From 0.1.0-beta.7 to 0.1.0-beta.8
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.8
-bun add @flowy-agent-store/protocol@0.1.0-beta.8
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.8
+npm install @flowy-agent-store/protocol@0.1.0-beta.8
+pnpm run typecheck
 ```
 
 - The protocol fingerprint advances to `fp-12` (this release crosses `fp-9` through `fp-11` as well) and the handshake enforces strict equality: **host and client must be upgraded together** — one side alone cannot connect;
@@ -194,13 +194,13 @@ bun run typecheck
 ### 6.8 From 0.1.0-beta.8 to 0.1.0-beta.9
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.9
-bun add @flowy-agent-store/protocol@0.1.0-beta.9
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.9
+npm install @flowy-agent-store/protocol@0.1.0-beta.9
+pnpm run typecheck
 ```
 
 - The protocol fingerprint advances to `fp-13` and the handshake enforces strict equality: **host and client must be upgraded together** — one side alone cannot connect;
-- **No TypeScript signature breaks this time**: `getMarketSettings()` / `setMarketSettings()` and `SpawnOptions.marketDownload` / `configPath` are all additive, so `bun run typecheck` should pass unchanged;
+- **No TypeScript signature breaks this time**: `getMarketSettings()` / `setMarketSettings()` and `SpawnOptions.marketDownload` / `configPath` are all additive, so `pnpm run typecheck` should pass unchanged;
 - Adds two HTTP mapped methods, `market/settings` / `market/settings-set` (`GET` / `POST /api/app-server/market-settings`), bringing total methods to 80 and HTTP mapped routes to 55;
 - **`exportTeam()` output changed** (no wire or type shape change): a team's `pack.skills` is no longer always empty — it now holds the skills that team declares at the package level and actually installed. If you previously walked `pack.team.members[].skills` yourself to collect a team's skills, that code can go away; read `result.writtenSkills` instead (usage in the [TypeScript SDK cookbook](/en-US/docs/examples-sdk) §5.2);
 - If you want the host to stop downloading market sources at boot, use `download_on_start = false` or `AGENT_STORE_MARKET_DOWNLOAD=none`; the upgradable entry kinds and the sweep cadence can be changed while the host runs through `market/settings-set` (see the [configuration reference](/en-US/docs/configuration)).
@@ -208,13 +208,13 @@ bun run typecheck
 ### 6.9 From 0.1.0-beta.9 to 0.1.0-beta.10
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.10
-bun add @flowy-agent-store/protocol@0.1.0-beta.10
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.10
+npm install @flowy-agent-store/protocol@0.1.0-beta.10
+pnpm run typecheck
 ```
 
 - The protocol fingerprint advances to `fp-14` and the handshake enforces strict equality: **host and client must be upgraded together** — one side alone cannot connect;
-- **No TypeScript signature breaks this time**: `ExpertPack.assets` / `ExpertPack.avatar`, `ExpertAssetRef`, `client.listImportAssets()` / `client.readImportAsset()`, `ExportResult.writtenAssets` and the `snapshot_assets` capability are all **additive**, so `bun run typecheck` should pass unchanged;
+- **No TypeScript signature breaks this time**: `ExpertPack.assets` / `ExpertPack.avatar`, `ExpertAssetRef`, `client.listImportAssets()` / `client.readImportAsset()`, `ExportResult.writtenAssets` and the `snapshot_assets` capability are all **additive**, so `pnpm run typecheck` should pass unchanged;
 - Adds two **WebSocket-only** methods, `import/assets` / `import/asset`, bringing total methods to 82 and HTTP mapped routes stay at 55;
 - **`exportTeam()` / `exportAgent()` write more into the target directory** (nothing is removed): the package-level `avatars/`, `bin/` and `scripts/` land at their snapshot-relative paths (`result.writtenAssets`) and the materialized directory becomes a complete plugin root — if your consumer assumed the directory holds only `expert-pack.json` / `persona.md` / `members/` / `skills/`, check that the new directories do not interfere;
 - **Executable content boundary**: `kind: "script"` is a class label, not a permission — the host itself never executes plugin-level scripts and the bytes land 0644; an operator who does not want the pack to declare the class adds `[expert_export] scripts = false` to `config.toml` (avatars unaffected);
@@ -223,13 +223,13 @@ bun run typecheck
 ### 6.10 From 0.1.0-beta.10 to 0.1.0-beta.11
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.11
-bun add @flowy-agent-store/protocol@0.1.0-beta.11
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.11
+npm install @flowy-agent-store/protocol@0.1.0-beta.11
+pnpm run typecheck
 ```
 
 - The protocol fingerprint advances from `fp-14` to `fp-16` (one release spanning `fp-15`) and the handshake enforces strict equality: **host and client must be upgraded together** — one side alone cannot connect;
-- **No TypeScript signature breaks**: every new field is an **optional** addition — `StoreItem.category_id` / `.category`, `AgentSummary.tags` / `.category_id`, `TeamSummary.tags` / `.category_id`, `SkillSummary.tags`, `ExpertPack.tags` / `.category_id`, `StoreCategories`, and `client.listStoreCategories()` / `client.store.categories()` — so `bun run typecheck` should pass unchanged;
+- **No TypeScript signature breaks**: every new field is an **optional** addition — `StoreItem.category_id` / `.category`, `AgentSummary.tags` / `.category_id`, `TeamSummary.tags` / `.category_id`, `SkillSummary.tags`, `ExpertPack.tags` / `.category_id`, `StoreCategories`, and `client.listStoreCategories()` / `client.store.categories()` — so `pnpm run typecheck` should pass unchanged;
 - **One field relocation**: `AgentDetail`'s `tags` / `category_id` move up to `AgentSummary` (flattened JSON cannot carry the same key in both summary and detail). `AgentDetail` extends `AgentSummary`, so code reading `detail.tags` keeps working; if you hand-write `AgentDetail` object literals to feed assertions or mocks, move those two keys up into the summary level;
 - Adds `store/categories` (HTTP `GET /api/app-server/store/categories`), bringing total methods to 83 and HTTP mapped routes to 56; it returns every **enabled** market's category dictionary plus the market-level tag vocabulary (`marketplace_tags`, a position-paired localized array), complete even on a cold start;
 - **How to read the new fields**: `category` is the name the host resolved through the dictionary and is **absent when the id misses it** (the host never guesses); a skill's `tags` come from the market index row and are frozen at import time, so a later market edit to them requires upgrading that entry; connector entries **have no tag source**, so their tags are always absent. Write all of these as "read it when present, degrade to the raw id when not" — `item.tags ?? []` is the safe default;
@@ -238,13 +238,13 @@ bun run typecheck
 ### 6.11 From 0.1.0-beta.11 to 0.1.0-beta.12
 
 ```bash
-bun add @flowy-agent-store/sdk@0.1.0-beta.12
-bun add @flowy-agent-store/protocol@0.1.0-beta.12
-bun run typecheck
+npm install @flowy-agent-store/sdk@0.1.0-beta.12
+npm install @flowy-agent-store/protocol@0.1.0-beta.12
+pnpm run typecheck
 ```
 
 - **The protocol fingerprint goes from `fp-16` to `fp-18`** (one release skips `fp-17`), and the handshake still checks strict equality: **the client and the runtime must upgrade together**, upgrading only one side cannot connect;
-- **One genuinely breaking rename**: `ConnectorSummary.auth_mode` → **`auth_transport`** (`fp-17`), still typed `none` / `oauth`, and the old field is **gone without a transition period**. Its meaning also narrows: it is only good for showing *how credentials travel*; **whether to show the authorize affordance must now come from `credential.mode` + `credential.status`**, no longer inferred from the transport's shape. `bun run typecheck` will point at every read of the old name (see [TypeScript SDK reference](/en-US/docs/typescript-sdk) §3.3);
+- **One genuinely breaking rename**: `ConnectorSummary.auth_mode` → **`auth_transport`** (`fp-17`), still typed `none` / `oauth`, and the old field is **gone without a transition period**. Its meaning also narrows: it is only good for showing *how credentials travel*; **whether to show the authorize affordance must now come from `credential.mode` + `credential.status`**, no longer inferred from the transport's shape. `pnpm run typecheck` will point at every read of the old name (see [TypeScript SDK reference](/en-US/docs/typescript-sdk) §3.3);
 - **The display fields are pure additions (`fp-18`)**: `AgentSummary` / `TeamSummary` / `SkillSummary` / `ConnectorSummary` each carry `display_name` / `display_description` / `tags` / `quick_prompts`, all **optional**, merged per locale at import time from the author's declaration and the market index row, so reading them issues no extra request. **Each side is independently optional and absent means absent**: `display_name?.zh ?? display_name?.en ?? name` is the contract; never assume all four are present (only 15 of the skill market's 268 entries declare a Chinese name);
 - **One field move**: `AgentDetail`'s `display_description` / `quick_prompts` move up to `AgentSummary` (same shape as last release's `tags` / `category_id`). `AgentDetail` extends `AgentSummary`, so `detail.display_description` still works; code that hand-writes an `AgentDetail` literal for mocks must move those two keys up one level;
 - **Old snapshots never grow the new fields**: entries installed before `fp-18` still lack the four keys after the host upgrade; `store.update()` or a reinstall is what produces a new snapshot — which is why they must be read as optional;
@@ -255,11 +255,11 @@ bun run typecheck
 
 ```bash
 # Verify project-level resolved versions
-bun pm ls | grep '@flowy-agent-store'
+npm ls | grep '@flowy-agent-store'
 # Read installed package manifests
 node -p "require('@flowy-agent-store/protocol/package.json').version"
 # Verify lockfile records
-grep -o '@flowy-agent-store/sdk@[0-9][^"]*' bun.lock | head -1
+grep -o '@flowy-agent-store/sdk@[0-9][^"]*' pnpm-lock.yaml | head -1
 # Check remote tag pointers
 npm view @flowy-agent-store/sdk versions dist-tags --json
 ```

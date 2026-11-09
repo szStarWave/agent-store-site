@@ -73,8 +73,17 @@ export async function writeZipFile(zipPath, entries, { mtime, level = 6 } = {}) 
   if (entries.length > 0xffff) {
     throw new Error(`zip 条目数 ${entries.length} 超过 65535，需要 ZIP64（本库刻意不支持）`);
   }
+  // 在打开文件之前做纯输入校验：抛错时不留半成品句柄，也不会触发
+  // createWriteStream 的惰性 open 与测试的临时目录清理竞态。
+  for (const entry of entries) {
+    if (Buffer.from(entry.name, "utf8").includes(0x5c)) {
+      throw new Error(`条目名含反斜杠，应为 POSIX 相对路径：${entry.name}`);
+    }
+  }
 
   const out = createWriteStream(zipPath);
+  // 没有监听者的 'error' 事件会变成 uncaught exception（如目标目录已被调用方清理）。
+  out.on("error", () => {});
   const central = [];
   let offset = 0;
 
@@ -85,7 +94,6 @@ export async function writeZipFile(zipPath, entries, { mtime, level = 6 } = {}) 
 
   for (const entry of entries) {
     const name = Buffer.from(entry.name, "utf8");
-    if (name.includes(0x5c)) throw new Error(`条目名含反斜杠，应为 POSIX 相对路径：${entry.name}`);
     const { data, crc, usize } = await deflateFile(entry.path, level);
     if (offset + 30 + name.length + data.length > 0xffffffff) {
       throw new Error("zip 偏移越过 4 GiB，需要 ZIP64（本库刻意不支持）");

@@ -14,7 +14,7 @@
 
 ```bash
 # 安装 SDK 统一封装包（依赖 Node.js ≥ 22 或 Bun）
-bun add @flowy-agent-store/sdk # 或 npm install @flowy-agent-store/sdk
+npm install @flowy-agent-store/sdk # 或 pnpm add @flowy-agent-store/sdk
 ```
 
 ```ts

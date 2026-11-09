@@ -257,7 +257,7 @@ avatars/expert.png → avatars/avatar.png → avatar.png → icon.png
 $env:MARKET_SRC_EXPERTS    = "<完整专家市场工作目录>"
 $env:MARKET_SRC_SKILLS     = "<仓库>/market-source/skills"
 $env:MARKET_SRC_CONNECTORS = "<仓库>/market-source/connectors"
-bun run sync:tree -- --dry-run
+pnpm run sync:tree -- --dry-run
 ```
 
 预期形态（方案 A）：`experts` 的 `+added` 约 15（carousel 5 个 + ux-architect 10 个文件；
@@ -277,9 +277,9 @@ bun run sync:tree -- --dry-run
 预检通过后才允许执行（沿用 §5.2 的三个 `MARKET_SRC_*`）：
 
 ```powershell
-bun run sync
-bun run check:market
-bun run build
+pnpm run sync
+pnpm run check:market
+pnpm run build
 ```
 
 > `sync` 会按同一份来源重写三个 `_files.txt`。skills / connectors 的自镜像只会产生
@@ -324,7 +324,7 @@ content/market.json
 
 **CRLF（2026-09-17 复核：已不适用）。** 当时 Windows 工作区的 `market-source/*/_files.txt`
 为 CRLF，而 `check-market.mjs` 按 `\n` 切分未去 `\r`，会把清单误报为全量缺失和多余。
-2026-09-17 复核：仓库里三份清单都是 LF，`bun run check:market` 全绿；`sync:tree` 重写清单
+2026-09-17 复核：仓库里三份清单都是 LF，`pnpm run check:market` 全绿；`sync:tree` 重写清单
 时统一写 `\n`。若某台机器检出后又看到「全量缺失 + 全量多余」这种对称报错，先确认清单行尾，
 不要按「树坏了」处理。
 
@@ -366,10 +366,10 @@ content/market.json
 | 步骤 | 命令 | 结果 |
 | --- | --- | --- |
 | 只读预检 | `sync:tree -- --dry-run`（experts=副本，另两市场自镜像） | `experts +125 -0 ~1`，skills/connectors `+0 -0 ~0` |
-| 同步 | `bun run sync` | 两产物成对更新；基线 `experts=16 skills=268 connectors=228 avatars=352` |
-| 门禁 | `bun run check:market` | 0 findings，退出码 0 |
+| 同步 | `pnpm run sync` | 两产物成对更新；基线 `experts=16 skills=268 connectors=228 avatars=352` |
+| 门禁 | `pnpm run check:market` | 0 findings，退出码 0 |
 | 幂等 | `sync:tree -- --dry-run` 复跑 | `+0 -0 ~0` |
-| 构建 | `bun run build` | 退出码 0；`build/client/source/experts/` 含 1115 个文件；三张新卡片的中英文名均出现在 `/zh-CN/market`、`/en-US/market` 的预渲染 HTML 中 |
+| 构建 | `pnpm run build` | 退出码 0；`build/client/source/experts/` 含 1115 个文件；三张新卡片的中英文名均出现在 `/zh-CN/market`、`/en-US/market` 的预渲染 HTML 中 |
 
 提交：市场产物与文档分成两笔（见 §5.4），推送 `feat/market-add-local-experts`；合并 `main`
 后由 EdgeOne Makers 触发上线。
@@ -548,8 +548,8 @@ agent 378 个；目录 agent 375 个，**未收 1 个**（见 §10.4）。
    头像/README 状态符合分档记录、无 `.DS_Store`/`.git`/`node_modules`。
 3. 预检：`MARKET_SRC_EXPERTS=<副本>`，`MARKET_SRC_SKILLS/CONNECTORS` 指回仓库自镜像；
    期望 `experts` 的 `-removed=0`，另两个市场 `+0 -0 ~0`。
-4. `bun run sync` → `bun run check:market`（退出码 0）→ 幂等复检 `+0 -0 ~0`。
-5. `bun run build`；确认 `build/client/source/experts/` 含 20 个新包，且 `/zh-CN/market`、
+4. `pnpm run sync` → `pnpm run check:market`（退出码 0）→ 幂等复检 `+0 -0 ~0`。
+5. `pnpm run build`；确认 `build/client/source/experts/` 含 20 个新包，且 `/zh-CN/market`、
    `/en-US/market` 预渲染 HTML 出现 20 张新卡片的中英文名。
 6. 提交：市场产物一笔（`chore(market): …`）+ 文档/工具一笔；推送后按 §5.4 合并 `main`。
 

@@ -10,16 +10,16 @@ Flowy Agent Store 官网：**Docusaurus 3.10**（SSG）、React 19、TypeScript 
 
 | 命令 | 说明 |
 | --- | --- |
-| `bun run dev` | 开发服务器 → `http://127.0.0.1:5173`（`docusaurus start --host 127.0.0.1`）。启动报 safe-delete / trash 失败时，先 `$env:NODE_OPTIONS=""`。 |
-| `bun run build` | SSG → `build/`，并把市场树头像拷成 `build/source/`。直接跑 `docusaurus build` 会漏掉拷贝步骤，线上头像全部退化成字母徽标。 |
-| `bun run preview` | 本地托管 `build/`。它**刻意不做 SPA 兜底**，用来暴露上一条的漏拷贝。 |
-| `bun run check:docs-sync` | 双语文档结构门禁，改过 `content/docs/` 后必跑；`bun run test:docs-sync` 是它自身的测试。 |
-| `bun run sync` | 市场树同步（`sync:tree` + `sync:market`）。这是唯一允许写 `market-source/` 与 `content/market.json` 的入口，流程见 [市场维护](docs/market-maintenance.md)。 |
-| `bun run import:experts` | 从上游专家市场 bundle 批量获取专家到**站外副本**（`--slugs` / `--from-file` / `--dry-run` / `--archive` / `--allow-b`）。只写副本与存档，不碰生成物；用法见 [专家导入计划](docs/market-expert-import-plan.md) §9。 |
-| `bun run import:skills-index` | 用 WMC 的 1889 条技能索引重建 `market-source/skills/`（清单 + 128px 图标，无载荷）。图标压缩需 Python + Pillow，可用 `--icons copy` 复制原图。 |
-| `bun run import:index` | 用 WMC 的专家/连接器索引重建 `market-source/{experts,connectors}/`（清单 + 图标，无载荷；403 专家 / 476 连接器）。 |
-| `bun run check:market` | 市场门禁：查清单内重复登记，并核对 `market-source/` 与 `content/market.json` 是否一致（条目数、条目集合、头像文件是否存在、`_files.txt` 与树）。改过任一产物后必跑；`bun run test:market` 是它自身的测试。 |
-| `bun run check:release` | 发布门禁（站点半边）：`check:docs-sync` + `test:docs-sync` + `check:market` + `test:market` + `test:market-zips` + `typecheck`。发版时与源仓库的 `bun run release:check` 一起跑，流程见 [发布流程](docs/release-process.md)。 |
+| `pnpm run dev` | 开发服务器 → `http://127.0.0.1:5173`（`docusaurus start --host 127.0.0.1`）。启动报 safe-delete / trash 失败时，先 `$env:NODE_OPTIONS=""`。 |
+| `pnpm run build` | SSG → `build/`，并把市场树头像拷成 `build/source/`。直接跑 `docusaurus build` 会漏掉拷贝步骤，线上头像全部退化成字母徽标。 |
+| `pnpm run preview` | 本地托管 `build/`。它**刻意不做 SPA 兜底**，用来暴露上一条的漏拷贝。 |
+| `pnpm run check:docs-sync` | 双语文档结构门禁，改过 `content/docs/` 后必跑；`pnpm run test:docs-sync` 是它自身的测试。 |
+| `pnpm run sync` | 市场树同步（`sync:tree` + `sync:market`）。这是唯一允许写 `market-source/` 与 `content/market.json` 的入口，流程见 [市场维护](docs/market-maintenance.md)。 |
+| `pnpm run import:experts` | 从上游专家市场 bundle 批量获取专家到**站外副本**（`--slugs` / `--from-file` / `--dry-run` / `--archive` / `--allow-b`）。只写副本与存档，不碰生成物；用法见 [专家导入计划](docs/market-expert-import-plan.md) §9。 |
+| `pnpm run import:skills-index` | 用 WMC 的 1889 条技能索引重建 `market-source/skills/`（清单 + 128px 图标，无载荷）。图标压缩需 Python + Pillow，可用 `--icons copy` 复制原图。 |
+| `pnpm run import:index` | 用 WMC 的专家/连接器索引重建 `market-source/{experts,connectors}/`（清单 + 图标，无载荷；403 专家 / 476 连接器）。 |
+| `pnpm run check:market` | 市场门禁：查清单内重复登记，并核对 `market-source/` 与 `content/market.json` 是否一致（条目数、条目集合、头像文件是否存在、`_files.txt` 与树）。改过任一产物后必跑；`pnpm run test:market` 是它自身的测试。 |
+| `pnpm run check:release` | 发布门禁（站点半边）：`check:docs-sync` + `test:docs-sync` + `check:market` + `test:market` + `test:market-zips` + `typecheck`。发版时与源仓库的 `pnpm run release:check` 一起跑，流程见 [发布流程](docs/release-process.md)。 |
 
 提交信息用 Conventional Commits + 中文主题，沿用现有 scope：`feat(landing): …`、
 `chore(market): …`、`fix(dev): …`、`docs(market): …`。用户文档一律中文
@@ -30,20 +30,20 @@ Flowy Agent Store 官网：**Docusaurus 3.10**（SSG）、React 19、TypeScript 
 **生成物只由脚本写。** `market-source/` 是上游市场工作目录的 1:1 镜像，
 `content/market.json` 是目录页快照，两者都是生成物，手工编辑会被下次同步覆盖或剪除。
 它们是一次同步的两个产物，**必须成对提交**——只提交一个会让页面与树互相指向不存在的东西。
-市场条目的新增、修改、下架一律去上游做，不要在本仓库里改。`bun run check:market` 是这条
+市场条目的新增、修改、下架一律去上游做，不要在本仓库里改。`pnpm run check:market` 是这条
 约束的判据：同步门禁只看树内部，重复登记与两产物不一致都不在它的视野里。
 
 **三个市场都是索引型镜像。** `market-source/{experts,skills,connectors}/` 只保留清单与
 `icons/`（技能 1889 条 / 865 图标，专家 403 条 / 383 图标，连接器 476 条 / 460 图标），
 **没有** `plugins/<slug>/`、`skills/<slug>/`、`connectors/<slug>/` 载荷；完整载荷都在
 ModelScope 的 `wb-market/{experts,skills,connectors}/` 归档里。技能索引用
-`bun run import:skills-index` 生成；专家与连接器用 `bun run import:index` 生成。`sync:tree`
+`pnpm run import:skills-index` 生成；专家与连接器用 `pnpm run import:index` 生成。`sync:tree`
 会跳过索引型市场的默认源（避免被本地载荷树覆盖），`pack:market` 也会跳过它们（避免用
 只有索引的 zip 覆盖 ModelScope 上的完整归档）。
 
 **双语文档保持结构一致。** `content/docs/zh-CN/` 与 `en-US/` 各自要有同名页面。
 译文可以自由重写措辞，但标题层级、代码块数量与语言、表格列数、相对链接目标必须对齐，
-`bun run check:docs-sync` 就是这条约束的判据。新增一篇文档要同时建两份，并**在
+`pnpm run check:docs-sync` 就是这条约束的判据。新增一篇文档要同时建两份，并**在
 `src/lib/docOrder.ts` 登记**——`docusaurus.config.ts` 会在构建期核对两者是否一致，漏登记直接构建失败。
 
 **两套语言前缀是硬需求，不要启用 Docusaurus 的 i18n。** 文档正文里的站内链写死为

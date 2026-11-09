@@ -85,7 +85,7 @@ if (!existsSync(sourceRoot)) {
   process.exit(1);
 }
 if (!existsSync(clientRoot)) {
-  console.error("[copy-market-tree] build/ 不存在 —— 先跑 `bun run build`");
+  console.error("[copy-market-tree] build/ 不存在 —— 先跑 `pnpm run build`");
   process.exit(1);
 }
 
@@ -117,7 +117,7 @@ for (const market of MARKETS) {
       const src = path.join(from, rel);
       if (!existsSync(src)) {
         console.error(
-          `[copy-market-tree] ${market}: content/market.json 指向 ${rel}，树里却没有 —— 先跑 \`bun run check:market\``,
+          `[copy-market-tree] ${market}: content/market.json 指向 ${rel}，树里却没有 —— 先跑 \`pnpm run check:market\``,
         );
         process.exit(1);
       }
@@ -136,7 +136,7 @@ for (const market of MARKETS) {
   total += n;
   const listing = path.join(to, "_files.txt");
   if (!existsSync(listing)) {
-    console.error(`[copy-market-tree] ${market} has no _files.txt — run \`bun run sync:tree\``);
+    console.error(`[copy-market-tree] ${market} has no _files.txt — run \`pnpm run sync:tree\``);
     process.exit(1);
   }
   console.log(`[copy-market-tree] ${market.padEnd(11)} files=${n}`);

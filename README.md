@@ -12,7 +12,7 @@
   <a href="https://docusaurus.io/"><img src="https://img.shields.io/badge/Docusaurus-3.10-3ECC5F?logo=docusaurus" alt="Docusaurus 3.10" /></a>
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19-61DAFB?logo=react" alt="React 19" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.8+-3178C6?logo=typescript" alt="TypeScript" /></a>
-  <a href="https://bun.sh/"><img src="https://img.shields.io/badge/Bun-1.1+-fbf0df?logo=bun" alt="Bun" /></a>
+  <a href="https://pnpm.io/"><img src="https://img.shields.io/badge/pnpm-12-FF8A00?logo=pnpm" alt="pnpm" /></a>
   <a href="https://github.com/szStarWave/agent-store-site/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License" /></a>
   <img src="https://img.shields.io/badge/Protocol-fp--12-orange" alt="Protocol fp-12" />
 </p>
@@ -37,7 +37,7 @@
 ## 🛠️ 技术栈与核心特性
 
 - **静态站点生成（SSG）**：Docusaurus 3.10 驱动，预渲染全量 HTML 页面，无任何服务端运行时依赖；
-- **现代前端生态**：React 19 + TypeScript 5.8+ + Bun 包管理与脚本执行环境；
+- **现代前端生态**：React 19 + TypeScript 7 + pnpm 包管理与脚本执行环境；
 - **原生双语前缀架构**：采用「单 Locale + 双 Docs 插件实例」架构，严格保留 `/zh-CN/` 与 `/en-US/` 显式路由前缀，文档正文内部互链严格对称；
 - **极简原生 CSS 架构**：纯 CSS 变量（`tokens.css`）+ 站点组件样式（`style.css`）+ Docusaurus 外壳覆盖（`docusaurus-overrides.css`），不依赖任何 Tailwind / UnoCSS 编译流水线；
 - **历史锚点算法兼容**：内置 `src/remark/legacy-heading-ids.ts` 插件，确保已有外链和历史锚点（含复杂中文标点）永久有效；
@@ -48,7 +48,7 @@
 ## 🚀 快速开始
 
 ### 依赖环境
-- [Bun](https://bun.sh/) ≥ 1.1（推荐）或 Node.js ≥ 22
+- [pnpm](https://pnpm.io/) ≥ 12（`corepack enable` 即得）或 Node.js ≥ 22
 - Git
 
 ### 本地开发
@@ -59,10 +59,10 @@ git clone https://github.com/szStarWave/agent-store-site.git
 cd agent-store-site
 
 # 2. 安装项目依赖
-bun install
+pnpm install
 
 # 3. 启动本地开发服务器（默认端口 5173）
-bun run dev
+pnpm run dev
 ```
 
 浏览器访问 `http://127.0.0.1:5173` 即可实时预览全站页面与双语文档。
@@ -74,26 +74,26 @@ bun run dev
 
 ## 📋 常用命令清单
 
-项目提供了一组开箱即用的 NPM/Bun 脚本，覆盖本地研发、市场同步、静态打包与门禁校验全周期：
+项目提供了一组开箱即用的 pnpm 脚本，覆盖本地研发、市场同步、静态打包与门禁校验全周期：
 
 | 命令 | 类别 | 功能说明 |
 | --- | --- | --- |
-| `bun run dev` | 本地开发 | 启动本地热重载开发服务器（`docusaurus start --host 127.0.0.1 --port 5173`） |
-| `bun run build` | 静态编译 | 执行 Docusaurus SSG 静态打包至 `build/`，并自动拷贝市场头像至 `build/source/` |
-| `bun run preview` | 产物预览 | 本地静态托管 `build/` 目录（**刻意不设 SPA 兜底**，严格暴露 404 漏拷贝缺陷） |
-| `bun run typecheck` | 类型检查 | 执行 TypeScript 全量静态类型检查（`tsc --noEmit`） |
-| `bun run sync` | 市场同步 | 完整市场树与快照同步流程（串联 `sync:tree` + `sync:market`） |
-| `bun run sync:tree` | 市场镜像 | 将本地三个市场工作目录镜像写入 `market-source/` 并生成 `_files.txt` |
-| `bun run sync:market` | 快照生成 | 解析 `market-source/` 生成前端目录页数据源快照 `content/market.json` |
-| `bun run import:experts` | 专家导入 | 从上游专家市场 bundle 批量拉取专家至站外副本与存档目录 |
-| `bun run import:skills-index` | 技能索引导入 | 从 WMC 的 1889 条技能索引生成 `market-source/skills/`（只含清单与图标，不含载荷） |
-| `bun run import:index` | 专家/连接器索引导入 | 从 WMC 索引生成 `market-source/{experts,connectors}/`（只含清单与图标，不含载荷） |
-| `bun run check:docs-sync` | 文档门禁 | 双语文档结构强一致性门禁（核验标题、代码块、表格与链接对称性） |
-| `bun run test:docs-sync` | 文档测试 | 执行双语文档同步检测脚本自身的单元测试套件 |
-| `bun run check:market` | 市场门禁 | 校验市场清单重复项，并核对 `market-source/` 与 `content/market.json` 的一致性 |
-| `bun run test:market` | 市场测试 | 执行市场校验逻辑与清单算法的单元测试套件 |
-| `bun run test:market-zips` | 归档测试 | 校验确定性 Zip 压缩逻辑、CRC32 校验与大小写防撞库单测 |
-| `bun run check:release` | 发布门禁 | 站点发版综合大门禁（`check:docs-sync` + `test:*` + `check:market` + `typecheck`） |
+| `pnpm run dev` | 本地开发 | 启动本地热重载开发服务器（`docusaurus start --host 127.0.0.1 --port 5173`） |
+| `pnpm run build` | 静态编译 | 执行 Docusaurus SSG 静态打包至 `build/`，并自动拷贝市场头像至 `build/source/` |
+| `pnpm run preview` | 产物预览 | 本地静态托管 `build/` 目录（**刻意不设 SPA 兜底**，严格暴露 404 漏拷贝缺陷） |
+| `pnpm run typecheck` | 类型检查 | 执行 TypeScript 全量静态类型检查（`tsc --noEmit`） |
+| `pnpm run sync` | 市场同步 | 完整市场树与快照同步流程（串联 `sync:tree` + `sync:market`） |
+| `pnpm run sync:tree` | 市场镜像 | 将本地三个市场工作目录镜像写入 `market-source/` 并生成 `_files.txt` |
+| `pnpm run sync:market` | 快照生成 | 解析 `market-source/` 生成前端目录页数据源快照 `content/market.json` |
+| `pnpm run import:experts` | 专家导入 | 从上游专家市场 bundle 批量拉取专家至站外副本与存档目录 |
+| `pnpm run import:skills-index` | 技能索引导入 | 从 WMC 的 1889 条技能索引生成 `market-source/skills/`（只含清单与图标，不含载荷） |
+| `pnpm run import:index` | 专家/连接器索引导入 | 从 WMC 索引生成 `market-source/{experts,connectors}/`（只含清单与图标，不含载荷） |
+| `pnpm run check:docs-sync` | 文档门禁 | 双语文档结构强一致性门禁（核验标题、代码块、表格与链接对称性） |
+| `pnpm run test:docs-sync` | 文档测试 | 执行双语文档同步检测脚本自身的单元测试套件 |
+| `pnpm run check:market` | 市场门禁 | 校验市场清单重复项，并核对 `market-source/` 与 `content/market.json` 的一致性 |
+| `pnpm run test:market` | 市场测试 | 执行市场校验逻辑与清单算法的单元测试套件 |
+| `pnpm run test:market-zips` | 归档测试 | 校验确定性 Zip 压缩逻辑、CRC32 校验与大小写防撞库单测 |
+| `pnpm run check:release` | 发布门禁 | 站点发版综合大门禁（`check:docs-sync` + `test:*` + `check:market` + `typecheck`） |
 
 ---
 
@@ -170,16 +170,16 @@ agent-store-site/
 为保证站点在持续集成与长期维护中的稳定性，本仓库确立了以下几条必须严格遵守的**硬约束**：
 
 ### 1. 生成物严禁手工编辑
-- `market-source/` 是上游市场的镜像，`content/market.json` 是目录页快照。**两者只能由 `bun run sync` 写入**；
-  三个市场均为索引型：由 `bun run import:skills-index` / `bun run import:index` 生成清单与图标，不含载荷；
+- `market-source/` 是上游市场的镜像，`content/market.json` 是目录页快照。**两者只能由 `pnpm run sync` 写入**；
+  三个市场均为索引型：由 `pnpm run import:skills-index` / `pnpm run import:index` 生成清单与图标，不含载荷；
 - 两个产物强关联，必须成对提交，严禁单侧修改，否则会造成页面与静态文件映射失配；
-- 每次修改后必须跑通 `bun run check:market`。
+- 每次修改后必须跑通 `pnpm run check:market`。
 
 ### 2. 双语技术文档结构强对齐
 - `content/docs/zh-CN/` 与 `content/docs/en-US/` 必须具备完全对应的同名 Markdown 文档；
 - 翻译文案允许根据语言习惯本土化重写，但**标题层级深度、代码块数量与标注语言、表格列数、相对路由链接必须 100% 对齐**；
 - 新增或调整文档必须在 `src/lib/docOrder.ts` 中同步登记，构建期将执行严格一致性核验；
-- 提交前必须通过 `bun run check:docs-sync` 门禁。
+- 提交前必须通过 `pnpm run check:docs-sync` 门禁。
 
 ### 3. 禁止开启 Docusaurus 内置 i18n
 - 站点要求对外 URL 保留显式 `/zh-CN/` 与 `/en-US/` 路径前缀（正文中存在超百处强依赖前缀的静态链接）；
@@ -202,8 +202,8 @@ agent-store-site/
 
 ```json
 {
-  "installCommand": "bun install",
-  "buildCommand": "bun run build",
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm run build",
   "outputDirectory": "build"
 }
 ```
@@ -220,7 +220,7 @@ agent-store-site/
 每次正式发版涉及双出口发布（源仓库 `allo` 的 NPM 包与二进制发布 + 本站官网文档与 release 快照更新）：
 1. 权威发布指引以源仓库 `docs/agent-store/25-release-runbook.zh.md` 为准；
 2. 站点侧发版步骤、依赖包版本锁步规则与自检清单见 [发布流程指南](docs/release-process.md)；
-3. 发版前须确保在源仓库跑通 `bun run release:check`，并在本仓库跑通 `bun run check:release`。
+3. 发版前须确保在源仓库跑通 `pnpm run release:check`，并在本仓库跑通 `pnpm run check:release`。
 
 ---
 

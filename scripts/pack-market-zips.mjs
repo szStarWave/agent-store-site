@@ -18,9 +18,9 @@
  *     `market-hosts.json` 幂等（哪次打的、什么时候打的，问 git）。
  *
  * 用法：
- *   bun run pack:market              # 打包三个市场 + 写 market-hosts.json
- *   bun run pack:market -- --only experts
- *   bun run pack:market -- --check   # 只校验确定性（重打包比对摘要），不落盘
+ *   pnpm run pack:market              # 打包三个市场 + 写 market-hosts.json
+ *   pnpm run pack:market -- --only experts
+ *   pnpm run pack:market -- --check   # 只校验确定性（重打包比对摘要），不落盘
  */
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
@@ -147,7 +147,7 @@ async function packMarket(market, { destDir, outDir }) {
   }
   const names = (await listFiles(destDir)).slice().sort();
   if (names.length === 0) {
-    throw new Error(`${market}: 市场树里一个文件都没有（先跑 \`bun run sync:tree\`）`);
+    throw new Error(`${market}: 市场树里一个文件都没有（先跑 \`pnpm run sync:tree\`）`);
   }
   const collisions = caseCollisions(names);
   if (collisions.length) {

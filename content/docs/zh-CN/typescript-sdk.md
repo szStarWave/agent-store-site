@@ -20,10 +20,10 @@ Flowy Agent Store 提供三个分层解耦的官方 TypeScript 软件包，支�
 
 ```bash
 # 标准场景：引入 SDK 统一封装（内置 client 与进程托管能力）
-bun add @flowy-agent-store/sdk # 或 npm install @flowy-agent-store/sdk
+npm install @flowy-agent-store/sdk # 或 pnpm add @flowy-agent-store/sdk
 
 # 仅消费协议类型定义
-bun add @flowy-agent-store/protocol
+npm install @flowy-agent-store/protocol
 ```
 
 所有软件包均提供标准的 ESM 与 CommonJS 双格式产物，通过 `package.json` 的 `exports` 字段导出 TypeScript 类型定义。

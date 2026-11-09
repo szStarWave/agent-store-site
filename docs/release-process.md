@@ -9,22 +9,22 @@
 |---|---|---|
 | **官网前端**（落地页 / 兼容性矩阵） | `src/pages/`、`src/lib/platform.ts` | 客户端下载直链中的**版本号与二进制资产文件名**严格匹配 |
 | **双语技术文档站** | `content/docs/{zh-CN,en-US}/` | 与源仓库协议 wire 面严格对齐（包含协议指纹、RPC 方法计数、未发布台账） |
-| **市场源静态分发（已退役）** | 不再由本站托管；官方客户端源为 ModelScope 的 `wb-market/<market>/index.json` | `/source/**` 只保留目录页头像，`/source/*/_files.txt` 必须 404（见 §2 第 3 步）；本站门禁仍用 `bun run check:market` 守住 `market-source/` 与 `content/market.json` 自洽 |
+| **市场源静态分发（已退役）** | 不再由本站托管；官方客户端源为 ModelScope 的 `wb-market/<market>/index.json` | `/source/**` 只保留目录页头像，`/source/*/_files.txt` 必须 404（见 §2 第 3 步）；本站门禁仍用 `pnpm run check:market` 守住 `market-source/` 与 `content/market.json` 自洽 |
 | **可执行二进制分发** | GitHub Releases（由 `content/release.json` 的 `repo` 声明） | 分发的二进制产物与 npm 运行时包中的 exe **二进制字节严格同一（SHA256 完全一致）** |
 
 - **版本号单一真实源 (Single Source of Truth)**：`content/release.json`。`src/lib/platform.ts` 的下载直链构造与 `scripts/release.mjs` 中的 Git 标签与 Release 资产命名均读取该配置文件。
-- **跨仓版本锁步约束**：该版本号必须与 npm 发布的 `@flowy-agent-store/*` 套件版本保持一致。该不变量由源仓库门禁 `bun run check:release-sync` 强制校验（比对本仓 `content/release.json` 及双语 `typescript-sdk.md` 文档）。
+- **跨仓版本锁步约束**：该版本号必须与 npm 发布的 `@flowy-agent-store/*` 套件版本保持一致。该不变量由源仓库门禁 `pnpm run check:release-sync` 强制校验（比对本仓 `content/release.json` 及双语 `typescript-sdk.md` 文档）。
 
 ## 2. 站点发布标准化步骤
 
 ### 阶段 0：前置条件检查 (Preconditions)
 - 源仓库（`Michael-Lfx/allo`）与本站仓在本地同级检出。
-- 两个仓库均已完成 `bun install` 依赖安装。
+- 两个仓库均已完成 `pnpm install` 依赖安装。
 - 两个仓库工作树均为 clean 状态（无未提交的脏改动）。
 
 ### 阶段 1：双语文档同步与门禁校验
 - 根据源仓库 `25-release-runbook.zh.md` §4 清单更新 `content/docs/`：更新协议指纹、方法计数、新增 RPC 接口与错误码枚举、`changelog` §4 待发布台账、`upgrade` §8 及 `examples-sdk`。
-- **验收判据**：运行 `bun run check:docs-sync`，检查结果必须为 `0 drift`。
+- **验收判据**：运行 `pnpm run check:docs-sync`，检查结果必须为 `0 drift`。
 
 ### 阶段 2：版本号更新
 - 将 `content/release.json` 中的 `version` 字段更新为本次发布的 npm 目标版本号。
@@ -32,15 +32,15 @@
 ### 阶段 3：发布门禁全量检测
 - 执行本仓综合发布门禁脚本：
   ```bash
-  bun run check:release
+  pnpm run check:release
   ```
   门禁覆盖：文档结构同构检测、文档同步测试、市场数据一致性检测、市场打包测试及 TypeScript 全局类型检查。
 
 ### 阶段 4：GitHub Release 打包与正式发布
 ```powershell
-bun run release:pack -- --exe C:\workspace\allo\target\release\agent-store.exe --expect-sha256 <SHA256哈希>
-bun run release:publish     # 流程：创建草稿 -> 上传资产 -> 体积回读校验 -> 下载回验 -> 转为正式发布（prerelease）
-bun run release:status      # 查看发布状态与已上传资产列表
+pnpm run release:pack -- --exe C:\workspace\allo\target\release\agent-store.exe --expect-sha256 <SHA256哈希>
+pnpm run release:publish     # 流程：创建草稿 -> 上传资产 -> 体积回读校验 -> 下载回验 -> 转为正式发布（prerelease）
+pnpm run release:status      # 查看发布状态与已上传资产列表
 ```
 - `--exe` 参数必须指向源仓库构建出的可执行文件（**构建时必须启用 `--features static-webui`**，否则生成的二进制文件将缺失内置 WebUI）。
 - `--expect-sha256` 必须填入**源仓库 `web/packages/runtime/vendor/flowy-agent-store.exe` 的哈希值**，即校验发布资产与 npm 运行时内置文件完全一致。
@@ -68,9 +68,9 @@ bun run release:status      # 查看发布状态与已上传资产列表
 
 ## 3. 核心硬性约束与避坑指南
 
-1. **必须使用 `bun run build`**：严禁直接调用 `docusaurus build`。直接调用将跳过 `scripts/copy-market-tree.mjs` 执行，导致编译产物缺少头像资源，线上市场目录页头像全部降级为字母占位符（`bun run preview` 默认禁用 SPA 兜底以确保此类遗漏能被立即发现）。
+1. **必须使用 `pnpm run build`**：严禁直接调用 `docusaurus build`。直接调用将跳过 `scripts/copy-market-tree.mjs` 执行，导致编译产物缺少头像资源，线上市场目录页头像全部降级为字母占位符（`pnpm run preview` 默认禁用 SPA 兜底以确保此类遗漏能被立即发现）。
 2. **新增文档必须在 `src/lib/docOrder.ts` 完成注册**：虽然 `src/pages/` 下的页面与 docs 插件目录下的 Markdown 均支持自动化静态构建，但侧边栏渲染顺序表与磁盘文件集合强绑定。`docusaurus.config.ts` 在构建阶段执行严格一致性核验，遗漏注册将直接阻断构建。
-3. **市场树与 `content/market.json` 生成物强绑定**：二者必须通过 `bun run sync` 统一生成并成对提交，禁止人工手动篡改。常规版本发布无需重新执行市场同步，仅在发布明确涉及市场树更新时才需同步。
+3. **市场树与 `content/market.json` 生成物强绑定**：二者必须通过 `pnpm run sync` 统一生成并成对提交，禁止人工手动篡改。常规版本发布无需重新执行市场同步，仅在发布明确涉及市场树更新时才需同步。
 4. **产物规模配额约束**：EdgeOne Makers 构建平台严格限制**总文件数 ≤ 20,000** 且**单文件体积 ≤ 25 MiB**（无提额渠道）。三个市场源历史完整文件树包含 22,612 个文件且专家市场包含 45.8 MiB 数据集，全量打包必然导致构建因配额超限失败。**当前架构规范**：三个市场源已全量迁移至 ModelScope ZIP 归档存储，本站不再进行整树托管，构建产物仅保留目录页头像。构建完成时需核对 `[copy-market-tree] → build/source (N files…)` 的文件总量。
 
 ## 4. 已知系统缺口与局限

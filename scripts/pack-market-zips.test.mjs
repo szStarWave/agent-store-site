@@ -10,7 +10,7 @@
  * ZIP 规范直接解析字节。本库自己的 `crc32` 只跟已知常量比对（`hello` 的 CRC-32
  * 是 0x3610a686）。
  */
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { readFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";

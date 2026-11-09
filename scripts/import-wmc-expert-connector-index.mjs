@@ -24,9 +24,9 @@
  *   node scripts/import-wmc-expert-connector-index.mjs --source-dir D:\\dist-market
  *
  * 写完后再跑：
- *   bun run sync:tree -- --listing-only
- *   bun run sync:market
- *   bun run check:market
+ *   pnpm run sync:tree -- --listing-only
+ *   pnpm run sync:market
+ *   pnpm run check:market
  */
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";

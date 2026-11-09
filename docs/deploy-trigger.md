@@ -53,7 +53,7 @@ Token 的三种注入方式：
 
 - **非幂等**：每次调用都新建一个部署，同一次提交调用两次就有两个部署。
 - **失败不动线上**：未拿到 `UsedInProd: true` 的部署不接流量。
-- 平台按 `RepoCommitHash` 拉仓库，执行 `bun install` → `bun run build`，构建通过后自动切生产。
+- 平台按 `RepoCommitHash` 拉仓库，执行 `pnpm install` → `pnpm run build`，构建通过后自动切生产。
 - 请求超时不等于没触发：先用 §3 查最近部署，再决定是否重发。
 
 ## 3. 轮询状态 `DescribePagesDeployments`

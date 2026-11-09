@@ -3,7 +3,7 @@
  * 把 `dist-market/` 里的市场归档上传到 ModelScope，并用 `HEAD` **回验远端摘要**。
  *
  * 前提：
- *   - 先跑 `bun run pack:market`（本脚本只上传已打好、且与 `content/market-hosts.json`
+ *   - 先跑 `pnpm run pack:market`（本脚本只上传已打好、且与 `content/market-hosts.json`
  *     摘要一致的东西——绝不上传一个「和记录不符」的归档）；
  *   - `MODELSCOPE_API_TOKEN` 在环境里（ModelScope 的访问令牌）。**令牌只从环境读，
  *     绝不写进仓库、不作为命令行参数**（argv 在进程列表里是公开的）；
@@ -16,9 +16,9 @@
  * 都重下 289 MiB。所以这里把它当作上传的**验收条件**，而不是「顺便看一眼」。
  *
  * 用法：
- *   bun run publish:market                 # 上传三个市场并回验
- *   bun run publish:market -- --only experts
- *   bun run publish:market -- --verify-only  # 只回验（不依赖 ms / 令牌）
+ *   pnpm run publish:market                 # 上传三个市场并回验
+ *   pnpm run publish:market -- --only experts
+ *   pnpm run publish:market -- --verify-only  # 只回验（不依赖 ms / 令牌）
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -85,7 +85,7 @@ async function main() {
   const args = parseArgs(argv);
 
   if (!existsSync(hostsFile)) {
-    console.error("[publish-market] 缺少 content/market-hosts.json —— 先跑 `bun run pack:market`");
+    console.error("[publish-market] 缺少 content/market-hosts.json —— 先跑 `pnpm run pack:market`");
     process.exit(1);
   }
   const hosts = JSON.parse(readFileSync(hostsFile, "utf8"));
@@ -120,7 +120,7 @@ async function main() {
     if (local !== expected.sha256) {
       console.error(
         `[publish-market] ${market}: 本地归档与 market-hosts.json 不符（${local.slice(0, 12)}… ≠ ` +
-          `${expected.sha256.slice(0, 12)}…）—— 重新跑 \`bun run pack:market\``,
+          `${expected.sha256.slice(0, 12)}…）—— 重新跑 \`pnpm run pack:market\``,
       );
       failed = true;
       continue;
