@@ -10,6 +10,8 @@
     "sync:tree": "node scripts/sync-market-tree.mjs",
     "sync:market": "node scripts/sync-market-data.mjs",
     "import:experts": "node scripts/import-expert-bundles.mjs",
+    "import:skills-index": "node scripts/import-wmc-skill-index.mjs",
+    "import:index": "node scripts/import-wmc-expert-connector-index.mjs",
     "preview": "node scripts/preview.mjs",
     "serve": "docusaurus serve",
     "typecheck": "tsc --noEmit",

@@ -207,7 +207,7 @@ describe("this repository's markets", () => {
     expect(results.map((result) => result.market)).toEqual(["experts", "skills", "connectors"]);
     expect(results.flatMap((result) => result.findings)).toEqual([]);
     expect([snapshot.experts.length, snapshot.skills.length, snapshot.connectors.length]).toEqual([
-      381, 268, 228,
+      403, 1889, 476,
     ]);
   });
 

@@ -124,26 +124,41 @@ const expertAvatars = expertEntries.map((e) => {
     `${src}/avatars/avatar.png`,
     `${src}/avatar.png`,
     `${src}/icon.png`,
+    // 索引型专家市场不保留插件目录，头像放在市场根 `icons/<name>.<ext>`。
+    ...ICON_EXTS.map((ext) => `icons/${baseName(src)}.${ext}`),
   ]);
 });
 
 /**
  * 本地化的专家文案。`profession`（专家的角色）是目录页标题，`displayDescription`
  * 是简介，`tags` 是标签行；市场清单只是那些早于 locale 字段的插件的单语言兜底。
+ *
+ * 索引型市场不再有 `plugins/<name>/.codebuddy-plugin/plugin.json`，同样的三个字段
+ * 内联在清单条目里（`profession` / `displayDescription` / `tags`），优先读清单。
  */
 const expertCopy = await Promise.all(
   expertEntries.map(async (e) => {
     const plugin = await readExpertPlugin(cleanSource(e.source));
     const fallbackName = text(e.name);
     const fallbackDescription = text(e.description);
-    const describe = (lang) => pickLocale(plugin?.displayDescription, lang) || fallbackDescription;
+    const describe = (lang) =>
+      pickLocale(plugin?.displayDescription, lang) ||
+      pickLocale(e.displayDescription, lang) ||
+      fallbackDescription;
+    const tags = plugin?.tags ?? e.tags;
     return {
-      name: pickLocale(plugin?.profession, "zh") || fallbackName,
-      name_en: pickLocale(plugin?.profession, "en") || fallbackName,
+      name:
+        pickLocale(plugin?.profession, "zh") ||
+        pickLocale(e.profession, "zh") ||
+        fallbackName,
+      name_en:
+        pickLocale(plugin?.profession, "en") ||
+        pickLocale(e.profession, "en") ||
+        fallbackName,
       description_zh: describe("zh"),
       description_en: describe("en"),
-      tags_zh: pickTagLocale(plugin?.tags, "zh"),
-      tags_en: pickTagLocale(plugin?.tags, "en"),
+      tags_zh: pickTagLocale(tags, "zh"),
+      tags_en: pickTagLocale(tags, "en"),
     };
   }),
 );

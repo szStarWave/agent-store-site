@@ -22,7 +22,7 @@
 上游市场工作目录（运行时维护，非本仓库）
         │  bun run sync:tree          镜像同步 + 生成 _files.txt + 执行静态门禁校验
         ▼
-market-source/{experts,skills,connectors}/     版本库跟踪，上游目录的 1:1 镜像
+market-source/{experts,skills,connectors}/     版本库跟踪，上游目录的索引型镜像（清单 + 图标）
         │  bun run sync:market        本地离线解析，提取目录页数据快照
         ▼
 content/market.json                            版本库跟踪，前端目录页消费的结构化数据源
@@ -35,9 +35,13 @@ content/market.json                            版本库跟踪，前端目录页
 | 路径 | 角色定义 | 维护职责方 |
 | --- | --- | --- |
 | 上游市场工作目录 | 原始资产源目录树 | 运行时 / 市场侧独立维护；**非本仓库** |
-| `market-source/` | 上游目录的 1:1 本地镜像，包含各市场的 `_files.txt` | 由 `sync:tree` 脚本生成，**严禁手工编辑** |
+| `market-source/` | 上游目录的本地镜像；当前三个市场均为索引型（清单 + `icons/`），并包含各市场的 `_files.txt` | 由 `sync:tree` / `import:skills-index` / `import:index` 生成，**严禁手工编辑** |
 | `content/market.json` | 官网目录页消费的精简快照数据源 | 由 `sync:market` 脚本生成，**严禁手工编辑** |
 | `build/source/` | 构建产物中目录页引用的头像图标（临时产物，不纳入版本控制） | 由 `copy-market-tree.mjs` 构建阶段生成 |
+
+> **三个市场现在都是 1:1 镜像的索引型形态**：只镜像清单与 `icons/`，不镜像
+> `plugins/<slug>/`、`skills/<slug>/`、`connectors/<slug>/` 载荷；完整载荷均在
+> ModelScope 的 `wb-market/{experts,skills,connectors}/` 归档里。见 §2.1 / §2.3 / §2.4。
 
 对外分发接口中，本站作为三个静态市场源（`source_kind: "url"`）：
 
@@ -101,6 +105,12 @@ experts/plugins/<name>/
 └── skills/…                  ← 该专家内置的技能
 ```
 
+> **当前专家市场是索引型**：`market-source/experts/` 只保留
+> `.codebuddy-plugin/marketplace.json` 与 `icons/<name>.<ext>`，不再保留 `plugins/<name>/`。
+> 本地化字段（`profession` / `displayDescription` / `tags`）内联在清单条目里，
+> 由 `bun run import:index` 从 WMC 的 `dist-market/experts/index.json` 生成；
+> 完整专家载荷在 ModelScope 的 `wb-market/experts/` 归档里。
+
 `plugin.json` 里**影响本站显示**的字段（值都是 `{ "zh": …, "en": … }` 对）：
 
 | 字段 | 作用 | 缺失时页面表现 |
@@ -110,8 +120,8 @@ experts/plugins/<name>/
 | `tags` | 卡片标签，最多取 5 个 | 无标签行 |
 | `displayName` | 人格昵称（如「吴八哥」），**本站不读** | — |
 
-图标探测顺序：`avatars/expert.png` → `avatars/avatar.png` → `avatar.png` → `icon.png`，
-都不存在则页面显示字母徽标。建议只放 `avatars/expert.png`。
+图标探测顺序：`avatars/expert.png` → `avatars/avatar.png` → `avatar.png` → `icon.png`
+→ 市场根 `icons/<name>.<ext>`，都不存在则页面显示字母徽标。索引型市场只走最后一步。
 
 清单条目（`marketplace.json`）：
 
@@ -140,10 +150,17 @@ experts/plugins/<name>/
 ### 2.3 技能
 
 ```text
-skills/skills/<slug>/        含 SKILL.md
+skills/skills/<slug>/        含 SKILL.md（当前索引型市场不落这份载荷）
 skills/icons/<slug>.<ext>    图标放在市场根，不在条目目录里
 skills/.codebuddy-skill/marketplace.json
 ```
+
+> **当前 `skills` 是索引型市场（index-only）**：`market-source/skills/` 只保留清单与
+> `icons/`，没有 `skills/<slug>/` 载荷；1889 条索引由
+> `bun run import:skills-index` 从 WMC 的 `recommend-build/market/index.json` 生成，
+> 完整技能载荷在 ModelScope 的 `wb-market/skills/` 归档里。`sync:tree` 会跳过索引型
+> 市场的默认源，`pack:market` 也会跳过它——不要去本地载荷树上跑全量 `sync` 再提交，
+> 那会把 1889 条索引换回 578 条。
 
 清单条目中影响显示的字段：
 
@@ -168,6 +185,12 @@ connectors/connectors/<slug>/      mcp.json / cli.json / token-schema.json 等
 connectors/icons/<slug>.<ext>      图标放在市场根
 connectors/.codebuddy-connector/connectors.json
 ```
+
+> **当前连接器市场是索引型**：`market-source/connectors/` 只保留
+> `.codebuddy-connector/connectors.json` 与 `icons/<member>.<ext>`，不再保留
+> `connectors/<slug>/`。中文名、英文名、简介与示例都内联在清单里，由
+> `bun run import:index` 从 WMC 的 `dist-market/connectors/index.json` 生成；
+> 完整连接器载荷在 ModelScope 的 `wb-market/connectors/` 归档里。
 
 清单条目中影响显示的字段：
 

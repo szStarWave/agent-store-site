@@ -30,7 +30,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { checkMarkets, readSnapshot } from "./check-market.mjs";
-import { listFiles, sourceRoot } from "./sync-market-tree.mjs";
+import { listFiles, MANIFESTS, sourceRoot } from "./sync-market-tree.mjs";
 import { writeZipFile } from "./lib/zip-lite.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -100,7 +100,51 @@ function parseArgs(argv) {
   return out;
 }
 
+/** 该市场是否声明为索引型（只有清单，没有 `skills/<slug>/` 载荷）。 */
+async function manifestIsIndexOnly(destDir, market) {
+  const manifestPath = path.join(destDir, MANIFESTS[market].rel);
+  if (!existsSync(manifestPath)) return false;
+  try {
+    return JSON.parse(await readFile(manifestPath, "utf8"))?.index_only === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 清单里有多少条 `source` 在树里没有载荷。
+ *
+ * 打包是发布动作：把只有索引的树打出来的 `skills.zip` 传到 ModelScope，会覆盖掉
+ * 那边带 1889 条完整载荷的归档。宁可在这里失败。
+ */
+async function missingPayloadCount(destDir, market) {
+  const manifest = MANIFESTS[market];
+  const manifestPath = path.join(destDir, manifest.rel);
+  if (!existsSync(manifestPath)) return 0;
+  let parsed;
+  try {
+    parsed = JSON.parse(await readFile(manifestPath, "utf8"));
+  } catch {
+    return 0;
+  }
+  const entries = Array.isArray(parsed[manifest.entries]) ? parsed[manifest.entries] : [];
+  let missing = 0;
+  for (const entry of entries) {
+    const source = entry?.source;
+    if (typeof source !== "string" || source.trim() === "") continue;
+    const clean = source.replace(/^\.\//, "");
+    if (!existsSync(path.join(destDir, manifest.contentRoot, clean))) missing += 1;
+  }
+  return missing;
+}
+
 async function packMarket(market, { destDir, outDir }) {
+  const missing = await missingPayloadCount(destDir, market);
+  if (missing > 0) {
+    throw new Error(
+      `${market}: ${missing} 个条目没有载荷（索引型市场不能打包成归档；完整载荷在 ModelScope 上）`,
+    );
+  }
   const names = (await listFiles(destDir)).slice().sort();
   if (names.length === 0) {
     throw new Error(`${market}: 市场树里一个文件都没有（先跑 \`bun run sync:tree\`）`);
@@ -168,9 +212,28 @@ async function main() {
   }
   await mkdir(outDir, { recursive: true });
 
+  // 索引型市场的归档不在本站构建（载荷在 ModelScope 上）。全量打包时保留台账里
+  // 它原有的摘要，不要把记录抹掉。
+  let previous = null;
+  if (existsSync(hostsFile)) {
+    try {
+      previous = JSON.parse(await readFile(hostsFile, "utf8"));
+    } catch {
+      console.warn(
+        `[pack-market] ${path.relative(siteRoot, hostsFile)} 无法解析——按本次结果重建台账；` +
+          `已有市场的摘要需要一次全量 pack:market 才能恢复`,
+      );
+    }
+  }
+
   const hosts = { host: MARKET_HOST, markets: {} };
   for (const market of markets) {
     const destDir = path.join(sourceRoot, market);
+    if (await manifestIsIndexOnly(destDir, market)) {
+      console.log(`[pack-market] ${market.padEnd(11)} index-only — 跳过打包（归档在 ModelScope）`);
+      if (previous?.markets?.[market]) hosts.markets[market] = previous.markets[market];
+      continue;
+    }
     const packed = await packMarket(market, { destDir, outDir });
     hosts.markets[market] = packed;
     const mib = (packed.bytes / 1024 / 1024).toFixed(1);
@@ -199,17 +262,6 @@ async function main() {
   // `--only` 只重打一个市场，而这份台账是**所有**市场的：读入现有记录并合并，
   // 否则另外两个市场的摘要会被抹掉（`mergeHosts` 的说明）。全量运行时本次结果就是
   // 全部，所以直接重建——记录必须恰好描述「我们打的这三个市场」，不留陈旧条目。
-  let previous = null;
-  if (args.only && existsSync(hostsFile)) {
-    try {
-      previous = JSON.parse(await readFile(hostsFile, "utf8"));
-    } catch {
-      console.warn(
-        `[pack-market] ${path.relative(siteRoot, hostsFile)} 无法解析——按本次结果重建台账；` +
-          `另外两个市场的摘要需要一次全量 pack:market 才能恢复`,
-      );
-    }
-  }
   const record = mergeHosts(previous, MARKET_HOST, hosts.markets);
   await writeFile(hostsFile, `${JSON.stringify(record, null, 2)}\n`, "utf8");
   const recorded = Object.keys(record.markets).length;

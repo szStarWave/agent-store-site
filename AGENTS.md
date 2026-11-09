@@ -16,6 +16,8 @@ Flowy Agent Store 官网：**Docusaurus 3.10**（SSG）、React 19、TypeScript 
 | `bun run check:docs-sync` | 双语文档结构门禁，改过 `content/docs/` 后必跑；`bun run test:docs-sync` 是它自身的测试。 |
 | `bun run sync` | 市场树同步（`sync:tree` + `sync:market`）。这是唯一允许写 `market-source/` 与 `content/market.json` 的入口，流程见 [市场维护](docs/market-maintenance.md)。 |
 | `bun run import:experts` | 从上游专家市场 bundle 批量获取专家到**站外副本**（`--slugs` / `--from-file` / `--dry-run` / `--archive` / `--allow-b`）。只写副本与存档，不碰生成物；用法见 [专家导入计划](docs/market-expert-import-plan.md) §9。 |
+| `bun run import:skills-index` | 用 WMC 的 1889 条技能索引重建 `market-source/skills/`（清单 + 128px 图标，无载荷）。图标压缩需 Python + Pillow，可用 `--icons copy` 复制原图。 |
+| `bun run import:index` | 用 WMC 的专家/连接器索引重建 `market-source/{experts,connectors}/`（清单 + 图标，无载荷；403 专家 / 476 连接器）。 |
 | `bun run check:market` | 市场门禁：查清单内重复登记，并核对 `market-source/` 与 `content/market.json` 是否一致（条目数、条目集合、头像文件是否存在、`_files.txt` 与树）。改过任一产物后必跑；`bun run test:market` 是它自身的测试。 |
 | `bun run check:release` | 发布门禁（站点半边）：`check:docs-sync` + `test:docs-sync` + `check:market` + `test:market` + `test:market-zips` + `typecheck`。发版时与源仓库的 `bun run release:check` 一起跑，流程见 [发布流程](docs/release-process.md)。 |
 
@@ -30,6 +32,14 @@ Flowy Agent Store 官网：**Docusaurus 3.10**（SSG）、React 19、TypeScript 
 它们是一次同步的两个产物，**必须成对提交**——只提交一个会让页面与树互相指向不存在的东西。
 市场条目的新增、修改、下架一律去上游做，不要在本仓库里改。`bun run check:market` 是这条
 约束的判据：同步门禁只看树内部，重复登记与两产物不一致都不在它的视野里。
+
+**三个市场都是索引型镜像。** `market-source/{experts,skills,connectors}/` 只保留清单与
+`icons/`（技能 1889 条 / 865 图标，专家 403 条 / 383 图标，连接器 476 条 / 460 图标），
+**没有** `plugins/<slug>/`、`skills/<slug>/`、`connectors/<slug>/` 载荷；完整载荷都在
+ModelScope 的 `wb-market/{experts,skills,connectors}/` 归档里。技能索引用
+`bun run import:skills-index` 生成；专家与连接器用 `bun run import:index` 生成。`sync:tree`
+会跳过索引型市场的默认源（避免被本地载荷树覆盖），`pack:market` 也会跳过它们（避免用
+只有索引的 zip 覆盖 ModelScope 上的完整归档）。
 
 **双语文档保持结构一致。** `content/docs/zh-CN/` 与 `en-US/` 各自要有同名页面。
 译文可以自由重写措辞，但标题层级、代码块数量与语言、表格列数、相对链接目标必须对齐，
@@ -66,7 +76,7 @@ JSON 解析并抛 `Unexpected token '<'`。
 | `content/docs/` | 站点文档（双语 Markdown），**不是**生成物；由 docs 插件直接读，正文不解析 MDX |
 | `content/market.json` | 生成物：目录页数据源 |
 | `content/release.json` | 版本号单一真源，站点 UI 与 `scripts/release.mjs` 共用同一个号 |
-| `market-source/` | 生成物：市场树镜像（约 22.6k 文件），刻意不在 `static/`，因为构建期拷贝整个静态目录会拖垮构建 |
+| `market-source/` | 生成物：市场树镜像（约 1.7k 文件；三个市场均为索引型，只有清单与图标），刻意不在 `static/`，因为构建期拷贝整个静态目录会拖垮构建 |
 | `static/` | Docusaurus 的静态目录（原 `public/`）：`install.ps1`、favicon 等 |
 | `scripts/` | 市场同步、市场与文档门禁、构建期拷贝、本地预览、发版 |
 | `docs/` | 面向维护者的中文文档，不进站点 |

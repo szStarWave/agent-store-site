@@ -86,6 +86,8 @@ bun run dev
 | `bun run sync:tree` | 市场镜像 | 将本地三个市场工作目录镜像写入 `market-source/` 并生成 `_files.txt` |
 | `bun run sync:market` | 快照生成 | 解析 `market-source/` 生成前端目录页数据源快照 `content/market.json` |
 | `bun run import:experts` | 专家导入 | 从上游专家市场 bundle 批量拉取专家至站外副本与存档目录 |
+| `bun run import:skills-index` | 技能索引导入 | 从 WMC 的 1889 条技能索引生成 `market-source/skills/`（只含清单与图标，不含载荷） |
+| `bun run import:index` | 专家/连接器索引导入 | 从 WMC 索引生成 `market-source/{experts,connectors}/`（只含清单与图标，不含载荷） |
 | `bun run check:docs-sync` | 文档门禁 | 双语文档结构强一致性门禁（核验标题、代码块、表格与链接对称性） |
 | `bun run test:docs-sync` | 文档测试 | 执行双语文档同步检测脚本自身的单元测试套件 |
 | `bun run check:market` | 市场门禁 | 校验市场清单重复项，并核对 `market-source/` 与 `content/market.json` 的一致性 |
@@ -111,10 +113,10 @@ agent-store-site/
 │   ├── market-maintenance.md   # 市场资源维护与同步排错指南
 │   ├── release-process.md      # 站点与上游源仓库协同发版流程
 │   └── deploy-trigger.md       # EdgeOne Makers 手动触发部署实操指南
-├── market-source/           # 市场树本地镜像（约 22.6k 文件，严格作为生成物受版本控制）
-│   ├── experts/             # 专家（Agent）市场清单与资源树
-│   ├── skills/              # 技能（Skill）市场清单与资源树
-│   └── connectors/          # 连接器（MCP Connector）市场清单与资源树
+├── market-source/           # 市场索引镜像（约 1.7k 文件；三个市场均只含清单与图标）
+│   ├── experts/             # 专家（Agent）市场清单与图标（索引型，无载荷树）
+│   ├── skills/              # 技能（Skill）市场清单与图标（索引型，无载荷树）
+│   └── connectors/          # 连接器（MCP Connector）市场清单与图标（索引型，无载荷树）
 ├── scripts/                 # 研发工程脚本（构建拷贝、预览、门禁、发版工具链）
 ├── src/                     # 站点应用源码
 │   ├── assets/              # 全局通用静态媒体资源（Logo、Web UI 实拍截图等）
@@ -167,6 +169,7 @@ agent-store-site/
 
 ### 1. 生成物严禁手工编辑
 - `market-source/` 是上游市场的镜像，`content/market.json` 是目录页快照。**两者只能由 `bun run sync` 写入**；
+  三个市场均为索引型：由 `bun run import:skills-index` / `bun run import:index` 生成清单与图标，不含载荷；
 - 两个产物强关联，必须成对提交，严禁单侧修改，否则会造成页面与静态文件映射失配；
 - 每次修改后必须跑通 `bun run check:market`。
 

@@ -83,6 +83,11 @@ const FILE_EXCLUDES = new Set([".DS_Store", "Thumbs.db"]);
 
 function parseArgs(argv) {
   const sources = { ...DEFAULT_SOURCES };
+  // 被显式指定的市场（环境变量或 --markets）。只有这些市场才允许覆盖 index-only 镜像；
+  // 默认源永远不碰索引型市场，否则一次 `bun run sync` 就会把 1889 条索引换成 578 条载荷树。
+  const explicit = new Set(
+    Object.keys(MANIFESTS).filter((name) => process.env[`MARKET_SRC_${name.toUpperCase()}`] !== undefined),
+  );
   let dryRun = false;
   let listingOnly = false;
   for (let i = 0; i < argv.length; i++) {
@@ -93,14 +98,18 @@ function parseArgs(argv) {
       while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) {
         const pair = argv[++i];
         const eq = pair.indexOf("=");
-        if (eq > 0) sources[pair.slice(0, eq)] = path.resolve(pair.slice(eq + 1));
+        if (eq > 0) {
+          const name = pair.slice(0, eq);
+          sources[name] = path.resolve(pair.slice(eq + 1));
+          explicit.add(name);
+        }
       }
     }
   }
-  return { sources, dryRun, listingOnly };
+  return { sources, dryRun, listingOnly, explicit };
 }
 
-const { sources, dryRun, listingOnly } = parseArgs(process.argv.slice(2));
+const { sources, dryRun, listingOnly, explicit } = parseArgs(process.argv.slice(2));
 
 /**
  * 递归列出 `dir` 下的文件，返回相对它的 POSIX 路径。
@@ -188,6 +197,9 @@ async function validate(name, destDir) {
     findings.push(`${name}: manifest is not valid JSON (${error.message})`);
     return { findings, warnings };
   }
+  // 索引型市场（如 skills）：清单有 1889 条，但没有 `skills/<slug>/` 载荷。
+  // 这是刻意形态——载荷在 ModelScope 的归档里——所以不把缺载荷当上游缺口告警。
+  const indexOnly = parsed?.index_only === true;
   const contentDir = path.join(destDir, manifest.contentRoot);
   const entries = Array.isArray(parsed[manifest.entries]) ? parsed[manifest.entries] : [];
   if (entries.length === 0) findings.push(`${name}: manifest has no "${manifest.entries}" entries`);
@@ -211,7 +223,7 @@ async function validate(name, destDir) {
     const resolved = path.join(contentDir, clean);
     if (!resolved.startsWith(destDir + path.sep)) {
       findings.push(`${label}: source "${source}" escapes the market`);
-    } else if (!existsSync(resolved)) {
+    } else if (!existsSync(resolved) && !indexOnly) {
       warnings.push(`${label}: source "${source}" ships no payload`);
     }
   }
@@ -283,6 +295,17 @@ async function relist() {
   await report(markets.map((name) => ({ name, destDir: path.join(sourceRoot, name) })));
 }
 
+/** 目标镜像是否已声明为索引型（只有清单，没有载荷）。 */
+async function manifestIsIndexOnly(destDir, name) {
+  const manifestPath = path.join(destDir, MANIFESTS[name].rel);
+  if (!existsSync(manifestPath)) return false;
+  try {
+    return JSON.parse(await readFile(manifestPath, "utf8"))?.index_only === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function main() {
   if (listingOnly) return relist();
 
@@ -295,11 +318,19 @@ export async function main() {
 
   const diffs = [];
   for (const [name, srcDir] of starts) {
+    const destDir = path.join(sourceRoot, name);
+    // 索引型市场只由 `import-wmc-skill-index.mjs` 维护；默认源是本地 578 条载荷树，
+    // 复制过来会把 1889 条索引打回 578 条。只有显式 `--markets skills=…` 才允许覆盖。
+    if (!explicit.has(name) && (await manifestIsIndexOnly(destDir, name))) {
+      console.log(`[sync-market-tree] ${name.padEnd(11)} index-only — 跳过默认源 ${srcDir}`);
+      diffs.push({ name, srcDir: null, destDir, srcFiles: [], added: [], removed: [], changed: [] });
+      continue;
+    }
     if (!existsSync(srcDir)) {
       console.error(`[sync-market-tree] source missing for ${name}: ${srcDir}`);
       process.exit(2);
     }
-    diffs.push(await diffMarket(name, srcDir, path.join(sourceRoot, name)));
+    diffs.push(await diffMarket(name, srcDir, destDir));
   }
 
   const totals = diffs.reduce(
@@ -332,12 +363,13 @@ export async function main() {
   }
 
   for (const d of diffs) {
+    if (!d.srcDir) continue;
     await prune(d.destDir, d.removed);
     await copyAll(d.srcDir, d.destDir, [...d.added, ...d.changed]);
     await writeListing(d.destDir);
   }
 
-  await report(diffs);
+  await report(diffs.map(({ name, destDir }) => ({ name, destDir })));
 }
 
 // 供 `check-market.mjs` 导入（共享清单/市场定义）。只在作为 CLI 调用时才执行镜像，

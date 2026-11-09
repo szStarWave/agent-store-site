@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="公司尽职调查">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f6fed"/>
+      <stop offset="1" stop-color="#1746c4"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="104" fill="url(#bg)"/>
+  <!-- 报告文档 -->
+  <g transform="rotate(-8 256 256)">
+    <rect x="148" y="116" width="204" height="280" rx="24" fill="#ffffff" opacity="0.96"/>
+    <rect x="180" y="156" width="120" height="18" rx="9" fill="#2f6fed" opacity="0.6"/>
+    <rect x="180" y="194" width="142" height="13" rx="6.5" fill="#9bb4e8"/>
+    <rect x="180" y="222" width="142" height="13" rx="6.5" fill="#9bb4e8"/>
+    <rect x="180" y="250" width="100" height="13" rx="6.5" fill="#9bb4e8"/>
+    <rect x="180" y="296" width="142" height="13" rx="6.5" fill="#cdd9f5"/>
+    <rect x="180" y="324" width="118" height="13" rx="6.5" fill="#cdd9f5"/>
+  </g>
+  <!-- 放大镜 -->
+  <g transform="rotate(22 300 300)">
+    <circle cx="300" cy="300" r="76" fill="#2f6fed" opacity="0.16" stroke="#ffffff" stroke-width="15"/>
+    <line x1="352" y1="352" x2="410" y2="410" stroke="#ffffff" stroke-width="24" stroke-linecap="round"/>
+  </g>
+  <!-- 核验徽标 -->
+  <circle cx="384" cy="360" r="48" fill="#22c55e"/>
+  <path d="M362 360 l15 15 l28 -30" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
