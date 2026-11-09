@@ -302,7 +302,7 @@ pnpm run dev            # http://127.0.0.1:5173
 - 判定某条是否已被收录时**精确匹配名字**，不要只按关键词：
 
   ```powershell
-  bun -e "const c=require('./content/market.json').connectors; console.log(c.filter(x=>x.name.includes('飞常准')).map(x=>x.name+'/'+x.id))"
+  node -e "const c=require('./content/market.json').connectors; console.log(c.filter(x=>x.name.includes('飞常准')).map(x=>x.name+'/'+x.id))"
   ```
 
 ### 第 5 步：提交与部署
