@@ -1,6 +1,6 @@
 {
-  "installCommand": "bun install",
-  "buildCommand": "bun run build",
+  "installCommand": "corepack pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm run build",
   "outputDirectory": "build",
   "headers": [
     {
