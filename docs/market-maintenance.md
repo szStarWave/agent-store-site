@@ -43,15 +43,18 @@ content/market.json                            版本库跟踪，前端目录页
 > `plugins/<slug>/`、`skills/<slug>/`、`connectors/<slug>/` 载荷；完整载荷均在
 > ModelScope 的 `wb-market/{experts,skills,connectors}/` 归档里。见 §2.1 / §2.3 / §2.4。
 
-对外分发接口中，本站作为三个静态市场源（`source_kind: "url"`）：
+### 对外分发接口（已退役）
 
-| 市场类别 | 元数据清单相对路径 | 文件目录树清单 |
-| --- | --- | --- |
-| 专家 (Experts) | `/source/experts/.codebuddy-plugin/marketplace.json` | `/source/experts/_files.txt` |
-| 技能 (Skills) | `/source/skills/.codebuddy-skill/marketplace.json` | `/source/skills/_files.txt` |
-| 连接器 (Connectors) | `/source/connectors/.codebuddy-connector/connectors.json` | `/source/connectors/_files.txt` |
+本站**不再**作为市场源模块对外分发清单或文件树。官方客户端源指向上游的索引型市场（ModelScope）：
 
-- **`_files.txt` 协议契约**：按行存储的 POSIX 相对路径集合（排除自身），客户端据此对整棵目录树执行增量同步。在缺乏动态枚举接口的纯静态托管架构下，该清单必须在构建前预先静态生成。
+| 市场类别 | 客户端清单（官方源） |
+| --- | --- |
+| 专家 (Experts) | `…/wb-market/experts/index.json`（每条一个 `tar.gz`） |
+| 技能 (Skills) | `…/wb-market/skills/index.json`（共享 `payload` zip + 条目 `member`） |
+| 连接器 (Connectors) | `…/wb-market/connectors/index.json`（共享 `payload` zip + 条目 `member`） |
+
+- **生产环境 `HOSTED_DEFAULT` 为空**：`/source/<market>/…` 与 `/source/<market>/_files.txt` **不对外提供**（`/source/**` 只剩目录页头像），客户端配置不应再指向它们；`release-process.md` §2 的「退役资源 404 核验」正是这条。
+- `_files.txt` 仍由 `sync:tree` 生成，但它只是**本地镜像自检与遗留 zip 打包的输入**，不再是客户端契约。`content/market-hosts.json` + `dist-market/*.zip` 同理：它们是冻结的旧归档台账，不参与发布门禁（发布门禁校验的是 ModelScope 上的 `index.json` 与 payload，WMC 侧 `wbcollect pipeline verify` / `wb-market/state.json` 是权威）。
 - **清单与 Git 跟踪范围强一致性**：清单生成逻辑依赖 `listFiles()` 扫描本地磁盘，而 `git add` 会自动过滤 `.gitignore` 规则命中的文件。若存在「磁盘存在但被 Git 忽略」的文件，该文件将写入 `_files.txt` 却无法提交进版本库，导致客户端请求时遭遇 HTTP 404，而本地开发机无法直接察觉异常。2026-09-17 曾排查修复此类问题：未锚定根目录的 `.codebuddy/` 导致专家市场产生 84 条孤立无效记录（见 §4.3 与 §7）。因此修改 `.gitignore` 时必须避免针对市场树设置宽泛规则，该约束已在 `.gitignore` 头部声明并通过 `check:market` 中的 `ignore.market-tree` 自动化门禁检验。
 
 ### 托管边界：哪些市场由本站整树托管
@@ -66,7 +69,7 @@ EdgeOne Makers 对**构建产物**设有两条硬性配额指标（源自官方�
 | `connectors` | 3,264 |
 | **全量合计** | **约 22,700** ← 超出平台配额：日志停滞于 `Checking output` 并抛出 `File count exceeds project limit.` |
 
-**当前架构基线 (doc 30)**：三个市场源已全量迁移至 ModelScope ZIP 压缩包托管（通过 `bun run pack:market` 打包并由 `bun run publish:market` 发布），本站**不再对任何市场源进行整树全量托管**，构建脚本 `copy-market-tree.mjs` 中的 `HOSTED_DEFAULT` 已配置为**空数组**。生产构建产物仅保留目录页引用的头像资源（共 648 个文件，总计约 103 MB）。
+**当前架构基线 (doc 30)**：三个市场源已全量迁移至 ModelScope 托管，且都以**索引型**发布（`wb-market/<market>/index.json` + `payload`/`entries`，由 `workbuddy-market-collect` 生成上传；站点仓 `bun run pack:market`/`publish:market` 只对应**冻结的旧 `{market}.zip`**）。本站**不再对任何市场源进行整树全量托管**，构建脚本 `copy-market-tree.mjs` 中的 `HOSTED_DEFAULT` 已配置为**空数组**。生产构建产物仅保留目录页引用的头像资源（共 1,708 个文件）。
 
 系统仍保留按需恢复整树托管的能力，修改 `HOSTED_DEFAULT` 常量即可调整生产产物范围；本地调试与测试可通过环境变量 `SITE_HOSTED_MARKETS` 临时覆盖：
 
@@ -665,6 +668,10 @@ git check-ignore -v market-source/experts/plugins/<专家>/skills/<技能>/.code
 
 > 产物体积与旧站（`build/client` 699.1 MB）不可比：三个市场已迁到 ModelScope 的 zip 归档，
 > 站点不再整树托管它们，只留目录页引用的头像。
+
+> **2026-11-09 现状**（上表为历史基线）：专家 **403** / 技能 **1,889** / 连接器 **476**，带图标 **1,708**；
+> `market-source/` 共 **1,716** 个文件（三个市场均为索引型，只含清单 + `icons/`，不含 `<slug>/` 载荷）。
+> 官方客户端源为 ModelScope 的 `wb-market/<market>/index.json`，本站不再托管市场树。
 
 > **2026-09-17 更正**：此前记的 22,696 含 84 个只存在于同步机磁盘、进不了提交的文件
 > （4 个专家的 `skills/fbs-bookwriter/.codebuddy/{agents,providers}`）。它们从未出现在已发布

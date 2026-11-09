@@ -20,33 +20,34 @@ Flowy Agent Store 原生支持插件（Plugin）与插件市场（Marketplace）
 
 ## 2. 市场源协议与配置规范
 
-市场源通过 [`~/.agent-store/config.toml`](/zh-CN/docs/configuration) 进行声明，支持五种 `source_kind` 协议：
+市场源通过 [`~/.agent-store/config.toml`](/zh-CN/docs/configuration) 进行声明，支持六种 `source_kind` 协议：
 
 | source_kind | 声明协议格式 | 缓存更新机制 | 适用分发场景 |
 | --- | --- | --- | --- |
-| `zip` | HTTP(S) 归档地址 | HTTP `HEAD` 校验 `X-Linked-Etag`（SHA-256 内容摘要） | **官方市场标准格式**：单文件分发，单次请求同步全量元数据 |
+| `index` | HTTP(S) `index.json` 清单地址 | `index.json` 以 `X-Linked-Etag`（SHA-256 内容摘要）做增量校验，条目载荷按需下载并校验 `sha256` | **官方市场标准格式**：小体积索引 + 按需取载荷（`wb-market/<market>/index.json`） |
+| `zip` | HTTP(S) 归档地址 | HTTP `HEAD` 校验 `X-Linked-Etag`（SHA-256 内容摘要） | 第三方归档与冻结的旧版官方包：单文件分发，单次请求同步全量元数据 |
 | `url` | HTTPS/HTTP 清单目录 | 依据根目录 `_files.txt` 清单进行增量哈希比对 | 自建静态 HTTP 服务器或 CDN 托管的解包市场树 |
 | `github` | GitHub 仓库标识 | 基于 GitHub API 查询 Release 资产与归档哈希 | 借助开源仓库自动发布与分发市场组件 |
 | `git` | Git 远程仓库地址 | 基于 Git 协议执行 fetch 与 commit 变更追踪 | 团队内部私有 Git 仓库协同维护与测试 |
 | `directory` | 本地文件系统绝对路径 | 本地文件系统 mtime 与哈希监听 | 本地开发阶段的专家与技能实时调试 |
 
 ```toml
-# 官方三个市场各是一个托管在 ModelScope 上的 zip 归档；
+# 官方三个市场各是一个托管在 ModelScope 上的 index.json 索引；
 # 未声明 [default_marketplaces] 时，运行时的内置默认源就是它们
 [default_marketplaces.experts]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/experts/index.json"
 
 [default_marketplaces.skills]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/skills.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/skills/index.json"
 
 [default_marketplaces.connectors]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/connectors/index.json"
 ```
 
-- **内容摘要校验与缓存**：对于 `zip` 格式，客户端发起 HTTP `HEAD` 请求获取响应头 `X-Linked-Etag`（即归档文件 SHA-256 摘要）；摘要未变更时跳过下载，下载完成后二次校验确保文件完整性；
+- **内容摘要校验与缓存**：`index` 源先取小体积 `index.json`（HTTP `HEAD` 校验 `X-Linked-Etag`），条目载荷按需下载并按 `payload.sha256` / 条目 `sha256` 二次校验；`zip` 源仍是单归档整体下载，摘要校验逻辑同理；
 - **ModelScope 稳定下载地址**：ModelScope LFS 稳定下载地址会自动 302 重定向至附带时效签名的 CDN 节点，配置与文档中**必须始终使用官方持久稳定 URL**，禁止硬编码临时 CDN 地址；
 - **全树镜像支持**：对于 `url` / `git` / `github` / `directory` 等源类型，服务端可提供预编译的 `_files.txt`（包含相对路径清单），客户端据此同步镜像文件。
 

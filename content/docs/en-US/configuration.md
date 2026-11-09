@@ -37,17 +37,17 @@ model = "laguna-s-2.1-free"
 max_context_size = 256000
 display_name = "Laguna S 2.1 Free"
 
-# Default marketplace sources (auto-registered on first store/market call; each official market is a zip archive on ModelScope)
+# Default marketplace sources (auto-registered on first store/market call; each official market is an index.json on ModelScope)
 [default_marketplaces.experts]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/experts/index.json"
 ```
 
-> Official marketplaces (`experts` / `skills` / `connectors`) are published as single Zip archives hosted on ModelScope. Clients issue HTTP `HEAD` requests to read the `X-Linked-Etag` header (representing the sha256 archive digest), bypassing redundant downloads when unchanged and validating payload integrity upon transfer.
+> Official marketplaces (`experts` / `skills` / `connectors`) are published on ModelScope as **index-type** sources (`index.json` + a shared `payload` archive or per-entry `tar.gz`). Clients fetch the small `index.json` first (HTTP `HEAD` against `X-Linked-Etag`, the content sha256, for incremental caching), then download entry payloads on demand, verifying integrity against `payload.sha256` / per-entry `sha256`.
 
 `[default_marketplaces]` declares custom marketplace sources. Configuration rules:
 - **Override behavior**: Explicit declarations supersede built-in defaults; runtime registers only declared sources. Removing or emptying this table restores default sources.
-- **Distribution format**: Official marketplaces use single Zip archive packages; legacy `/source/<market>/...` static directory trees are deprecated.
+- **Distribution format**: Official marketplaces use index-type distribution (`source_kind = "index"`); `zip` remains a supported source kind (third-party archives and frozen legacy bundles), and the legacy `/source/<market>/...` static directory trees are deprecated.
 - **Fault tolerance**: Sync failures retain the most recent valid local snapshot without invalidating installed entries.
 
 ## Top-level fields
@@ -156,21 +156,21 @@ If the configuration file is omitted or lacks `[default_marketplaces]`, official
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `source_kind` | `string` | Protocol kind: `zip` \| `url` \| `github` \| `git` \| `directory` |
-| `source` | `string` | Target URI; `url` types recommend `_files.txt` indexing, `zip` accepts HTTP(S) URLs |
+| `source_kind` | `string` | Protocol kind: `index` \| `zip` \| `url` \| `github` \| `git` \| `directory` |
+| `source` | `string` | Target URI; `index` points to an HTTP(S) `index.json`, `zip` accepts HTTP(S) URLs |
 
 ```toml
 [default_marketplaces.experts]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/experts/index.json"
 
 [default_marketplaces.skills]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/skills.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/skills/index.json"
 
 [default_marketplaces.connectors]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/connectors/index.json"
 ```
 
 ## memory

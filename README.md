@@ -141,24 +141,26 @@ agent-store-site/
 
 ## 📦 市场资源与托管机制
 
-### 市场源规格定义
+### 市场源规格定义（对外接口已退役）
 
-站点对外部运行时（Agent Store 宿主程序）提供三类标准的市场清单入口：
+本站**不再**作为市场源对外分发清单或文件树。官方客户端（Agent Store 宿主）直接消费上游索引型市场（ModelScope）：
 
-| 市场类型 | 标识与清单文件 | 目录索引清单 |
-| --- | --- | --- |
-| 专家市场（Experts） | `/source/experts/.codebuddy-plugin/marketplace.json` | `/source/experts/_files.txt` |
-| 技能市场（Skills） | `/source/skills/.codebuddy-skill/marketplace.json` | `/source/skills/_files.txt` |
-| 连接器市场（Connectors） | `/source/connectors/.codebuddy-connector/connectors.json` | `/source/connectors/_files.txt` |
+| 市场类型 | 客户端清单（官方源） |
+| --- | --- |
+| 专家市场（Experts） | `…/wb-market/experts/index.json`（每条一个 `tar.gz`） |
+| 技能市场（Skills） | `…/wb-market/skills/index.json`（共享 `payload` zip + 条目 `member`） |
+| 连接器市场（Connectors） | `…/wb-market/connectors/index.json`（共享 `payload` zip + 条目 `member`） |
+
+生产环境 `HOSTED_DEFAULT` 为空：`/source/<market>/…` 与 `_files.txt` 不对外提供（`/source/**` 只剩目录页头像）。`market-source/` 内的 `_files.txt` 与 `content/market-hosts.json` 仅供本地镜像自检与遗留 zip 打包，不是客户端契约。
 
 ### 生产托管边界与优化
 
 1. **避免静态目录遍历风暴**：
-   - 市场源文件树（含全量历史资产约 22,600+ 文件）**严禁置于 `static/` 目录下**；
+   - 市场源镜像（当前为索引型，约 1.7k 文件；历史全量载荷曾达 22,600+ 文件）**严禁置于 `static/` 目录下**；
    - Docusaurus 在编译时会对 `static/` 执行深层全量拷贝，会导致本地开发与 CI 构建耗时剧增并耗尽内存；
-   - 本站由 `scripts/copy-market-tree.mjs` 在 `docusaurus build` 结束后，按需精准抽取市场卡片所需的图标资产（约 648 个文件）拷贝至 `build/source/`。
+   - 本站由 `scripts/copy-market-tree.mjs` 在 `docusaurus build` 结束后，按需精准抽取市场卡片所需的图标资产（约 1,708 个文件）拷贝至 `build/source/`。
 2. **ModelScope 归档解耦**：
-   - 当前官方市场完整包已迁移至 ModelScope 的 Zip 归档服务；
+   - 当前官方市场以**索引型**（`wb-market/<market>/index.json` + `payload`/`entries`）托管在 ModelScope，由 `workbuddy-market-collect` 生成上传；
    - 官网生产环境严守边缘托管平台的两项硬限制（**文件总数 ≤ 20,000**，**单文件 ≤ 25 MiB**），仅托管目录页图片与轻量元数据。
 
 ---

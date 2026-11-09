@@ -37,17 +37,17 @@ model = "laguna-s-2.1-free"
 max_context_size = 256000
 display_name = "Laguna S 2.1 Free"
 
-# 默认市场源（首次调 store/market 时自动注册；官方三个市场各是一个 ModelScope 上的 zip 归档）
+# 默认市场源（首次调 store/market 时自动注册；官方三个市场各是一个 ModelScope 上的 index.json 索引）
 [default_marketplaces.experts]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/experts/index.json"
 ```
 
-> 官方市场（`experts` / `skills` / `connectors`）采用单 Zip 归档格式托管于 ModelScope。客户端通过 HTTP `HEAD` 请求获取 `X-Linked-Etag`（内容 sha256 摘要）实现增量缓存校验；当摘要未发生变化时跳过下载，下载后通过校验 sha256 确保完整性。
+> 官方市场（`experts` / `skills` / `connectors`）以**索引型**（`index.json` + 共享 `payload` 归档或逐条目 `tar.gz`）托管于 ModelScope。客户端先取小体积的 `index.json`（HTTP `HEAD` 校验 `X-Linked-Etag` 内容 sha256 做增量缓存），条目载荷按需下载，并按 `payload.sha256` / 条目 `sha256` 校验完整性。
 
 `[default_marketplaces]` 声明自定义市场源。配置规则如下：
 - **覆盖机制**：一旦显式声明，运行时仅注册配置中指定的源，内置默认源不再加载；若需恢复默认行为，清空或删除该配置块即可。
-- **格式规范**：官方市场已切换为 Zip 单归档分发模式，已弃用历史版本中的 `/source/<market>/...` 树形静态目录。
+- **格式规范**：官方市场为索引型分发（`source_kind = "index"`）；`zip` 仍是受支持的源协议（第三方归档与冻结的旧官方包），历史 `/source/<market>/...` 树形静态目录已弃用。
 - **容灾策略**：拉取失败时保留本地最近一次有效快照，不影响既有已安装条目的索引与运行。
 
 ## 顶层字段
@@ -156,21 +156,21 @@ set Max output tokens on the <provider>/<model> model in Settings -> Models
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `source_kind` | `string` | 来源协议类型：`zip` \| `url` \| `github` \| `git` \| `directory` |
-| `source` | `string` | 目标地址；`url` 类型建议包含 `_files.txt` 索引，`zip` 类型仅接受 HTTP(S) URL |
+| `source_kind` | `string` | 来源协议类型：`index` \| `zip` \| `url` \| `github` \| `git` \| `directory` |
+| `source` | `string` | 目标地址；`index` 类型指向 HTTP(S) `index.json`，`zip` 类型仅接受 HTTP(S) URL |
 
 ```toml
 [default_marketplaces.experts]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/experts/index.json"
 
 [default_marketplaces.skills]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/skills.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/skills/index.json"
 
 [default_marketplaces.connectors]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/connectors/index.json"
 ```
 
 ## `memory`

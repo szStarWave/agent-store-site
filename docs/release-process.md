@@ -9,7 +9,7 @@
 |---|---|---|
 | **官网前端**（落地页 / 兼容性矩阵） | `src/pages/`、`src/lib/platform.ts` | 客户端下载直链中的**版本号与二进制资产文件名**严格匹配 |
 | **双语技术文档站** | `content/docs/{zh-CN,en-US}/` | 与源仓库协议 wire 面严格对齐（包含协议指纹、RPC 方法计数、未发布台账） |
-| **市场源静态分发** | `market-source/` → 线上 `/source/**` | 仅整树托管 `SITE_HOSTED_MARKETS` 所列市场源（详见 `market-maintenance.md` §1「托管边界」）；门禁满足 `bun run check:market` |
+| **市场源静态分发（已退役）** | 不再由本站托管；官方客户端源为 ModelScope 的 `wb-market/<market>/index.json` | `/source/**` 只保留目录页头像，`/source/*/_files.txt` 必须 404（见 §2 第 3 步）；本站门禁仍用 `bun run check:market` 守住 `market-source/` 与 `content/market.json` 自洽 |
 | **可执行二进制分发** | GitHub Releases（由 `content/release.json` 的 `repo` 声明） | 分发的二进制产物与 npm 运行时包中的 exe **二进制字节严格同一（SHA256 完全一致）** |
 
 - **版本号单一真实源 (Single Source of Truth)**：`content/release.json`。`src/lib/platform.ts` 的下载直链构造与 `scripts/release.mjs` 中的 Git 标签与 Release 资产命名均读取该配置文件。

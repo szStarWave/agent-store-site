@@ -20,33 +20,34 @@ Importing a plugin converts assets into standardized, reusable component definit
 
 ## 2. Marketplace Protocols & Configuration
 
-Marketplace sources are declared in [`~/.agent-store/config.toml`](/en-US/docs/configuration) across five supported `source_kind` protocols:
+Marketplace sources are declared in [`~/.agent-store/config.toml`](/en-US/docs/configuration) across six supported `source_kind` protocols:
 
 | source_kind | Source Format | Cache Verification | Target Scenario |
 | --- | --- | --- | --- |
-| `zip` | HTTP(S) archive URL | HTTP `HEAD` checks `X-Linked-Etag` (SHA-256 archive digest) | **Official marketplace standard**: single archive package, metadata synchronized in one request |
+| `index` | HTTP(S) `index.json` manifest URL | `index.json` is incrementally verified via `X-Linked-Etag` (SHA-256 content digest); entry payloads download on demand with `sha256` validation | **Official marketplace standard**: small index + on-demand payloads (`wb-market/<market>/index.json`) |
+| `zip` | HTTP(S) archive URL | HTTP `HEAD` checks `X-Linked-Etag` (SHA-256 archive digest) | Third-party archives and frozen legacy official bundles: single archive package, metadata synchronized in one request |
 | `url` | HTTPS/HTTP manifest URL | Incremental hash diffing based on root `_files.txt` manifest | Self-hosted static HTTP servers or unpacked directory trees on CDN |
 | `github` | GitHub repository identifier | Querying GitHub Releases assets and archive hashes via API | Automated open-source repository distribution |
 | `git` | Git remote repository URL | Fetching and commit tracking via standard Git protocol | Private internal Git collaboration and testing |
 | `directory` | Local filesystem absolute path | Real-time filesystem mtime and hash change detection | Local development and live debugging of experts and skills |
 
 ```toml
-# Each official market is a zip archive hosted on ModelScope;
+# Each official market is an index.json hosted on ModelScope;
 # with no [default_marketplaces] declared, these are exactly what the runtime registers
 [default_marketplaces.experts]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/experts.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/experts/index.json"
 
 [default_marketplaces.skills]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/skills.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/skills/index.json"
 
 [default_marketplaces.connectors]
-source_kind = "zip"
-source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/connectors.zip"
+source_kind = "index"
+source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/connectors/index.json"
 ```
 
-- **Content Digest Verification & Caching**: For `zip` sources, the client dispatches an HTTP `HEAD` request to inspect the `X-Linked-Etag` header (representing the sha256 archive digest), skipping re-download when unchanged and validating payload integrity upon transfer;
+- **Content Digest Verification & Caching**: An `index` source fetches the small `index.json` first (HTTP `HEAD` against `X-Linked-Etag`), then downloads entry payloads on demand with a second check against `payload.sha256` / per-entry `sha256`; a `zip` source still downloads one archive wholesale with the same digest logic;
 - **ModelScope Stable URLs**: When hosted via ModelScope LFS, stable URLs return HTTP 302 redirects to signed CDN URLs; **always configure official stable URLs in settings, never hardcode temporary signed CDN URLs**;
 - **Full Tree Mirroring**: Other source kinds (`url`, `git`, `github`, `directory`) support full file tree mirroring using a precompiled `_files.txt` manifest list.
 
