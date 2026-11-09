@@ -43,7 +43,7 @@ bun add @flowy-agent-store/protocol
 
 | 导出符号 | 类型定义与用途 |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-20"`）。建连握手时执行全等校验，跨版本不兼容 |
+| `APP_SERVER_PROTOCOL_VERSION` | 协议指纹常量（当前值为 `"fp-21"`）。建连握手时执行全等校验，跨版本不兼容 |
 | `InitializeRequest` / `InitializeResult` | 协议初始化握手载荷（交换协议版本、客户端标识及服务端能力集） |
 | `ClientInfo` / `ClientCapabilities` | 客户端身份声明（名称、版本）与能力声明（`events`、`approvals`、`team_runtime`） |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | 统一资源商店目录结构与安装回执模型 |
@@ -771,6 +771,18 @@ export interface LocalizedDisplayFields {
 4. **仅作为 UI 展示元数据**：展示字段不参与目录检索索引构建，亦不改变运行时标识（如工具命名空间 `connector__<name>__<tool>` 始终以 `name` 为准）。各子客户端的 `get` 与 `list` 接口返回的展示字段保持一致。
 
 ---
+
+#### 技能与连接器依赖（`fp-21`）
+
+自 `fp-21` 起，`StoreItem` 新增可选字段 `required_connectors?: string[]`：取值是**连接器条目的 `entry_name`**（不是 MCP server 名——两者可能不同，例如条目 `fenbi-baokao-decision` 装出来叫 `fenbi_mcp`）。它只出现在来自连接器包的技能上：这类技能可见、可搜，但**不能单独安装**，宿主会给出 `blocked_reason` 指向所属连接器；安装连接器即会带上该技能，单独安装会产生同名重复。字段缺省表示没有依赖。
+
+```ts
+/** 解析条目声明的依赖连接器条目（按 entry_name 精确匹配，跨市场）。 */
+dependencies(item: StoreItem, items?: StoreItem[]): Promise<StoreItem[]>
+```
+
+- 传入 `items` 可复用一次 `store.list()` 的结果，避免逐条请求；解析不到的声明会被跳过（连接器市场尚未同步），不抛错。
+- `store.install()` 对带 `blocked_reason` 的条目会直接抛 `StoreError("item_blocked", reason)`，**不发起任何请求**；调用方应改为引导用户安装 `dependencies()` 返回的连接器条目。
 
 #### 市场索引源与条目下载字段（`fp-20`）
 

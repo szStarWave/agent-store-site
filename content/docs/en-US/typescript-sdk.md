@@ -43,7 +43,7 @@ The protocol package serves as the definitive source of truth for wire interacti
 
 | Export symbol | Contract definition and usage |
 | --- | --- |
-| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-20"`). Enforces strict equality during handshakes |
+| `APP_SERVER_PROTOCOL_VERSION` | Protocol fingerprint constant (currently `"fp-21"`). Enforces strict equality during handshakes |
 | `InitializeRequest` / `InitializeResult` | Protocol handshake payloads exchanging protocol versions, client identities, and host capabilities |
 | `ClientInfo` / `ClientCapabilities` | Client identity declarations (name, version) and feature subscriptions (`events`, `approvals`, `team_runtime`) |
 | `StoreList` / `StoreItem` / `StoreInstallResult` | Unified catalog structures and installation receipt models |
@@ -769,6 +769,18 @@ Field consumption contract and boundaries:
 4. **Display metadata only**: Display fields are not indexed for catalogue search and do not alter runtime identities such as `connector__<name>__<tool>`. `get` and `list` methods across all subclients return identical display metadata.
 
 ---
+
+#### Skill-to-connector dependencies (`fp-21`)
+
+Starting in `fp-21`, `StoreItem` gains the optional `required_connectors?: string[]`: the values are connector **`entry_name`s** (not MCP server names — they can differ; the entry `fenbi-baokao-decision` installs a server called `fenbi_mcp`). The field appears only on skills bundled inside a connector package: they stay visible and searchable but are **not installable on their own**. The host sets `blocked_reason` pointing at the owning connector; installing that connector ships the skill, while installing the skill alone would duplicate its name. An absent field means no dependency.
+
+```ts
+/** Resolve the connector entries an item declares (exact entry_name match, cross-market). */
+dependencies(item: StoreItem, items?: StoreItem[]): Promise<StoreItem[]>
+```
+
+- Pass `items` to reuse one `store.list()` result instead of issuing a request per item. Declarations the catalogue cannot resolve (connector market not synced yet) are skipped rather than thrown.
+- `store.install()` throws `StoreError("item_blocked", reason)` for an item with `blocked_reason` and **sends no request**; route the user to install the connector returned by `dependencies()`.
 
 #### Market index sources and entry download fields (`fp-20`)
 
