@@ -22,7 +22,8 @@ The following table documents published releases, distribution tags, and breakin
 
 | Version | Published (UTC) | Current dist-tag | Substantive changes from prior release |
 | --- | --- | --- | --- |
-| `0.1.0-beta.12` | 2026-10-22T08:27:59Z | `beta` | **Breaking**: the protocol fingerprint moves from `fp-16` to `fp-18` (skipping `fp-17`; the handshake still checks strict equality, and the protocol method count and HTTP mapped-route count stay 83 / 56). `fp-17` renames `ConnectorSummary.auth_mode` to `auth_transport` (the old field is gone) and moves the "show the authorize affordance" decision onto `credential.mode` + `credential.status`; `fp-18` adds the four **optional** display fields `display_name` / `display_description` / `tags` / `quick_prompts` to expert / team / skill / connector entities (merged per locale at import from the author declaration and the market index row, then frozen, so reads issue no extra request), and the two matching `AgentDetail` fields move up to `AgentSummary`. Also ships a fingerprint-neutral catalogue search rework (`store.search` multi-term AND with three relevance buckets, `searchWithHits` / `searchInstalled` / `listStatus`) and per-entry `quick_prompts` (taken from the `examples_*` keys of the index row) (upgrade steps in §6.11) |
+| `0.1.0-beta.14` | 2026-11-09T10:41:06Z | `beta` | **Breaking**: the protocol fingerprint moves from `fp-18` to `fp-21` (skipping `fp-19` / `fp-20`; the handshake stays strict, method totals stay 83 / 56). `fp-19` adds export-face icons (`pack_format 4`), `fp-20` adds the index market source and optional `StoreItem` fields, and `fp-21` adds `StoreItem.required_connectors` for skill→connector dependencies; the host also fixes shared-payload index installs and connector `auth_mode` (upgrade steps in §6.12) |
+| `0.1.0-beta.12` | 2026-10-22T08:27:59Z | — | **Breaking**: the protocol fingerprint moves from `fp-16` to `fp-18` (skipping `fp-17`; the handshake still checks strict equality, and the protocol method count and HTTP mapped-route count stay 83 / 56). `fp-17` renames `ConnectorSummary.auth_mode` to `auth_transport` (the old field is gone) and moves the "show the authorize affordance" decision onto `credential.mode` + `credential.status`; `fp-18` adds the four **optional** display fields `display_name` / `display_description` / `tags` / `quick_prompts` to expert / team / skill / connector entities (merged per locale at import from the author declaration and the market index row, then frozen, so reads issue no extra request), and the two matching `AgentDetail` fields move up to `AgentSummary`. Also ships a fingerprint-neutral catalogue search rework (`store.search` multi-term AND with three relevance buckets, `searchWithHits` / `searchInstalled` / `listStatus`) and per-entry `quick_prompts` (taken from the `examples_*` keys of the index row) (upgrade steps in §6.11) |
 | `0.1.0-beta.11` | 2026-10-14T11:18:29Z | — | **Breaking**: Protocol fingerprint incremented to `fp-16` (spanning `fp-15`; strict equality check); adds `store/categories` for a market's category dictionary and tag vocabulary (`GET /api/app-server/store/categories`), bringing total methods to 83 and HTTP mapped routes to 56; store items carry `category_id` / the host-resolved `category`, expert and team listings carry `tags` / `category_id`, skill listings carry `tags`, and `ExpertPack` moves to `pack_format 3`; `AgentDetail`'s `tags` / `category_id` move up to `AgentSummary` (steps in §6.10) |
 | `0.1.0-beta.10` | 2026-10-12T07:31:25Z | — | **Breaking**: Protocol fingerprint incremented to `fp-14` (strict equality check); adds the WebSocket-only `import/assets` / `import/asset`, method count grows to 82 (HTTP mapped routes stay 55); the expert pack moves to `pack_format 2` (plugin-level `avatars/ bin/ scripts/` ride along, `materializePack` writes `writtenAssets`); the connector authorization callback answers only after the token exchange, `auth/status` reports `authorization_pending`, WebUI installs go through `store.install()`, and `store.findByConnector()` / `MCP_OAUTH_CLIENT_NAME` are new (upgrade steps in §6.9) |
 | `0.1.0-beta.9` | 2026-10-10T04:34:35Z | — | **Breaking**: Protocol fingerprint incremented to `fp-13` (strict equality check); adds `market/settings` / `market/settings-set` for reading and writing the market policy, bringing total methods to 80 and HTTP mapped routes to 55; adds per-source `download_on_start`, `AGENT_STORE_MARKET_DOWNLOAD` / `AGENT_STORE_CONFIG`, and bounded auto-upgrade; `exportTeam()` now exports a team's package-level skills (steps in §6.8) |
@@ -42,7 +43,7 @@ The following table documents published releases, distribution tags, and breakin
 | dist-tag | Points at today |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.11` |
+| `beta` | `0.1.0-beta.14` |
 
 ```bash
 npm view @flowy-agent-store/sdk versions dist-tags --json
@@ -50,8 +51,8 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0-beta.11", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.11", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0-beta.11", "0.1.0-beta.12", "0.1.0-beta.14", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.14", "latest": "0.1.0-beta.2" }
 }
 ```
 
@@ -251,6 +252,20 @@ pnpm run typecheck
 - **Method counts are unchanged**: 83 protocol methods, 56 HTTP mapped routes; neither `fp-17` nor `fp-18` adds or removes one. But `store.search`'s multi-term AND and three relevance buckets are a **behaviour change** (not a signature change): the same query may come back in a different order, and `search()` is no longer a single substring match;
 - **A connector's `name` is still not a display name**: it is the runtime identity and a segment of the tool namespace `connector__<name>__<tool>`; use `display_name` for titles and show a placeholder rather than falling back to `name`.
 
+### 6.12 From 0.1.0-beta.12 to 0.1.0-beta.14
+
+```bash
+npm install @flowy-agent-store/sdk@0.1.0-beta.14
+npm install @flowy-agent-store/protocol@0.1.0-beta.14
+pnpm run typecheck
+```
+
+- **Protocol fingerprint moves from `fp-18` to `fp-21`** (skipping `fp-19` / `fp-20`); the handshake stays strict, so client and runtime must be upgraded together.
+- **Export-face icons are additive**: `ExpertPack.avatar` / `assets[]` and entry `icon` are optional; `pack_format` becomes `4`, new exports use 4 while old packs remain readable by the old logic.
+- **Index markets are additive**: `StoreItem` gains `icon_url` / `download_size` / `sha256` / `available` / `unavailable_reason` / `default_init_prompt`; read them as optional (`available ?? true`).
+- **The dependency field is additive**: `StoreItem.required_connectors?: string[]`; use `client.dependencies()` or check before installing, to avoid installing a connector-bundled skill alone.
+- **No breaking renames**; method totals stay 83 / 56, so `pnpm run typecheck` should pass unchanged.
+
 ## 7. Verifying Installed Versions
 
 ```bash
@@ -266,7 +281,7 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. Artifact Diff Verification
 
-As of `0.1.0-beta.12`, repository contracts align with published packages:
+As of `0.1.0-beta.14`, repository contracts align with published packages:
 
 1. **Localized display fields on all four entity kinds — `fp-16` $\to$ `fp-18`**: the list and get faces for expert / team / skill / connector each carry `display_name` / `display_description` / `tags` / `quick_prompts` (connectors gain all four for the first time; their `name` remains the runtime identity); values merge per locale at import from `plugin.json` and the market index row, and the sibling keys `description_zh` / `description_en` of team packages are read from this release on. The `fp-17` rename of `auth_mode` to `auth_transport` ships in the same batch.
 2. **Market categories and tags end-to-end — `fp-14` $\to$ `fp-16`**: adds `store/categories` (`GET /api/app-server/store/categories`), bringing wire methods to 83 and HTTP mapped routes to 56; store items carry `category_id` and the host-resolved `category`, expert / team listings carry `tags` / `category_id`, skill listings carry `tags`, and `ExpertPack` moves to `pack_format 3`; `AgentDetail`'s `tags` / `category_id` move up to `AgentSummary`.
@@ -278,6 +293,8 @@ As of `0.1.0-beta.12`, repository contracts align with published packages:
 8. **Connector user credential system — `fp-8` $\to$ `fp-11`**: the `credential` block and `token-schema.json` declarations, `connector/credential/{get,set,clear}`, and `connector/register` (the template is the declaration); credentials are keyed per caller.
 9. **SDK pack materialization**: `exportAgent` / `exportTeam` / `materializePack`.
 10. **Two entry-version and install-state fixes**: skill and connector entry versions are no longer pinned at the `1.0.0` placeholder, and install-state writes narrow on `(snapshot_id, component_id)`.
+
+11. **This round — `fp-19` → `fp-21`**: export-face icons (`ExpertPack.avatar` / `assets[]`, entry `icon`, `pack_format 4`), the `index` market source and `StoreItem`'s `icon_url` / `download_size` / `sha256` / `available` / `unavailable_reason` / `default_init_prompt`, and skill→connector `required_connectors`; the host also fixes shared-payload index installs and connector `auth_mode`. Method totals stay 83 / 56.
 
 ### 8.1 Migrating Marketplace Sources in Existing Configurations
 
