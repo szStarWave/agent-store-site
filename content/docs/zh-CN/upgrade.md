@@ -22,7 +22,8 @@
 
 | 版本 | 发布时间（UTC） | 当前 dist-tag | 与上一版的实质差异 |
 | --- | --- | --- | --- |
-| `0.1.0-beta.14` | 2026-11-09T10:41:06Z | `beta` | **破坏性**：协议指纹由 `fp-18` 递增至 `fp-21`（跨过 `fp-19` / `fp-20`；握手严格全等，方法总数保持 83 / 56）。`fp-19` 导出面图标（`pack_format 4`）、`fp-20` 索引市场源与 `StoreItem` 可选字段、`fp-21` 技能→连接器依赖 `StoreItem.required_connectors`；宿主修复索引共享包安装与连接器 `auth_mode`（升级步骤见 §6.12） |
+| `0.1.0-beta.15` | 2026-11-11T16:29:42Z | `beta` | **加法**：协议指纹保持 `fp-21`（方法保持 83 / 56）；SDK 新增导出原地更新 `replaceExisting` 与导出前市场版本同步 `syncToMarketVersion`，并补市场发布版本守卫（升级步骤见 §6.13） |
+| `0.1.0-beta.14` | 2026-11-09T10:41:06Z | — | **破坏性**：协议指纹由 `fp-18` 递增至 `fp-21`（跨过 `fp-19` / `fp-20`；握手严格全等，方法总数保持 83 / 56）。`fp-19` 导出面图标（`pack_format 4`）、`fp-20` 索引市场源与 `StoreItem` 可选字段、`fp-21` 技能→连接器依赖 `StoreItem.required_connectors`；宿主修复索引共享包安装与连接器 `auth_mode`（升级步骤见 §6.12） |
 | `0.1.0-beta.12` | 2026-10-22T08:27:59Z | — | **破坏性**：协议指纹由 `fp-16` 递增至 `fp-18`（跨过 `fp-17`；握手仍全等校验，协议方法总数与 HTTP 路由映射数保持 83 / 56）。`fp-17` 把 `ConnectorSummary.auth_mode` 更名为 `auth_transport`（旧字段直接消失），并把「是否显示授权入口」的判断移到 `credential.mode` + `credential.status`；`fp-18` 给专家 / 专家团 / 技能 / 连接器四类实体补 `display_name` / `display_description` / `tags` / `quick_prompts` 四个**可选**展示字段（导入期按「作者声明 → 市场索引行」逐语种合并后固化，读面零额外请求），`AgentDetail` 的同两个字段上移到 `AgentSummary`。附带不换指纹的目录检索改造（`store.search` 多词 AND + 三档相关性排序、`searchWithHits` / `searchInstalled` / `listStatus`）与条目 `quick_prompts`（来自索引行 `examples_*`）（升级步骤见 §6.11） |
 | `0.1.0-beta.11` | 2026-10-14T11:18:29Z | — | **破坏性**：协议指纹递增至 `fp-16`（跨过 `fp-15`；握手全等校验）；新增 `store/categories` 市场分类字典与标签词表（`GET /api/app-server/store/categories`），方法总数扩充至 83（HTTP 路由映射数扩充至 56）；商店条目携带 `category_id` / 宿主解析的 `category`，专家与团队列表携带 `tags` / `category_id`、技能列表携带 `tags`，`ExpertPack` 升至 `pack_format 3`；`AgentDetail` 的 `tags` / `category_id` 上移到 `AgentSummary`（升级步骤见 §6.10） |
 | `0.1.0-beta.10` | 2026-10-12T07:31:25Z | — | **破坏性**：协议指纹递增至 `fp-14`（握手全等校验）；新增 WebSocket 专用接口 `import/assets` 与 `import/asset`，方法总数扩充至 82（HTTP 路由映射数保持 55）；专家包升至 `pack_format 2`（插件级资产 `avatars/ bin/ scripts/` 随包导出，`materializePack` 落盘 `writtenAssets`）；连接器授权回调页改为交换后才出结果、`auth/status` 新增 `authorization_pending`、WebUI 安装走 `store.install()`、新增 `store.findByConnector()` 与 `MCP_OAUTH_CLIENT_NAME`（升级步骤见 §6.9） |
@@ -43,7 +44,7 @@
 | dist-tag | 当前指向 |
 | --- | --- |
 | `latest` | `0.1.0-beta.2` |
-| `beta` | `0.1.0-beta.14` |
+| `beta` | `0.1.0-beta.15` |
 
 ```bash
 npm view @flowy-agent-store/sdk versions dist-tags --json
@@ -51,8 +52,8 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ```json
 {
-  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0-beta.11", "0.1.0-beta.12", "0.1.0-beta.14", "0.1.0"],
-  "dist-tags": { "beta": "0.1.0-beta.14", "latest": "0.1.0-beta.2" }
+  "versions": ["0.1.0-beta.2", "0.1.0-beta.3", "0.1.0-beta.4", "0.1.0-beta.5", "0.1.0-beta.6", "0.1.0-beta.7", "0.1.0-beta.8", "0.1.0-beta.9", "0.1.0-beta.10", "0.1.0-beta.11", "0.1.0-beta.12", "0.1.0-beta.14", "0.1.0-beta.15", "0.1.0"],
+  "dist-tags": { "beta": "0.1.0-beta.15", "latest": "0.1.0-beta.2" }
 }
 ```
 
@@ -252,6 +253,18 @@ pnpm run typecheck
 - **方法数不变**：协议方法 83、HTTP 路由映射数 56，`fp-17` 与 `fp-18` 都没有增删方法。但 `store.search` 的多词 AND 与三档相关性排序属于**行为变更**（不是签名变更）：同一个查询的返回顺序可能与旧版不同，`search()` 也不再是一次整串子串匹配；
 - **连接器的 `name` 仍不是展示名**：它是运行期标识，同时拼进工具命名空间 `connector__<name>__<tool>`；界面标题请用 `display_name`，缺席时占位而不是回落到 `name`。
 
+### 6.13 从 0.1.0-beta.14 升到 0.1.0-beta.15
+
+```bash
+npm install @flowy-agent-store/sdk@0.1.0-beta.15
+npm install @flowy-agent-store/protocol@0.1.0-beta.15
+pnpm run typecheck
+```
+
+- 协议指纹保持 `fp-21`，方法总数 83 / 56 不变，无破坏性改名或方法增删。
+- 新增 `ExportOptions.replaceExisting` 与 `syncToMarketVersion`（SDK 加法面）；旧调用方不受影响。
+- 导出只读已安装快照：换市场源后要导出新版本，先 `store.update()` 或使用 `syncToMarketVersion`；同版本内容变化需市场侧 bump `version`。
+
 ### 6.12 从 0.1.0-beta.12 升到 0.1.0-beta.14
 
 ```bash
@@ -281,7 +294,7 @@ npm view @flowy-agent-store/sdk versions dist-tags --json
 
 ## 8. 已发布产物的差异与自查方法
 
-截至 `0.1.0-beta.14`，工作区与线上发布产物保持一致：
+截至 `0.1.0-beta.15`，工作区与线上发布产物保持一致：
 
 1. **四类实体的多语言展示字段 —— `fp-16` $\to$ `fp-18`**：专家 / 专家团 / 技能 / 连接器的 list 与 get 两面各带 `display_name` / `display_description` / `tags` / `quick_prompts`（连接器首次拥有这四个字段，其 `name` 仍是运行期标识）；取值在导入期从 `plugin.json` 与市场索引行逐语种合并后固化，团队包的兄弟键 `description_zh` / `description_en` 也从本版起被读取。`fp-17` 的 `auth_mode` → `auth_transport` 改名同批发布。
 2. **市场分类与标签全链路透出 —— `fp-14` $\to$ `fp-16`**：新增 `store/categories`（`GET /api/app-server/store/categories`），协议方法总数扩充至 83、HTTP 路由映射数扩充至 56；商店条目携带 `category_id` 与宿主解析的 `category`，专家 / 团队列表携带 `tags` / `category_id`、技能列表携带 `tags`，`ExpertPack` 升至 `pack_format 3`；`AgentDetail` 的 `tags` / `category_id` 上移到 `AgentSummary`。
