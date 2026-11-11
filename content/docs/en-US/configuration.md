@@ -173,6 +173,13 @@ source_kind = "index"
 source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/connectors/index.json"
 ```
 
+> Changing only `source` under the same `[default_marketplaces.<id>]` reactivates that marketplace
+> and replaces its index and `{market_root}/<id>/live` cache, but it **does not upgrade installed
+> entries**: installed snapshots stay as they are. Use an explicit `store/update-entry` (SDK
+> `store.update(item)`) to move an installed resource to the new version; update before exporting too,
+> because export reads the installed snapshot (the SDK's `syncToMarketVersion` does this — see
+> TypeScript SDK §4.4).
+
 ## memory
 
 Configures policies for the local file-based memory system across two independent scopes:

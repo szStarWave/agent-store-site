@@ -50,6 +50,7 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 - **内容摘要校验与缓存**：`index` 源先取小体积 `index.json`（HTTP `HEAD` 校验 `X-Linked-Etag`），条目载荷按需下载并按 `payload.sha256` / 条目 `sha256` 二次校验；`zip` 源仍是单归档整体下载，摘要校验逻辑同理；
 - **ModelScope 稳定下载地址**：ModelScope LFS 稳定下载地址会自动 302 重定向至附带时效签名的 CDN 节点，配置与文档中**必须始终使用官方持久稳定 URL**，禁止硬编码临时 CDN 地址；
 - **全树镜像支持**：对于 `url` / `git` / `github` / `directory` 等源类型，服务端可提供预编译的 `_files.txt`（包含相对路径清单），客户端据此同步镜像文件。
+- **切源不自动升级已安装资源**：同一个 `[default_marketplaces.<id>]` 只改 `source` 会替换该市场的索引与 `live` 缓存，但已安装快照保持不变。要换成新版本需显式 `store/update-entry`；导出前也要先更新（SDK `syncToMarketVersion`，见 TypeScript SDK §4.4）。
 
 ---
 

@@ -50,6 +50,7 @@ source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/mast
 - **Content Digest Verification & Caching**: An `index` source fetches the small `index.json` first (HTTP `HEAD` against `X-Linked-Etag`), then downloads entry payloads on demand with a second check against `payload.sha256` / per-entry `sha256`; a `zip` source still downloads one archive wholesale with the same digest logic;
 - **ModelScope Stable URLs**: When hosted via ModelScope LFS, stable URLs return HTTP 302 redirects to signed CDN URLs; **always configure official stable URLs in settings, never hardcode temporary signed CDN URLs**;
 - **Full Tree Mirroring**: Other source kinds (`url`, `git`, `github`, `directory`) support full file tree mirroring using a precompiled `_files.txt` manifest list.
+- **Switching a source does not upgrade installed resources**: changing only `source` under the same `[default_marketplaces.<id>]` replaces that market's index and `live` cache, but installed snapshots stay unchanged. Use an explicit `store/update-entry` for a new version; update before exporting too (SDK `syncToMarketVersion`, see TypeScript SDK §4.4).
 
 ---
 
