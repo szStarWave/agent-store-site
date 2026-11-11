@@ -946,13 +946,55 @@ The SDK provides higher-level utilities to materialize expert and team configura
 
 ```ts
 /** Deconstructs and materializes specified expert and bound skills to local disk */
-export function exportAgent(client: AppServerClient, agentId: string, destDir: string): Promise<ExportResult>;
+export function exportAgent(
+  client: AppServerClient,
+  agentId: string,
+  destDir: string,
+  options?: ExportOptions,
+): Promise<ExportResult>;
 
 /** Materializes team topology, member personas, and all skills to local disk */
-export function exportTeam(client: AppServerClient, teamId: string, destDir: string, options?: ExportTeamOptions): Promise<ExportResult>;
+export function exportTeam(
+  client: AppServerClient,
+  teamId: string,
+  destDir: string,
+  teamVersion?: string,
+  options?: ExportOptions,
+): Promise<ExportResult>;
 
 /** Materializes an in-memory ExpertPack contract object into a standard directory tree */
-export function materializePack(client: AppServerClient, pack: ExpertPack, destDir: string): Promise<ExportResult>;
+export function materializePack(
+  client: AppServerClient,
+  pack: ExpertPack,
+  destDir: string,
+  options?: MaterializeOptions,
+): Promise<ExportResult>;
+
+export interface MaterializeOptions {
+  /**
+   * In-place update: write the whole pack into a sibling staging directory,
+   * then swap it into the target. Files the new pack no longer has are
+   * removed, and a failed write leaves the previous export untouched.
+   * Only an empty directory or a previous export root (top-level
+   * expert-pack.json) may be replaced.
+   */
+  replaceExisting?: boolean;
+}
+
+export interface ExportOptions extends MaterializeOptions {
+  /**
+   * Align the installed entry with the version its market advertises before
+   * exporting: find the installed item by marketplaceId + entryName; when
+   * update_available, run store.update() (the new snapshot installs before
+   * the old one is released), then fetch and export the pack.
+   * Never installs a missing entry; never overrides a same-version content
+   * change (the market must bump version).
+   */
+  syncToMarketVersion?: {
+    marketplaceId: string;
+    entryName: string;
+  };
+}
 
 export interface ExportResult {
   /** Absolute target filesystem path where assets were materialized */
@@ -996,12 +1038,31 @@ export interface DanglingSkillRef {
   /** Diagnostic error explanation (uninstalled or missing host capability) */
   error?: string;
 }
-
-export interface ExportTeamOptions {
-  /** Expected team semantic version string for consistency validation */
-  teamVersion?: string;
-}
 ```
+
+`teamVersion` is the optional 4th argument of `exportTeam` (a version pin). `replaceExisting`
+and `syncToMarketVersion` live on `ExportOptions` — see §4.4.
+
+#### Switched the market source, but the export is still the old version?
+
+**Yes — export reads the locally installed snapshot; the market source only changes the catalogue.**
+Editing `config.toml` to point at the new `index.json` and refreshing the market does not replace
+the installed expert/team. To export the new resources, update the installed entry first:
+
+```ts
+// Recommended: align the installed entry with the market's advertised version before exporting
+const result = await exportTeam(client, "wb-stock-partner-team-team", "./exported-team", undefined, {
+  replaceExisting: true,
+  syncToMarketVersion: { marketplaceId: "experts", entryName: "stock-partner-team" },
+});
+```
+
+`syncToMarketVersion` boundaries:
+
+- entry **not installed** → refuses; it never installs;
+- installed and already current → exports directly;
+- installed with `update_available` → runs `store.update()` (new snapshot installs before the old one is released), then exports;
+- the market changed content **without bumping `version`** → `update_available` is false and this option does nothing; the publisher must bump `version`, otherwise the immutable-snapshot digest conflict rejects the import (uninstall/reinstall does not help).
 
 Team export and materialization workflows are documented in [TypeScript SDK Examples](/en-US/docs/examples-sdk) §5.2.
 

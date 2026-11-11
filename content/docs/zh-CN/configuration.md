@@ -173,6 +173,11 @@ source_kind = "index"
 source = "https://www.modelscope.cn/models/me9rez/flowy-marketplace/resolve/master/wb-market/connectors/index.json"
 ```
 
+> 同一个 `[default_marketplaces.<id>]` 只改 `source` 会重新激活该市场并替换它的索引与
+> `{market_root}/<id>/live` 缓存，但**不会自动升级已安装条目**：已安装快照保持不变。要让
+> 已安装资源换成新版本，需要显式 `store/update-entry`（SDK `store.update(item)`）；导出前也要
+> 先更新，因为导出只读已安装快照（建议使用 SDK 的 `syncToMarketVersion`，见 TypeScript SDK §4.4）。
+
 ## `memory`
 
 配置本地文件型记忆系统策略。包含两个相互独立的作用域开关：

@@ -948,13 +948,51 @@ SDK 提供高阶导出工具，用于将专家与团队资产完整解构物化�
 
 ```ts
 /** 将指定专家及其所有绑定的技能解构并物化导出到本地磁盘目录 */
-export function exportAgent(client: AppServerClient, agentId: string, destDir: string): Promise<ExportResult>;
+export function exportAgent(
+  client: AppServerClient,
+  agentId: string,
+  destDir: string,
+  options?: ExportOptions,
+): Promise<ExportResult>;
 
 /** 将指定专家团队、所有成员人设及包级/成员技能完整物化导出到本地目录 */
-export function exportTeam(client: AppServerClient, teamId: string, destDir: string, options?: ExportTeamOptions): Promise<ExportResult>;
+export function exportTeam(
+  client: AppServerClient,
+  teamId: string,
+  destDir: string,
+  teamVersion?: string,
+  options?: ExportOptions,
+): Promise<ExportResult>;
 
 /** 将内存中的 ExpertPack 契约对象完整物化落盘为符合规范的资产目录树 */
-export function materializePack(client: AppServerClient, pack: ExpertPack, destDir: string): Promise<ExportResult>;
+export function materializePack(
+  client: AppServerClient,
+  pack: ExpertPack,
+  destDir: string,
+  options?: MaterializeOptions,
+): Promise<ExportResult>;
+
+export interface MaterializeOptions {
+  /**
+   * 原地更新：先在目标旁的 staging 目录写完整，再整体换入。
+   * 旧版独有、新版不再有的文件会被清掉；写失败不破坏上一版目录。
+   * 只允许替换空目录或上一次导出目录（顶层有 expert-pack.json）。
+   */
+  replaceExisting?: boolean;
+}
+
+export interface ExportOptions extends MaterializeOptions {
+  /**
+   * 导出前先把已安装条目对齐市场广告的版本：
+   * 按 marketplaceId + entryName 找到已安装条目；若 update_available，
+   * 先执行 store.update()（新版装成功才释放旧版），再取 pack 导出。
+   * 不会安装原本未安装的条目；也不解决“同版本内容变化”（需发布端 bump version）。
+   */
+  syncToMarketVersion?: {
+    marketplaceId: string;
+    entryName: string;
+  };
+}
 
 export interface ExportResult {
   /** 产物物化落盘的目标物理目录绝对路径 */
@@ -998,12 +1036,31 @@ export interface DanglingSkillRef {
   /** 错误分类原因（未安装或宿主缺少能力位） */
   error?: string;
 }
-
-export interface ExportTeamOptions {
-  /** 目标专家团队版本号（校验版本一致性） */
-  teamVersion?: string;
-}
 ```
+
+`teamVersion` 是 `exportTeam` 第 4 个参数（可选版本钉）；`ExportOptions` 里的
+`replaceExisting` 与 `syncToMarketVersion` 见 §4.4。
+
+#### 切换市场源后，导出仍然是旧版本？
+
+**是，导出只读本机已安装快照；市场源只决定商店目录。** 只把 `config.toml` 的默认源换成新的
+`index.json`、刷新市场，不会自动替换已安装的专家/团队。要导出新版本资源，必须先更新已安装条目：
+
+```ts
+// 推荐：导出前显式对齐市场广告的版本（只处理“已安装且 update_available”的条目）
+const result = await exportTeam(client, "wb-stock-partner-team-team", "./exported-team", undefined, {
+  replaceExisting: true,
+  syncToMarketVersion: { marketplaceId: "experts", entryName: "stock-partner-team" },
+});
+```
+
+`syncToMarketVersion` 的边界：
+
+- 条目**未安装** → 直接拒绝，不会顺手安装；
+- 已安装但已是最新 → 直接导出；
+- 已安装且有新版 → 先 `store.update()`（新版装成功才释放旧版），再导出；
+- 市场里**同版本改了内容** → 宿主 `update_available` 为 false，本选项无动作；发布端必须 bump `version`，
+  否则会被不可变快照的 digest 冲突拒绝（卸载重装也解决不了）。
 
 团队导出与物化实战请参阅 [TypeScript SDK 实战示例](/zh-CN/docs/examples-sdk) §5.2。
 

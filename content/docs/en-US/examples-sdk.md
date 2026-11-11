@@ -690,6 +690,35 @@ for (const conn of pack.connectors ?? []) {
 └── avatars/connectors/github.svg   ← Connector icon materialized to snapshot asset path
 ```
 
+#### 5.2.4 Exporting the new version after switching the market source
+
+Export reads the **installed snapshot**; switching the market source only refreshes the catalogue.
+To export the new resources, align the installed entry first:
+
+```ts
+// 1. Confirm the market is refreshed and the entry has a new version
+const items = await client.store.list();
+const item = items.find(
+  (i) => i.marketplace_id === "experts" && i.entry_name === "stock-partner-team",
+);
+console.log("installed:", item?.installed_version, "market:", item?.version);
+
+// 2. Update before export (only handles installed + update_available; never installs a missing entry)
+const result = await exportTeam(client, "wb-stock-partner-team-team", "./exported-team", undefined, {
+  replaceExisting: true,
+  syncToMarketVersion: { marketplaceId: "experts", entryName: "stock-partner-team" },
+});
+
+// 3. Verify the pack really came from the new snapshot
+console.log(result.pack.version, result.pack.provenance.snapshot_id);
+```
+
+Boundaries:
+
+- `syncToMarketVersion` runs `store.update()` only when `installed && update_available` (the new snapshot installs before the old one is released);
+- a missing entry is an error — it never installs;
+- if the market changes content **without bumping `version`**, `update_available` is false and this option does nothing; the publisher must bump `version`, otherwise the immutable-snapshot digest conflict rejects the import (uninstall/reinstall does not help).
+
 ### 5.3 Workspace management and reading internal skill files
 
 ```ts

@@ -680,6 +680,35 @@ for (const conn of pack.connectors ?? []) {
 └── avatars/connectors/github.svg   ← 连接器图标自动落盘至快照资产路径
 ```
 
+#### 5.2.4 切换市场源后导出新版本资源
+
+导出只读**已安装快照**；换市场源只刷新目录。要让导出拿到新版本，先对齐已安装条目：
+
+```ts
+// 1. 先确认市场已经刷新、条目有新版
+const items = await client.store.list();
+const item = items.find(
+  (i) => i.marketplace_id === "experts" && i.entry_name === "stock-partner-team",
+);
+console.log("installed:", item?.installed_version, "market:", item?.version);
+
+// 2. 导出前自动更新（只处理“已安装且有新版”；不会安装未安装的条目）
+const result = await exportTeam(client, "wb-stock-partner-team-team", "./exported-team", undefined, {
+  replaceExisting: true,
+  syncToMarketVersion: { marketplaceId: "experts", entryName: "stock-partner-team" },
+});
+
+// 3. 用包里的 version / snapshot_id 核验确实来自新快照
+console.log(result.pack.version, result.pack.provenance.snapshot_id);
+```
+
+关键边界：
+
+- `syncToMarketVersion` 只在 `installed && update_available` 时执行 `store.update()`（新版安装成功才释放旧版）；
+- 未安装的条目直接报错，不会顺手安装；
+- 市场**同版本改内容**时 `update_available` 为 false，本选项无动作；发布端必须 bump `version`，
+  否则会被不可变快照的 digest 冲突拒绝（卸载重装也解决不了）。
+
 ### 5.3 工作区管理与技能内部文件读取
 
 ```ts
