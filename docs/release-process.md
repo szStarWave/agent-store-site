@@ -1,6 +1,6 @@
 # 发布流程（本站仓规范）
 
-> 最后核对：2026-09-16  
+> 最后核对：2026-11-12
 > **权威清单以源仓库为准**：`Michael-Lfx/allo` 仓 `docs/agent-store/25-release-runbook.zh.md`（定义了 npm 四包锁步发布、本站 GitHub Release 资产生成、站点上线流程及失败回退机制）。本文档仅声明**本站仓专属执行规范与验收判据**；若两份文档发生冲突，以源仓库规范为准。
 
 ## 1. 站点仓在发布体系中的四大角色
@@ -46,14 +46,16 @@ pnpm run release:status      # 查看发布状态与已上传资产列表
 - `--expect-sha256` 必须填入**源仓库 `web/packages/runtime/vendor/flowy-agent-store.exe` 的哈希值**，即校验发布资产与 npm 运行时内置文件完全一致。
 
 ### 阶段 5：站点提交与部署触发
-1. 提交发布改动并推送至主干：
+1. 从 `origin/main` 起分支，提交并开 PR，合并到 `main`（禁止直接提交 `main`）：
    ```bash
-   git commit -am "chore(release): v<版本号>"
-   git push origin main
+   git switch -c docs/release-v<版本号> origin/main
+   git commit -am "docs(release): 发布 v<版本号>"
+   git push -u origin docs/release-v<版本号>
+   # 开 PR 并合并；随后 git switch main && git pull --ff-only
    ```
-2. **API 触发 EdgeOne Makers 构建**：自 2026-09-17 起，EdgeOne 的 GitHub Webhook 自动触发构建链路失效，且本站项目属性为 `Github` 型（CLI 产物上传通道不可用）。必须调用 EdgeOne Makers API 手动下发构建任务；具体接口规范、请求体结构与实测记录详见 [`deploy-trigger.md`](deploy-trigger.md)。
+2. 取合并后 `main` 的 40 位 sha，**API 触发 EdgeOne Makers 构建**：自 2026-09-17 起，EdgeOne 的 GitHub Webhook 自动触发构建链路失效，且本站项目属性为 `Github` 型（CLI 产物上传通道不可用）。必须调用 EdgeOne Makers API 手动下发构建任务，`RepoCommitHash` 用刚合并的 `main` sha；具体接口规范、请求体结构与实测记录详见 [`deploy-trigger.md`](deploy-trigger.md)。
 
-> ⚠️ **发布时序不变式 (Ordering Invariant)**：**必须先完成 Release 资产发布，再推送站点主分支**。`content/release.json` 一旦随站点发布生效，官网首页将立即引导用户下载新版本；若 GitHub Release 资产未处于就绪状态，将引发客户端下载 404 故障。
+> ⚠️ **发布时序不变式 (Ordering Invariant)**：**必须先完成 Release 资产发布，再合并站点发布 PR**。`content/release.json` 一旦随站点发布生效，官网首页将立即引导用户下载新版本；若 GitHub Release 资产未处于就绪状态，将引发客户端下载 404 故障。
 
 ### 阶段 6：生产部署后验收 (Verification)
 1. **SSG 预渲染检验**：直接访问 `/<lang>/docs/typescript-sdk`（中英文），确认服务端已渲染完整 HTML 正文而非客户端空容器。
